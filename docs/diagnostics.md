@@ -1,0 +1,13 @@
+- [ ] `sequence` is never null
+- [ ] `event` is never null
+- [ ] `order` is never null
+- [ ] `strata` is never null
+- [ ] `sequence` and `event` is always unique
+- [ ] `sequence` and `order` is always unique
+- [ ] `order` is an integer
+- [ ] `is_trigger` is boolean
+- [ ] `strata` is enumerated `{'train', 'test', 'valid'}`
+- [ ] every continuous field is an integer or float
+- [ ] every discrete field is an integer or string with finitely many values
+- [ ] every entity field is an integer or string
+- [ ] every datetime field is an integer or datetime
