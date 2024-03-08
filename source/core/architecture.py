@@ -13,7 +13,10 @@ from jaxtyping import Bool, Float, Int, jaxtyped
 from beartype import beartype
 from humanize import naturalsize as bytesize
 from torchdata import datapipes
-from torchdata.dataloader2 import DataLoader2, MultiProcessingReadingService
+from torch.utils.data import DataLoader
+
+from lightning.fabric.utilities.throughput import measure_flops
+
 from tdigest import TDigest
 
 from source.core.schema import Field, Hyperparameters, SPECIAL_TOKENS
@@ -98,24 +101,23 @@ def _squarify(tensor: Tensor) -> Tensor:
 
 @jaxtyped(typechecker=beartype)
 def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Tensor, Tensor]:
-    flags = []
+    is_null = []
 
     for field in fields:
         values = inputs[(field.name, "lookup")]
 
         is_padded = values.eq(getattr(SPECIAL_TOKENS, "PAD_"))
-        is_null = values.eq(getattr(SPECIAL_TOKENS, "NAN_"))
+        is_nan = values.eq(getattr(SPECIAL_TOKENS, "NAN_"))
+        is_unknown = values.eq(getattr(SPECIAL_TOKENS, "UNK_"))
 
-        # FIXME hold up... this won't work for the discrete tokens ("NULL_")
+        is_null.append(is_padded | is_nan | is_unknown)
 
-        flags.append(is_padded | is_null)
+    is_null = torch.stack(is_null, dim=-1)
 
-    flags = torch.stack(flags, dim=-1)
+    N, L, F = is_null.shape
 
-    N, L, F = flags.shape
-
-    field_mask = ~flags.view(N * L, F)
-    event_mask = ~flags.amin(-1)
+    field_mask = ~is_null.view(N * L, F)
+    event_mask = ~is_null.amin(-1)
 
     return (_squarify(field_mask), _squarify(event_mask))
 
@@ -581,7 +583,7 @@ def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
     stratas = torch.nn.ModuleDict(
         {
             "train_metrics": torch.nn.ModuleDict(),
-            "valid_metrics": torch.nn.ModuleDict(),
+            "validate_metrics": torch.nn.ModuleDict(),
             "test_metrics": torch.nn.ModuleDict(),
         }
     )
@@ -632,32 +634,27 @@ def step(
 
         if (strata == 'predict'):
             return representations
-        
-        labels = batch['labels']
 
-        loss = cross_entropy(representations, labels)
+        loss = cross_entropy(representations, batch['label'])
         log(f'{self._mode}-{strata}/loss', loss)
         
         logits = torch.nn.functional.softmax(representations)
         
         for title, metric in self.metrics[f'{strata}_metrics'].items():
-            metric(logits, labels)
+            metric(logits, batch['label'])
             log(f'{self._mode}-{strata}/{title}', metric)
         
         return loss
-        
 
 
-def dataloader(self: "SequenceModule", strata: str) -> DataLoader2:
+def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]
 
     pipe = self.pipes[strata]
     # rs = MultiProcessingReadingService(num_workers=2)
-    loader = DataLoader2(pipe) #, reading_service=rs)
-    self.loaders.append(loader)
+    self.dataloaders[strata] = loader = DataLoader(pipe, batch_size=None, num_workers=8, collate_fn=lambda x: x)
 
     return loader
-
 
 class SequenceModule(lit.LightningModule):
     def __init__(
@@ -674,6 +671,8 @@ class SequenceModule(lit.LightningModule):
         self.datapath: str | os.PathLike = datapath
 
         self.params: Hyperparameters = params
+        
+        self.lr = params.pretrain_lr
 
         self.modular_field_embedder = ModularAttributeEmbeddingSystem(params=params)
         self.field_encoder = FieldEncoder(params=params)
@@ -686,10 +685,15 @@ class SequenceModule(lit.LightningModule):
         self._mode: str = "pretrain"
         self.digests: dict[str, TDigest] = digests
 
-        self.loaders: list[DataLoader2] = []
+        self.dataloaders: dict[str, DataLoader] = {}
         self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
         
         self.example_input_array = mock(params)
+        
+        self.flops_per_batch = measure_flops(
+            self,
+            lambda: self.forward(mock(params, batch_size=1)),
+        )
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N T"], TensorDict]:
@@ -742,7 +746,7 @@ class SequenceModule(lit.LightningModule):
 
         assert stage in ["fit", "validate", "test", "predict"]
         
-        print(f'setting up for stage {stage}')
+        print(f'setting up for stage {str(stage)}')
 
         mapping = dict(
             fit=['train', 'validate'],
@@ -763,13 +767,13 @@ class SequenceModule(lit.LightningModule):
             test=['test'],
             predict=['predict'],   
         )
-
-        for loader in self.loaders:
-            loader.shutdown()
-        self.loaders.clear()
         
         for strata in mapping[stage]:
+
             del self.pipes[strata]
+
+            self.dataloader[strata].shutdown()
+            del self.dataloader[strata]
 
     train_dataloader = partialmethod(dataloader, strata="train")
     val_dataloader = partialmethod(dataloader, strata="validate")

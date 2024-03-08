@@ -14,8 +14,6 @@ def parse_field_from_ledger(ledger: pl.DataFrame, fieldreq: dict[str, str]) -> F
 
     if dtype == "discrete":
         n_levels = ledger.get_column(name).n_unique()
-        if ledger.get_column(name).null_count() > 0:
-            n_levels += 1
 
     else:
         n_levels = None

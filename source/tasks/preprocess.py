@@ -3,7 +3,7 @@ from pathlib import Path
 import flytekit as fl
 import polars as pl
 
-from source.core.schema import Field
+from source.core.schema import Field, SPECIAL_TOKENS
 
 
 @fl.task
@@ -12,11 +12,20 @@ def preprocess_ledger_to_shards(
     fields: list[Field],
     n_shards: int,
 ) -> fl.types.directory.FlyteDirectory:
+
     assert len(fields) > 0
     assert n_shards > 0
 
     def discretize(column: str) -> pl.Expr:
-        return pl.col(column).fill_null("NULL_").cast(pl.Categorical).to_physical().cast(pl.Int32).alias(column)
+
+        return (
+            pl.col(column)
+            .cast(pl.String)
+            .cast(pl.Categorical)
+            .to_physical()
+            .cast(pl.Int32)
+            .alias(column)
+        )
 
     def format(field: Field) -> pl.Expr:
         match field.dtype:
@@ -24,12 +33,17 @@ def preprocess_ledger_to_shards(
                 return pl.col(field.name)
 
             case "discrete":
-                return discretize(field.name)
-
+                return (
+                    discretize(field.name)
+                    .add(len(SPECIAL_TOKENS))
+                    .fill_null(getattr(SPECIAL_TOKENS, 'UNK_')
+                )
+)
             case "entity":
                 return pl.col(field.name)
 
     shard_size = ledger.get_column("sequence_id").unique().count() // n_shards
+
     outpath = Path(fl.current_context().working_directory) / "lifestreams"
     outpath.mkdir(exist_ok=True)
 
@@ -54,5 +68,9 @@ def preprocess_ledger_to_shards(
 
     for index, shard in enumerate(lifestreams):
         shard.write_avro(outpath / f"shard-{index}.avro", name="lifestream")
+        
+    print(shard.head())
+    
+    print(outpath)
 
     return fl.types.directory.FlyteDirectory(outpath)

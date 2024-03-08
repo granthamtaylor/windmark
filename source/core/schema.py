@@ -4,7 +4,7 @@ import re
 
 from dataclasses_json import dataclass_json
 
-tokens = ["VAL_", "NAN_", "PAD_", "MASK_"]
+tokens = ["VAL_", "NAN_", "UNK_", "PAD_", "MASK_"]
 SpecialTokens = namedtuple("SpecialTokens", tokens)
 SPECIAL_TOKENS = SpecialTokens(*list(range(len(tokens))))
 
@@ -72,11 +72,11 @@ class Hyperparameters:
 
     # architecture hyperparameters
     batch_size: int = 64
-    n_context: int = 32
+    n_context: int = 8
     n_targets: int = 2
     p_mask_event: float = 0.0
     p_mask_field: float = 0.0
-    d_field: int = 32
+    d_field: int = 12
     n_heads_field_encoder: int = 4
     n_layers_field_encoder: int = 1
     n_heads_event_encoder: int = 4
@@ -89,14 +89,14 @@ class Hyperparameters:
 
     # pretraining hyperparameters
     pretrain_lr: float = 0.0001
-    pretrain_sample_rate: float = 0.01
+    pretrain_sample_rate: float = 0.001
     pretrain_val_interval: int = 8
 
     # finetuning hyperparameters
     finetune_lr: float = 0.00001
     finetune_head_lr_ratio: float = 10.0
-    finetune_sample_rate: float = 0.01
-    finetune_interpolation_rate: float = 0.1
+    finetune_sample_rate: float = 0.1
+    finetune_interpolation_rate: float = 0.001
     finetune_val_interval: int = 2
 
     def __post_init__(self):

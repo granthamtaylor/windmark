@@ -2,6 +2,7 @@ import os
 import random
 from typing import Sequence
 from functools import partial
+from dataclasses import replace
 
 import fastparquet
 import polars as pl
@@ -105,7 +106,7 @@ def collate(
             out[(field.name, "lookup")] = pad(torch.tensor(indicators), pad=padding, value=PAD_)
 
         if field.dtype in ["discrete", "entity"]:
-            lookup = np.array(observation[field.name], dtype=int) + len(SPECIAL_TOKENS)
+            lookup = np.array(observation[field.name], dtype=int)
             out[(field.name, "lookup")] = pad(torch.tensor(lookup), pad=padding, value=PAD_)
 
     out["label"] = torch.tensor(observation["label"])
@@ -159,34 +160,37 @@ def mask(batch: TensorDict, params: Hyperparameters) -> tuple[TensorDict, Tensor
     return masked, targets
 
 
-def mock(params: Hyperparameters) -> TensorDict:
+def mock(params: Hyperparameters, **overrides: float|int) -> TensorDict:
+    
+    _params = replace(params, **overrides)
+    
     data = {}
 
-    N = params.batch_size
-    L = params.n_context
+    N = _params.batch_size
+    L = _params.n_context
 
     is_padded = torch.arange(L).expand(N, L).lt(torch.randint(1, L, [N]).unsqueeze(-1)).bool()
 
-    for field in params.fields:
+    for field in _params.fields:
         match field.dtype:
             case "continuous":
                 indicators = torch.randint(0, len(SPECIAL_TOKENS), (N, L))
-                indicators = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), indicators)
+                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), indicators)
 
-                is_empty = indicators.eq(getattr(SPECIAL_TOKENS, "VAL_")).long()
+                is_empty = padded.eq(getattr(SPECIAL_TOKENS, "VAL_")).long()
 
-                data[(field.name, "lookup")] = indicators
+                data[(field.name, "lookup")] = padded
                 data[(field.name, "values")] = torch.rand(N, L).mul(is_empty)
 
             case "discrete":
                 values = torch.randint(0, field.n_levels + len(SPECIAL_TOKENS), (N, L))
-                values = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
-                data[(field.name, "lookup")] = values
+                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
+                data[(field.name, "lookup")] = padded
 
             case "entity":
                 values = torch.randint(0, L + len(SPECIAL_TOKENS), (N, L))
-                values = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
-                data[(field.name, "lookup")] = values
+                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
+                data[(field.name, "lookup")] = padded
 
         data[(field.name, "dtype")] = field.dtype
 
@@ -218,6 +222,7 @@ def stream(
     )
 
     for field in params.fields:
+
         if field.dtype == "continuous":
             dp = dp.map(partial(cdf, field=field, digests=digests))
 
@@ -235,7 +240,7 @@ def stream(
     if mode == "pretrain":
         dp = dp.map(partial(mask, params=params))
 
-    return dp
+    return dp.prefetch()
 
 
 class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
