@@ -1,33 +1,33 @@
-import os
 import math
+import os
 from collections import OrderedDict
-from functools import partialmethod, partial
+from functools import partial, partialmethod
+from dataclasses import asdict
 
+import lightning.pytorch as lit
 import torch
 import torchmetrics
-from torch.nn.functional import cross_entropy
-from torch import Tensor
-import lightning.pytorch as lit
-from tensordict import TensorDict
-from jaxtyping import Bool, Float, Int, jaxtyped
 from beartype import beartype
 from humanize import naturalsize as bytesize
-from torchdata import datapipes
-from torch.utils.data import DataLoader
-
+from jaxtyping import Bool, Float, Int, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
-
+from lightning.pytorch.trainer.states import TrainerFn as StageName
 from tdigest import TDigest
+from tensordict import TensorDict
+from torch import Tensor
+from torch.nn.functional import cross_entropy
+from torch.utils.data import DataLoader
+from torchdata import datapipes
 
-from source.core.schema import Field, Hyperparameters, SPECIAL_TOKENS
-from source.core.iterops import stream, mock
+from source.core.iterops import mock, stream
+from source.core.schema import SPECIAL_TOKENS, Field, Hyperparameters
+from source.core.finetune import LabelBalancer
 
 
 def complexity(params: Hyperparameters) -> int:
-
     # as per https://pytorch.org/docs/stable/generated/torch.nn.TransformerEncoderLayer.html
     D_FFN = 2048
-    
+
     # pretty good assumption you are using FP16 or BF16
     FP_PRECISION = 16
 
@@ -63,7 +63,7 @@ def complexity(params: Hyperparameters) -> int:
 
         memory = batch_size * max_seq_len * (8 * d_hidden + d_ffn)
         memory += batch_size * n_heads * max_seq_len * max_seq_len
-        
+
         # the "3" comes from forward prop, backward prop, and general model overhead
         memory *= 3 * n_blocks * precision
 
@@ -505,7 +505,7 @@ class EventDecoder(torch.nn.Module):
             projected = projection(permuted)
             events[field] = torch.nn.functional.softmax(projected, dim=1)
 
-        # N L ?
+        # N, L, ?
         return TensorDict(events, batch_size=N)
 
 
@@ -599,11 +599,11 @@ def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
 
 def step(
     self: "SequenceModule",
-    batch: TensorDict|tuple[TensorDict, TensorDict],
+    batch: TensorDict | tuple[TensorDict, TensorDict],
     strata: str,
 ) -> Tensor | TensorDict:
     assert strata in ["train", "validate", "test", "predict"]
-    
+
     log = partial(
         self.log,
         on_step=False,
@@ -615,7 +615,7 @@ def step(
         masked, targets = batch
         _, reconstruction = self(masked)
 
-        if (strata == 'predict'):
+        if strata == "predict":
             return reconstruction
 
         losses = []
@@ -623,38 +623,41 @@ def step(
         for field in self.params.fields:
             loss = cross_entropy(reconstruction[field.name], targets[field.name])
             losses.append(loss)
-            log(f'{self._mode}-{strata}/{field.name}-loss', loss)
+            log(f"{self._mode}-{strata}/{field.name}-loss", loss)
 
         total_loss = torch.stack(losses).sum()
-        log(f'{self._mode}-{strata}/loss', total_loss)
+        log(f"{self._mode}-{strata}/loss", total_loss)
         return total_loss
 
     elif self._mode == "finetune":
         representations, _ = self(batch)
 
-        if (strata == 'predict'):
+        if strata == "predict":
             return representations
 
-        loss = cross_entropy(representations, batch['label'])
-        log(f'{self._mode}-{strata}/loss', loss)
-        
+        loss = cross_entropy(representations, batch["label"], weight=self.balancer.weight)
+        log(f"{self._mode}-{strata}/loss", loss)
+
         logits = torch.nn.functional.softmax(representations)
-        
-        for title, metric in self.metrics[f'{strata}_metrics'].items():
-            metric(logits, batch['label'])
-            log(f'{self._mode}-{strata}/{title}', metric)
-        
+
+        for title, metric in self.metrics[f"{strata}_metrics"].items():
+            metric(logits, batch["label"])
+            log(f"{self._mode}-{strata}/{title}", metric)
+
         return loss
 
 
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]
 
+    print(f"creating dataloader for strata {strata}")
+
     pipe = self.pipes[strata]
-    # rs = MultiProcessingReadingService(num_workers=2)
-    self.dataloaders[strata] = loader = DataLoader(pipe, batch_size=None, num_workers=8, collate_fn=lambda x: x)
+    loader = DataLoader(pipe, batch_size=None, num_workers=8, collate_fn=lambda x: x)
+    self.dataloaders[strata] = loader
 
     return loader
+
 
 class SequenceModule(lit.LightningModule):
     def __init__(
@@ -662,6 +665,7 @@ class SequenceModule(lit.LightningModule):
         datapath: str | os.PathLike,
         params: Hyperparameters,
         digests: dict[str, TDigest],
+        balancer: LabelBalancer,
     ):
         super().__init__()
 
@@ -671,7 +675,8 @@ class SequenceModule(lit.LightningModule):
         self.datapath: str | os.PathLike = datapath
 
         self.params: Hyperparameters = params
-        
+        self.save_hyperparameters(asdict(params))
+
         self.lr = params.pretrain_lr
 
         self.modular_field_embedder = ModularAttributeEmbeddingSystem(params=params)
@@ -684,16 +689,14 @@ class SequenceModule(lit.LightningModule):
 
         self._mode: str = "pretrain"
         self.digests: dict[str, TDigest] = digests
+        self.balancer = balancer
 
         self.dataloaders: dict[str, DataLoader] = {}
         self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
-        
+
         self.example_input_array = mock(params)
-        
-        self.flops_per_batch = measure_flops(
-            self,
-            lambda: self.forward(mock(params, batch_size=1)),
-        )
+
+        self.flops_per_batch = measure_flops(self, lambda: self.forward(mock(params, batch_size=1)))
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N T"], TensorDict]:
@@ -720,12 +723,13 @@ class SequenceModule(lit.LightningModule):
         return predictions, reconstructions
 
     def configure_optimizers(self) -> torch.optim.AdamW:
-        
+        print("configuring optimizer")
+
         if self._mode == "pretrain":
             lr = self.params.pretrain_lr
         elif self._mode == "finetune":
             lr = self.params.finetune_lr
-        
+
         return torch.optim.AdamW(self.parameters(), lr=lr)
 
     def complexity(self, format: bool = False) -> str | int:
@@ -741,35 +745,36 @@ class SequenceModule(lit.LightningModule):
     testing_step = partialmethod(step, strata="test")
     predict_step = partialmethod(step, strata="predict")
 
-    def setup(self, stage: str):
-        pipe = partial(stream, datapath=self.datapath, mode=self._mode, digests=self.digests, params=self.params)
+    def setup(self, stage: StageName):
+        pipe = partial(stream, datapath=self.datapath, mode=self._mode, digests=self.digests, params=self.params, balancer=self.balancer)
 
         assert stage in ["fit", "validate", "test", "predict"]
-        
-        print(f'setting up for stage {str(stage)}')
+
+        print(f"setting up for stage {stage.value}")
 
         mapping = dict(
-            fit=['train', 'validate'],
-            validate=['validate'],
-            test=['test'],
-            predict=['predict'],   
+            fit=["train", "validate"],
+            validate=["validate"],
+            test=["test"],
+            predict=["predict"],
         )
 
         for strata in mapping[stage]:
             self.pipes[strata] = pipe(masks="*.avro")
 
-    def teardown(self, stage: str):
+    def teardown(self, stage: StageName):
         assert stage in ["fit", "validate", "test", "predict"]
-        
-        mapping = dict(
-            fit=['train', 'validate'],
-            validate=['validate'],
-            test=['test'],
-            predict=['predict'],   
-        )
-        
-        for strata in mapping[stage]:
 
+        print(f"tearing down for stage {stage.value}")
+
+        mapping = dict(
+            fit=["train", "validate"],
+            validate=["validate"],
+            test=["test"],
+            predict=["predict"],
+        )
+
+        for strata in mapping[stage]:
             del self.pipes[strata]
 
             self.dataloader[strata].shutdown()
@@ -787,4 +792,7 @@ class SequenceModule(lit.LightningModule):
     @mode.setter
     def mode(self, mode: str):
         assert mode in ["pretrain", "finetune"]
+
+        print(f"setting mode to {mode}")
+
         self._mode = mode

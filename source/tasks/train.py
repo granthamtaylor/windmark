@@ -15,19 +15,21 @@ from lightning.pytorch.callbacks import (
     # ThroughputMonitor,
 )
 
-from source.core import Hyperparameters, SequenceModule
+from source.core import Hyperparameters, SequenceModule, LabelBalancer
 
 @fk.task(requests=fk.Resources(cpu="16", mem="8Gi"))
 def train_sequence_encoder(
     dataset: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
     digests: list[dict[str, TDigest]],
+    balancer: LabelBalancer,
 ) -> SequenceModule:
 
     module = SequenceModule(
         datapath=dataset.path,
         params=params,
         digests=join(digests),
+        balancer=balancer,
     )
     
     root = Path(fk.current_context().working_directory) / "checkpoints"
@@ -40,7 +42,7 @@ def train_sequence_encoder(
             # SpikeDetection(),
             LearningRateFinder(),
             DeviceStatsMonitor(),
-            EarlyStopping(monitor='pretrain-validate/loss'),
+            # EarlyStopping(monitor='pretrain-validate/loss'),
             ModelSummary(4),
             pretrain := ModelCheckpoint(),
             # ThroughputMonitor(lambda x: x[0].batch_size[0]),
@@ -58,7 +60,7 @@ def train_sequence_encoder(
             # SpikeDetection(),
             LearningRateFinder(),
             DeviceStatsMonitor(),
-            EarlyStopping(monitor='finetune-validate/loss'),
+            # EarlyStopping(monitor='finetune-validate/loss'),
             ModelSummary(4),
             finetune := ModelCheckpoint(),
             # ThroughputMonitor(lambda x: x.batch_size[0]),            

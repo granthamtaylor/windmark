@@ -8,6 +8,7 @@ from source.tasks import (
     parse,
     preprocess,
     parameterize,
+    rebalance,
     train,
     export,
 )
@@ -32,9 +33,12 @@ def pipeline():
 
     lifestreams = preprocess(ledger=df, fields=fields, n_shards=10)
 
+    balancer = rebalance(ledger=df, kappa=0.1)
+
     params = parameterize(fields=fields, params={})
 
-    module = train(dataset=lifestreams, params=params, digests=digests)
+    module = train(dataset=lifestreams, params=params, digests=digests, balancer=balancer)
+    
     
     # export(module=module)
 

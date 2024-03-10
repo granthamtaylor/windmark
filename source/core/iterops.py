@@ -17,7 +17,7 @@ from msgspec import json
 import lightning.pytorch as lit
 
 from source.core.schema import SPECIAL_TOKENS, Hyperparameters, Field
-
+from source.core.finetune import LabelBalancer
 
 def read(filename):
     with open(filename, "rb") as f:
@@ -27,15 +27,24 @@ def read(filename):
     return records
 
 
-def sample(sequence: dict, params: Hyperparameters) -> list[dict[str, int | float | None]]:
+def sample(
+    sequence: dict,
+    params: Hyperparameters,
+    balancer: LabelBalancer
+) -> list[dict[str, int | float | None]]:
+
     sequence_id = sequence["sequence_id"]
     observations: list[dict[str, int | float | None]] = []
 
     for event in range(sequence["size"]):
+
         if (label := sequence["target"][event]) is None:
             continue
 
         if params.pretrain_sample_rate < random.random():
+            continue
+
+        if balancer.thresholds[label] < random.random():
             continue
 
         window = slice(max(0, event - params.n_context), event)
@@ -203,6 +212,7 @@ def stream(
     masks: str,
     digests: dict[str, TDigest],
     params: Hyperparameters,
+    balancer: LabelBalancer,
 ) -> datapipes.iter.IterDataPipe:
     assert mode in ["pretrain", "finetune"]
 
@@ -212,7 +222,7 @@ def stream(
         .sharding_filter()
         .flatmap(read)
         .shuffle()
-        .flatmap(partial(sample, params=params))
+        .flatmap(partial(sample, params=params, balancer=balancer))
     )
 
     entity_hasher = partial(
