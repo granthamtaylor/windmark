@@ -1,5 +1,5 @@
 train:
-  @poetry run pyflyte run source/pipelines/workflow.py pipeline
+  @poetry run pyflyte --verbose run source/pipelines/workflow.py pipeline 
 
 check:
   @git add .
@@ -10,6 +10,9 @@ doc:
 
 test:
   @poetry run pytest ./source/tests
+
+tensorboard:
+  @poetry run tensorboard --logdir ./logs --host localhost --port 8888
 
 # cov:
 #   @poetry run pytest --cov=myproj ./source/tests

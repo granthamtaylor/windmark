@@ -2,11 +2,12 @@ from pathlib import Path
 
 import flytekit as fk
 from funcy import join
+import torch
 from tdigest import TDigest
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import (
     ModelSummary,
-    LearningRateFinder,
+    # LearningRateFinder,
     DeviceStatsMonitor,
     EarlyStopping,
     ModelCheckpoint
@@ -14,16 +15,19 @@ from lightning.pytorch.callbacks import (
     # OnExceptionCheckpoint,
     # ThroughputMonitor,
 )
+from lightning.pytorch.loggers import TensorBoardLogger
 
 from source.core import Hyperparameters, SequenceModule, LabelBalancer
 
-@fk.task(requests=fk.Resources(cpu="16", mem="8Gi"))
+@fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
 def train_sequence_encoder(
     dataset: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
     digests: list[dict[str, TDigest]],
     balancer: LabelBalancer,
 ) -> SequenceModule:
+    
+    assert torch.cuda.is_available()
 
     module = SequenceModule(
         datapath=dataset.path,
@@ -34,13 +38,19 @@ def train_sequence_encoder(
     
     root = Path(fk.current_context().working_directory) / "checkpoints"
     root.mkdir()
+    
+    logger = TensorBoardLogger("logs", name="windmark")
 
     trainer = Trainer(
+        logger=logger,
         default_root_dir=root/'pretrain',
-        accelerator="cpu",
+        accelerator="auto",
+        devices="auto",
+        strategy="auto",
+        precision="bf16",
         callbacks = [
             # SpikeDetection(),
-            LearningRateFinder(),
+            # LearningRateFinder(),
             DeviceStatsMonitor(),
             # EarlyStopping(monitor='pretrain-validate/loss'),
             ModelSummary(4),
@@ -54,11 +64,15 @@ def train_sequence_encoder(
 
     module.mode = 'finetune'
     trainer = Trainer(
+        logger=logger,
         default_root_dir=root/'finetune',
-        accelerator="cpu",
+        accelerator="auto",
+        devices="auto",
+        strategy="auto",
+        precision="bf16",
         callbacks=[
             # SpikeDetection(),
-            LearningRateFinder(),
+            # LearningRateFinder(),
             DeviceStatsMonitor(),
             # EarlyStopping(monitor='finetune-validate/loss'),
             ModelSummary(4),

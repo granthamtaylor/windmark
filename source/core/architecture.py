@@ -329,6 +329,10 @@ class FieldEncoder(torch.nn.Module):
         """
 
         super().__init__()
+        
+        
+        identity = torch.eye(params.n_fields).bool().unsqueeze(0)
+        self.register_buffer('identity', identity)
 
         self.H = params.n_heads_field_encoder
 
@@ -369,7 +373,7 @@ class FieldEncoder(torch.nn.Module):
         batched += self.positional().unsqueeze(dim=0).expand(N * L, F, C)
 
         # NLH F F
-        identity = torch.eye(F).bool().unsqueeze(0).expand((N * L * H, F, F))
+        identity = self.identity.expand((N * L * H, F, F))
 
         # NLH F F
         masks = torch.repeat_interleave(mask, H, dim=0) & ~identity
@@ -502,8 +506,7 @@ class EventDecoder(torch.nn.Module):
         events = {}
 
         for field, projection in self.projections.items():
-            projected = projection(permuted)
-            events[field] = torch.nn.functional.softmax(projected, dim=1)
+            events[field] = projection(permuted)
 
         # N, L, ?
         return TensorDict(events, batch_size=N)
@@ -599,10 +602,12 @@ def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
 
 def step(
     self: "SequenceModule",
-    batch: TensorDict | tuple[TensorDict, TensorDict],
+    batch: TensorDict,
     strata: str,
 ) -> Tensor | TensorDict:
     assert strata in ["train", "validate", "test", "predict"]
+    
+    batch = batch.to(self.device)
 
     log = partial(
         self.log,
@@ -612,8 +617,7 @@ def step(
     )
 
     if self._mode == "pretrain":
-        masked, targets = batch
-        _, reconstruction = self(masked)
+        _, reconstruction = self(batch['masked'])
 
         if strata == "predict":
             return reconstruction
@@ -621,7 +625,7 @@ def step(
         losses = []
 
         for field in self.params.fields:
-            loss = cross_entropy(reconstruction[field.name], targets[field.name])
+            loss = cross_entropy(reconstruction[field.name], batch['unmasked'][field.name])
             losses.append(loss)
             log(f"{self._mode}-{strata}/{field.name}-loss", loss)
 
@@ -653,7 +657,13 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     print(f"creating dataloader for strata {strata}")
 
     pipe = self.pipes[strata]
-    loader = DataLoader(pipe, batch_size=None, num_workers=8, collate_fn=lambda x: x)
+    loader = DataLoader(
+        pipe, 
+        batch_size=None, 
+        num_workers=15, 
+        collate_fn=lambda x: x,
+        pin_memory=False,
+    )
     self.dataloaders[strata] = loader
 
     return loader
@@ -711,6 +721,7 @@ class SequenceModule(lit.LightningModule):
             A tuple containing two tensors. The first tensor represents the supervised classification predictions and the second tensor represents the decoded, reconstructed events.
         """
 
+        # FIXME fix device
         field_mask, event_mask = create_attention_masks(inputs, fields=self.params.fields)
 
         fields = self.modular_field_embedder(inputs)
@@ -723,7 +734,8 @@ class SequenceModule(lit.LightningModule):
         return predictions, reconstructions
 
     def configure_optimizers(self) -> torch.optim.AdamW:
-        print("configuring optimizer")
+
+        print(f"configuring optimizer for mode {self._mode}")
 
         if self._mode == "pretrain":
             lr = self.params.pretrain_lr
@@ -746,7 +758,7 @@ class SequenceModule(lit.LightningModule):
     predict_step = partialmethod(step, strata="predict")
 
     def setup(self, stage: StageName):
-        pipe = partial(stream, datapath=self.datapath, mode=self._mode, digests=self.digests, params=self.params, balancer=self.balancer)
+        pipe = partial(stream, datapath=self.datapath, mode=self._mode, digests=self.digests, params=self.params, balancer=self.balancer, device=self.device)
 
         assert stage in ["fit", "validate", "test", "predict"]
 

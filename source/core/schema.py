@@ -71,15 +71,15 @@ class Hyperparameters:
     fields: list[Field]
 
     # architecture hyperparameters
-    batch_size: int = 64
-    n_context: int = 8
+    batch_size: int = 128
+    n_context: int = 16
     n_targets: int = 2
     p_mask_event: float = 0.0
     p_mask_field: float = 0.0
-    d_field: int = 12
-    n_heads_field_encoder: int = 4
+    d_field: int = 64
+    n_heads_field_encoder: int = 8
     n_layers_field_encoder: int = 1
-    n_heads_event_encoder: int = 4
+    n_heads_event_encoder: int = 8
     n_layers_event_encoder: int = 4
     precision: int = 8
     dropout: float = 0.1
@@ -89,15 +89,15 @@ class Hyperparameters:
 
     # pretraining hyperparameters
     pretrain_lr: float = 0.0001
-    pretrain_sample_rate: float = 0.001
-    pretrain_val_interval: int = 8
+    pretrain_sample_rate: float = 0.01
+    pretrain_val_interval: int = 4
 
     # finetuning hyperparameters
     finetune_lr: float = 0.00001
     finetune_head_lr_ratio: float = 10.0
     finetune_sample_rate: float = 0.1
-    finetune_interpolation_rate: float = 0.001
-    finetune_val_interval: int = 2
+    finetune_interpolation_rate: float = 0.01
+    finetune_val_interval: int = 1
 
     def __post_init__(self):
         fieldnames = set([field.name for field in self.fields])

@@ -30,22 +30,33 @@ def read(filename):
 def sample(
     sequence: dict,
     params: Hyperparameters,
-    balancer: LabelBalancer
+    balancer: LabelBalancer,
+    mode: str,
 ) -> list[dict[str, int | float | None]]:
 
     sequence_id = sequence["sequence_id"]
     observations: list[dict[str, int | float | None]] = []
 
     for event in range(sequence["size"]):
+        
+        if (mode == 'pretrain'):
+            
+            if params.pretrain_sample_rate < random.random():
+                continue
 
-        if (label := sequence["target"][event]) is None:
-            continue
+            label = -1
 
-        if params.pretrain_sample_rate < random.random():
-            continue
+        elif (mode == 'finetune'):
 
-        if balancer.thresholds[label] < random.random():
-            continue
+            if params.finetune_sample_rate < random.random():
+                continue
+
+            if (label := sequence["target"][event]) is None:
+                continue
+
+            if balancer.thresholds[label] < random.random():
+                continue
+        
 
         window = slice(max(0, event - params.n_context), event)
 
@@ -89,10 +100,11 @@ def cdf(
     field: Field,
     digests: dict[str, TDigest],
 ) -> dict[str, list[int] | list[float | None] | list[str | None]]:
+
     digest = digests[field.name]
     values = observation[field.name]
 
-    observation[field.name] = [digest.cdf(value) for value in values if value is not None]
+    observation[field.name] = list(map(lambda x: digest.cdf(x) if x is not None else 0, values))
     return observation
 
 
@@ -138,12 +150,12 @@ def treeify(batch: dict[str, torch.Tensor], params: Hyperparameters) -> TensorDi
     return tree
 
 
-def mask(batch: TensorDict, params: Hyperparameters) -> tuple[TensorDict, TensorDict]:
+def mask(batch: TensorDict, params: Hyperparameters) -> TensorDict:
     N, L = (params.batch_size, params.n_context)
 
     masked = batch.clone()
 
-    targets = {}
+    unmasked = {}
 
     is_event_masked = torch.rand(N, L).lt(params.p_mask_event)
     mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
@@ -159,14 +171,17 @@ def mask(batch: TensorDict, params: Hyperparameters) -> tuple[TensorDict, Tensor
                 masked[(field.name, "lookup")].masked_scatter_(mask, mask_token)
 
         if field.dtype == "continuous":
-            targets[field.name] = (
+            unmasked[field.name] = (
                 batch[(field.name, "values")].mul(params.n_quantiles).floor().long().add(batch[(field.name, "lookup")])
             )
 
         if field.dtype in ["discrete", "entity"]:
-            targets[field.name] = batch[(field.name, "lookup")]
+            unmasked[field.name] = batch[(field.name, "lookup")]
 
-    return masked, targets
+    return TensorDict(
+        dict(masked=masked, unmasked=unmasked),
+        batch_size=batch.batch_size
+    )
 
 
 def mock(params: Hyperparameters, **overrides: float|int) -> TensorDict:
@@ -213,6 +228,7 @@ def stream(
     digests: dict[str, TDigest],
     params: Hyperparameters,
     balancer: LabelBalancer,
+    device,
 ) -> datapipes.iter.IterDataPipe:
     assert mode in ["pretrain", "finetune"]
 
@@ -222,7 +238,7 @@ def stream(
         .sharding_filter()
         .flatmap(read)
         .shuffle()
-        .flatmap(partial(sample, params=params, balancer=balancer))
+        .flatmap(partial(sample, params=params, balancer=balancer, mode=mode))
     )
 
     entity_hasher = partial(
@@ -250,7 +266,7 @@ def stream(
     if mode == "pretrain":
         dp = dp.map(partial(mask, params=params))
 
-    return dp.prefetch()
+    return dp
 
 
 class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
