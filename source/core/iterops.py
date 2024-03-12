@@ -16,7 +16,7 @@ from torch.nn.functional import pad
 from msgspec import json
 import lightning.pytorch as lit
 
-from source.core.schema import SPECIAL_TOKENS, Hyperparameters, Field
+from source.core.schema import SPECIAL_TOKENS, Hyperparameters, PretrainingData, FinetuningData, InferenceData, SequenceData
 from source.core.finetune import LabelBalancer
 
 def read(filename):
@@ -34,11 +34,11 @@ def sample(
     mode: str,
 ) -> list[dict[str, int | float | None]]:
 
-    sequence_id = sequence["sequence_id"]
     observations: list[dict[str, int | float | None]] = []
 
     for event in range(sequence["size"]):
         
+
         if (mode == 'pretrain'):
             
             if params.pretrain_sample_rate < random.random():
@@ -48,20 +48,24 @@ def sample(
 
         elif (mode == 'finetune'):
 
-            if params.finetune_sample_rate < random.random():
+            label = sequence["target"][event]
+
+            if label is None:
                 continue
 
-            if (label := sequence["target"][event]) is None:
+            if params.finetune_sample_rate < random.random():
                 continue
 
             if balancer.thresholds[label] < random.random():
                 continue
+            
+        elif (mode == 'inference'):
+            label = -1
         
-
         window = slice(max(0, event - params.n_context), event)
 
         observation = dict(
-            sequence_id=str(sequence_id),
+            sequence_id=str(sequence["sequence_id"]),
             event_id=str(sequence["event_ids"][event]),
             label=label,
         )
@@ -76,42 +80,51 @@ def sample(
 
 def hash(
     observation: dict[str, list[int] | list[float | None] | list[str | None]],
-    n_context: int,
-    fieldname: str,
-    token_map: dict[str, int],
+    params: Hyperparameters,
 ) -> dict[str, list[int] | list[float | None] | list[str | None]]:
-    field = observation[fieldname]
+    
+    token_map = SPECIAL_TOKENS._asdict()
+    
+    for field in params.fields:
+        
+        if field.dtype in ['entity']:
+        
+            field = observation[field.name]
 
-    unique = set(field)
+            unique = set(field)
 
-    [unique.remove(token) for token in token_map.keys()]
+            [unique.remove(token) for token in token_map.keys()]
 
-    integers = random.sample(range(len(token_map), n_context + len(token_map)), len(unique))
+            integers = random.sample(range(len(token_map), params.n_context + len(token_map)), len(unique))
 
-    mapping = dict(zip(unique, integers))
+            mapping = dict(zip(unique, integers))
 
-    mapping.update(token_map)
+            mapping.update(token_map)
 
-    observation["fieldname"] = [mapping[token] for token in field]
+            observation[field.name] = [mapping[token] for token in field]
 
+    return observation
 
 def cdf(
     observation: dict[str, list[int] | list[float | None] | list[str | None]],
-    field: Field,
+    params: Hyperparameters,
     digests: dict[str, TDigest],
 ) -> dict[str, list[int] | list[float | None] | list[str | None]]:
+    
+    for field in params.fields:
+        
+        if field.dtype in ['continuous']:
 
-    digest = digests[field.name]
-    values = observation[field.name]
+            digest = digests[field.name]
+            values = observation[field.name]
+            observation[field.name] = list(map(lambda x: digest.cdf(x) if x is not None else 0, values))
 
-    observation[field.name] = list(map(lambda x: digest.cdf(x) if x is not None else 0, values))
     return observation
-
 
 def collate(
     observation: dict[str, list[int] | list[float | None] | list[str | None]], params: Hyperparameters
 ) -> dict[str, torch.Tensor]:
-    out = {}
+    output = {}
 
     PAD_ = getattr(SPECIAL_TOKENS, "PAD_")
     VAL_ = getattr(SPECIAL_TOKENS, "VAL_")
@@ -123,18 +136,18 @@ def collate(
             values = np.nan_to_num(np.array(observation[field.name], dtype=float))
             indicators = np.where(np.isnan(values), PAD_, VAL_)
 
-            out[(field.name, "values")] = pad(torch.tensor(values), pad=padding, value=0.0).float()
-            out[(field.name, "lookup")] = pad(torch.tensor(indicators), pad=padding, value=PAD_)
+            output[(field.name, "values")] = pad(torch.tensor(values), pad=padding, value=0.0).float()
+            output[(field.name, "lookup")] = pad(torch.tensor(indicators), pad=padding, value=PAD_)
 
         if field.dtype in ["discrete", "entity"]:
             lookup = np.array(observation[field.name], dtype=int)
-            out[(field.name, "lookup")] = pad(torch.tensor(lookup), pad=padding, value=PAD_)
+            output[(field.name, "lookup")] = pad(torch.tensor(lookup), pad=padding, value=PAD_)
 
-    out["label"] = torch.tensor(observation["label"])
-    out["sequence_id"] = observation["sequence_id"]
-    out["event_id"] = observation["event_id"]
+    output["label"] = torch.tensor(observation["label"])
+    output["sequence_id"] = observation["sequence_id"]
+    output["event_id"] = observation["event_id"]
 
-    return out
+    return output
 
 
 def treeify(batch: dict[str, torch.Tensor], params: Hyperparameters) -> TensorDict:
@@ -144,8 +157,8 @@ def treeify(batch: dict[str, torch.Tensor], params: Hyperparameters) -> TensorDi
         tree[(field.name, "dtype")] = field.dtype
 
     tree["label"] = batch["label"]
-    tree[("meta", "sequence_id")] = json.encode(batch["sequence_id"])
-    tree[("meta", "event_id")] = json.encode(batch["event_id"])
+    tree[("sequence_id")] = json.encode(batch["sequence_id"])
+    tree[("event_id")] = json.encode(batch["event_id"])
 
     return tree
 
@@ -178,11 +191,26 @@ def mask(batch: TensorDict, params: Hyperparameters) -> TensorDict:
         if field.dtype in ["discrete", "entity"]:
             unmasked[field.name] = batch[(field.name, "lookup")]
 
-    return TensorDict(
-        dict(masked=masked, unmasked=unmasked),
-        batch_size=batch.batch_size
+    return masked, unmasked
+
+def to_tensorclass(
+    batch: TensorDict | tuple[TensorDict, TensorDict],
+    params: Hyperparameters,
+    mode: str,
+) -> SequenceData:
+    
+    if mode == 'pretrain':
+        batch: tuple[TensorDict, TensorDict] = mask(batch, params=params)
+    
+    tensorclass_map = dict(
+        pretrain=PretrainingData,
+        finetune=FinetuningData,
+        inference=InferenceData,
     )
 
+    tensorclass = tensorclass_map[mode]
+    
+    return tensorclass.from_stream(batch, batch_size=params.batch_size)
 
 def mock(params: Hyperparameters, **overrides: float|int) -> TensorDict:
     
@@ -228,45 +256,26 @@ def stream(
     digests: dict[str, TDigest],
     params: Hyperparameters,
     balancer: LabelBalancer,
-    device,
 ) -> datapipes.iter.IterDataPipe:
-    assert mode in ["pretrain", "finetune"]
 
-    dp = (
+    assert mode in ["pretrain", "finetune", "inference"]
+
+    return (
         datapipes.iter.FileLister(datapath, masks=masks)
         .shuffle()
         .sharding_filter()
         .flatmap(read)
         .shuffle()
         .flatmap(partial(sample, params=params, balancer=balancer, mode=mode))
-    )
-
-    entity_hasher = partial(
-        hash,
-        token_map=SPECIAL_TOKENS._asdict(),
-        n_context=params.n_context,
-    )
-
-    for field in params.fields:
-
-        if field.dtype == "continuous":
-            dp = dp.map(partial(cdf, field=field, digests=digests))
-
-        if field.dtype == "entity":
-            dp = dp.map(partial(entity_hasher, name=field))
-
-    dp = (
-        dp.shuffle()
+        .map(partial(cdf, params=params, digests=digests))
+        .map(partial(hash, params=params))
+        .shuffle()
         .map(partial(collate, params=params))
         .batch(params.batch_size, drop_last=True)
         .collate()
         .map(partial(treeify, params=params))
+        .map(partial(to_tensorclass, params=params, mode=mode))
     )
-
-    if mode == "pretrain":
-        dp = dp.map(partial(mask, params=params))
-
-    return dp
 
 
 class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
@@ -281,7 +290,7 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
         module: lit.LightningModule,
         prediction: torch.Tensor,
         batch_indices: Sequence[int] | None,
-        batch: TensorDict,
+        batch: SequenceData,
         batch_index: int,
         dataloader_index: int,
     ) -> None:

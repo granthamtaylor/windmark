@@ -14,6 +14,8 @@ def preprocess_ledger_to_shards(
 ) -> fl.types.directory.FlyteDirectory:
     assert len(fields) > 0
     assert n_shards > 0
+    
+    print(f'ledger size: {len(ledger)}')
 
     def discretize(column: str) -> pl.Expr:
         return pl.col(column).cast(pl.String).cast(pl.Categorical).to_physical().cast(pl.Int32).alias(column)

@@ -9,7 +9,7 @@ def parse_field_from_ledger(ledger: pl.DataFrame, fieldreq: dict[str, str]) -> F
     name = fieldreq["name"]
     dtype = fieldreq["dtype"]
 
-    assert name in ledger.columns
+    assert name in ledger.columns, f'column {name} is not available'
     assert dtype in ["discrete", "continuous", "entity"]
 
     if dtype == "discrete":

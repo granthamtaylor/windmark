@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from torchdata import datapipes
 
 from source.core.iterops import mock, stream
-from source.core.schema import SPECIAL_TOKENS, Field, Hyperparameters
+from source.core.schema import SPECIAL_TOKENS, Field, Hyperparameters, SequenceData
 from source.core.finetune import LabelBalancer
 
 
@@ -602,12 +602,12 @@ def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
 
 def step(
     self: "SequenceModule",
-    batch: TensorDict,
+    batch: SequenceData,
     strata: str,
-) -> Tensor | TensorDict:
+) -> Tensor:
     assert strata in ["train", "validate", "test", "predict"]
-    
-    batch = batch.to(self.device)
+
+    predictions, reconstruction = self(batch.inputs)
 
     log = partial(
         self.log,
@@ -617,15 +617,11 @@ def step(
     )
 
     if self._mode == "pretrain":
-        _, reconstruction = self(batch['masked'])
-
-        if strata == "predict":
-            return reconstruction
 
         losses = []
 
         for field in self.params.fields:
-            loss = cross_entropy(reconstruction[field.name], batch['unmasked'][field.name])
+            loss = cross_entropy(reconstruction[field.name], batch.targets[field.name])
             losses.append(loss)
             log(f"{self._mode}-{strata}/{field.name}-loss", loss)
 
@@ -634,21 +630,19 @@ def step(
         return total_loss
 
     elif self._mode == "finetune":
-        representations, _ = self(batch)
 
-        if strata == "predict":
-            return representations
-
-        loss = cross_entropy(representations, batch["label"], weight=self.balancer.weight)
+        loss = cross_entropy(predictions, batch.targets, weight=self.weights)
         log(f"{self._mode}-{strata}/loss", loss)
 
-        logits = torch.nn.functional.softmax(representations)
-
+        logits = torch.nn.functional.softmax(predictions)
         for title, metric in self.metrics[f"{strata}_metrics"].items():
-            metric(logits, batch["label"])
+            metric(logits, batch.targets)
             log(f"{self._mode}-{strata}/{title}", metric)
 
         return loss
+
+    elif self._mode == "inference":
+        return predictions
 
 
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
@@ -701,6 +695,8 @@ class SequenceModule(lit.LightningModule):
         self.digests: dict[str, TDigest] = digests
         self.balancer = balancer
 
+        self.register_buffer('weights', torch.tensor(self.balancer.weights))
+
         self.dataloaders: dict[str, DataLoader] = {}
         self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
 
@@ -737,9 +733,9 @@ class SequenceModule(lit.LightningModule):
 
         print(f"configuring optimizer for mode {self._mode}")
 
-        if self._mode == "pretrain":
+        if (self._mode == "pretrain"):
             lr = self.params.pretrain_lr
-        elif self._mode == "finetune":
+        elif (self._mode == "finetune"):
             lr = self.params.finetune_lr
 
         return torch.optim.AdamW(self.parameters(), lr=lr)
@@ -758,7 +754,7 @@ class SequenceModule(lit.LightningModule):
     predict_step = partialmethod(step, strata="predict")
 
     def setup(self, stage: StageName):
-        pipe = partial(stream, datapath=self.datapath, mode=self._mode, digests=self.digests, params=self.params, balancer=self.balancer, device=self.device)
+        pipe = partial(stream, datapath=self.datapath, mode=self._mode, digests=self.digests, params=self.params, balancer=self.balancer)
 
         assert stage in ["fit", "validate", "test", "predict"]
 
@@ -803,7 +799,7 @@ class SequenceModule(lit.LightningModule):
 
     @mode.setter
     def mode(self, mode: str):
-        assert mode in ["pretrain", "finetune"]
+        assert mode in ["pretrain", "finetune", "inference"]
 
         print(f"setting mode to {mode}")
 

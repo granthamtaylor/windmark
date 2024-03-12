@@ -1,7 +1,11 @@
 from dataclasses import dataclass, field
 from collections import namedtuple
+from typing import TypeAlias
 import re
 
+from torch import Tensor
+from tensordict import TensorDict
+from tensordict.prototype import tensorclass
 from dataclasses_json import dataclass_json
 
 tokens = ["VAL_", "NAN_", "UNK_", "PAD_", "MASK_"]
@@ -71,7 +75,7 @@ class Hyperparameters:
     fields: list[Field]
 
     # architecture hyperparameters
-    batch_size: int = 128
+    batch_size: int = 2
     n_context: int = 16
     n_targets: int = 2
     p_mask_event: float = 0.0
@@ -95,7 +99,7 @@ class Hyperparameters:
     # finetuning hyperparameters
     finetune_lr: float = 0.00001
     finetune_head_lr_ratio: float = 10.0
-    finetune_sample_rate: float = 0.1
+    finetune_sample_rate: float = 1.0
     finetune_interpolation_rate: float = 0.01
     finetune_val_interval: int = 1
 
@@ -136,3 +140,49 @@ class Hyperparameters:
         assert 0.0 < self.finetune_sample_rate <= 1.0
         assert 0.0 <= self.finetune_interpolation_rate <= 1.0
         assert self.finetune_val_interval > 0
+
+@tensorclass
+class PretrainingData:
+
+    inputs: TensorDict
+    targets: TensorDict
+    
+    @classmethod
+    def from_stream(cls, batch: tuple[TensorDict, TensorDict], batch_size: int):
+        
+        inputs, targets = batch
+        
+        return cls(inputs=inputs, targets=targets, batch_size=[batch_size])
+
+@tensorclass
+class FinetuningData:
+
+    inputs: TensorDict
+    targets: Tensor
+    
+    @classmethod
+    def from_stream(cls, batch: TensorDict, batch_size: int):
+        
+        targets = batch.pop('label')
+        
+        return cls(inputs=batch, targets=targets, batch_size=[batch_size])
+    
+
+@tensorclass
+class InferenceData:
+
+    inputs: TensorDict
+
+    sequence_id: list[str]
+    event_id: list[str]
+    
+    @classmethod
+    def from_stream(cls, batch: TensorDict, batch_size: int):
+
+        sequence_id = batch.pop('sequence_id')
+        event_id = batch.pop('sequence_id')
+        
+        return cls(inputs=batch, sequence_id=sequence_id, event_id=event_id, batch_size=[batch_size])
+
+
+SequenceData: TypeAlias = PretrainingData|FinetuningData|InferenceData

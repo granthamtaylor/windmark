@@ -3,6 +3,7 @@ from functools import partial
 import flytekit as fl
 
 from source.tasks import (
+    fieldreq,
     read,
     digest,
     parse,
@@ -16,16 +17,18 @@ from source.tasks import (
 @fl.workflow
 def pipeline():
 
-    fieldreqs = [
-        dict(name="use_chip", dtype="discrete"),
-        dict(name="merchant_state", dtype="discrete"),
-        dict(name="merchant_city", dtype="discrete"),
-        dict(name="mcc", dtype="discrete"),
-        dict(name="amount", dtype="continuous"),
-        dict(name="timedelta", dtype="continuous"),
-    ]
+    schema = {
+        "use_chip": "discrete",
+        "merchant_state": "discrete",
+        "merchant_city": "discrete",
+        "mcc": "discrete",
+        "amount": "continuous",
+        "timedelta": "continuous",
+    }
+    
+    fieldreqs = fieldreq(schema=schema)
 
-    df = read(datapath="/home/grantham/Desktop/windmark/data/ledger.parquet")
+    df = read(datapath="/home/grantham/Desktop/windmark/data/ledger.subsample.parquet")
 
     fields = fl.map_task(partial(parse, ledger=df))(fieldreq=fieldreqs)
 
