@@ -3031,6 +3031,27 @@ test = ["hypothesis (>=6.46.1)", "pytest (>=7.3.2)", "pytest-xdist (>=2.2.0)"]
 xml = ["lxml (>=4.9.2)"]
 
 [[package]]
+name = "param"
+version = "2.0.2"
+description = "Make your Python code clearer and more reliable by declaring Parameters."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "param-2.0.2-py3-none-any.whl", hash = "sha256:b269fd7397886ec609e544f81035fa52e1950da0e76d20080bfeca3d7a0317ca"},
+    {file = "param-2.0.2.tar.gz", hash = "sha256:785845a727a588eb94c7666d80551c7e2bb97d4309d3507beab66f95e57f7527"},
+]
+
+[package.extras]
+all = ["param[doc]", "param[lint]", "param[tests-full]"]
+doc = ["nbsite (==0.8.4)", "param[examples]", "sphinx-remove-toctrees"]
+examples = ["aiohttp", "pandas", "panel"]
+lint = ["flake8", "pre-commit"]
+tests = ["coverage[toml]", "pytest", "pytest-asyncio"]
+tests-deser = ["odfpy", "openpyxl", "pyarrow", "tables", "xlrd"]
+tests-examples = ["nbval", "param[examples]", "pytest", "pytest-asyncio", "pytest-xdist"]
+tests-full = ["cloudpickle", "gmpy", "ipython", "jsonschema", "nest-asyncio", "numpy", "pandas", "param[tests-deser]", "param[tests-examples]", "param[tests]"]
+
+[[package]]
 name = "parso"
 version = "0.8.3"
 description = "A Python Parser"
@@ -4717,4 +4738,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "3.11.8"
-content-hash = "2c72162707735f4084bd3e20030dfecfcbfe8618eb2ab0511762a6f437aa98f0"
+content-hash = "fe2e296981a415a64d224b257e7a4c4e2ed888eabd276270ae852ad981ec51ef"

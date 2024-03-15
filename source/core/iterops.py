@@ -2,7 +2,6 @@ import os
 import random
 from typing import Sequence
 from functools import partial
-from dataclasses import replace
 
 import fastparquet
 import polars as pl
@@ -11,13 +10,11 @@ from tensordict import TensorDict
 from torchdata import datapipes
 import fastavro
 from tdigest import TDigest
-import numpy as np
-from torch.nn.functional import pad
-from msgspec import json
 import lightning.pytorch as lit
 
-from source.core.schema import SPECIAL_TOKENS, Hyperparameters, PretrainingData, FinetuningData, InferenceData, SequenceData
-from source.core.finetune import LabelBalancer
+from source.core.schema import SPECIAL_TOKENS, Hyperparameters
+from source.core.utils import LabelBalancer
+from source.core.tensorclass import DiscreteField, ContinuousField, EntityField, PretrainingData, FinetuningData, InferenceData, SequenceData
 
 def read(filename):
     with open(filename, "rb") as f:
@@ -124,77 +121,55 @@ def cdf(
 def collate(
     observation: dict[str, list[int] | list[float | None] | list[str | None]], params: Hyperparameters
 ) -> dict[str, torch.Tensor]:
+
     output = {}
 
-    PAD_ = getattr(SPECIAL_TOKENS, "PAD_")
-    VAL_ = getattr(SPECIAL_TOKENS, "VAL_")
+    tensorclass_map = dict(
+        discrete=DiscreteField,
+        continuous=ContinuousField,
+        entity=EntityField,
+    )
 
     for field in params.fields:
-        padding = (params.n_context - len(observation[field.name]), 0)
+        values = observation[field.name]
+        tensorclass = tensorclass_map[field.dtype]
+        output[field.name] = tensorclass.collate(values, params=params)
 
-        if field.dtype == "continuous":
-            values = np.nan_to_num(np.array(observation[field.name], dtype=float))
-            indicators = np.where(np.isnan(values), PAD_, VAL_)
+    inputs = TensorDict(output, batch_size=1)
+    labels = torch.tensor(observation["label"])
 
-            output[(field.name, "values")] = pad(torch.tensor(values), pad=padding, value=0.0).float()
-            output[(field.name, "lookup")] = pad(torch.tensor(indicators), pad=padding, value=PAD_)
+    return inputs, labels
 
-        if field.dtype in ["discrete", "entity"]:
-            lookup = np.array(observation[field.name], dtype=int)
-            output[(field.name, "lookup")] = pad(torch.tensor(lookup), pad=padding, value=PAD_)
-
-    output["label"] = torch.tensor(observation["label"])
-    output["sequence_id"] = observation["sequence_id"]
-    output["event_id"] = observation["event_id"]
-
-    return output
-
-
-def treeify(batch: dict[str, torch.Tensor], params: Hyperparameters) -> TensorDict:
-    tree = TensorDict(batch, batch_size=params.batch_size)
-
-    for field in params.fields:
-        tree[(field.name, "dtype")] = field.dtype
-
-    tree["label"] = batch["label"]
-    tree[("sequence_id")] = json.encode(batch["sequence_id"])
-    tree[("event_id")] = json.encode(batch["event_id"])
-
-    return tree
-
-
-def mask(batch: TensorDict, params: Hyperparameters) -> TensorDict:
+def mask(batch: TensorDict, params: Hyperparameters) -> tuple[TensorDict, TensorDict]:
+    
+    inputs, _ = batch
+    
     N, L = (params.batch_size, params.n_context)
-
-    masked = batch.clone()
-
-    unmasked = {}
+    
+    targets = {}
 
     is_event_masked = torch.rand(N, L).lt(params.p_mask_event)
-    mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
 
     for field in params.fields:
-        is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
 
-        for mask in [is_event_masked, is_field_masked]:
-            if field.dtype == "continuous":
-                masked[(field.name, "values")] *= ~mask
+        targets[field.name] = inputs[field.name].target(params=params)
+        inputs[field.name].mask(is_event_masked, params=params)
+        
+    targets = TensorDict(targets, batch_size=params.batch_size)
 
-            if field.dtype in ["discrete", "entity", "continuous"]:
-                masked[(field.name, "lookup")].masked_scatter_(mask, mask_token)
+    return inputs, targets
 
-        if field.dtype == "continuous":
-            unmasked[field.name] = (
-                batch[(field.name, "values")].mul(params.n_quantiles).floor().long().add(batch[(field.name, "lookup")])
-            )
+def stack(batch: list[tuple[TensorDict, torch.Tensor]]):
 
-        if field.dtype in ["discrete", "entity"]:
-            unmasked[field.name] = batch[(field.name, "lookup")]
-
-    return masked, unmasked
+    inputs, targets = list(map(list, zip(*batch)))
+    
+    inputs = torch.stack(inputs, dim=0).squeeze(dim=1).auto_batch_size_(batch_dims=1)
+    targets = torch.stack(targets)
+    
+    return inputs, targets
 
 def to_tensorclass(
-    batch: TensorDict | tuple[TensorDict, TensorDict],
+    batch: tuple[TensorDict, torch.Tensor],
     params: Hyperparameters,
     mode: str,
 ) -> SequenceData:
@@ -211,43 +186,6 @@ def to_tensorclass(
     tensorclass = tensorclass_map[mode]
     
     return tensorclass.from_stream(batch, batch_size=params.batch_size)
-
-def mock(params: Hyperparameters, **overrides: float|int) -> TensorDict:
-    
-    _params = replace(params, **overrides)
-    
-    data = {}
-
-    N = _params.batch_size
-    L = _params.n_context
-
-    is_padded = torch.arange(L).expand(N, L).lt(torch.randint(1, L, [N]).unsqueeze(-1)).bool()
-
-    for field in _params.fields:
-        match field.dtype:
-            case "continuous":
-                indicators = torch.randint(0, len(SPECIAL_TOKENS), (N, L))
-                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), indicators)
-
-                is_empty = padded.eq(getattr(SPECIAL_TOKENS, "VAL_")).long()
-
-                data[(field.name, "lookup")] = padded
-                data[(field.name, "values")] = torch.rand(N, L).mul(is_empty)
-
-            case "discrete":
-                values = torch.randint(0, field.n_levels + len(SPECIAL_TOKENS), (N, L))
-                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
-                data[(field.name, "lookup")] = padded
-
-            case "entity":
-                values = torch.randint(0, L + len(SPECIAL_TOKENS), (N, L))
-                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
-                data[(field.name, "lookup")] = padded
-
-        data[(field.name, "dtype")] = field.dtype
-
-    return TensorDict(data, batch_size=N)
-
 
 def stream(
     datapath: str | os.PathLike,
@@ -272,8 +210,7 @@ def stream(
         .shuffle()
         .map(partial(collate, params=params))
         .batch(params.batch_size, drop_last=True)
-        .collate()
-        .map(partial(treeify, params=params))
+        .map(stack)
         .map(partial(to_tensorclass, params=params, mode=mode))
     )
 

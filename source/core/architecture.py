@@ -2,7 +2,6 @@ import math
 import os
 from collections import OrderedDict
 from functools import partial, partialmethod
-from dataclasses import asdict
 
 import lightning.pytorch as lit
 import torch
@@ -19,10 +18,11 @@ from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
 
-from source.core.iterops import mock, stream
-from source.core.schema import SPECIAL_TOKENS, Field, Hyperparameters, SequenceData
-from source.core.finetune import LabelBalancer
-
+from source.core.iterops import stream
+from source.core.schema import SPECIAL_TOKENS, Field, Hyperparameters
+from source.core.utils import LabelBalancer
+from source.core.tensorclass import ContinuousField, DiscreteField, EntityField, SequenceData
+from source.core.mock import mock
 
 def complexity(params: Hyperparameters) -> int:
     # as per https://pytorch.org/docs/stable/generated/torch.nn.TransformerEncoderLayer.html
@@ -170,8 +170,8 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         self.field: Field = field
         self.embeddings = torch.nn.Embedding(field.n_levels + len(SPECIAL_TOKENS), params.d_field)
 
-    def forward(self, inputs: TensorDict) -> Tensor:
-        return self.embeddings(inputs["lookup"])
+    def forward(self, inputs: DiscreteField) -> Tensor:
+        return self.embeddings(inputs.lookup)
 
 
 class EntityFieldEmbedder(torch.nn.Module):
@@ -187,8 +187,8 @@ class EntityFieldEmbedder(torch.nn.Module):
         self.field: Field = field
         self.embeddings = torch.nn.Embedding(params.n_context + len(SPECIAL_TOKENS), params.d_field)
 
-    def forward(self, inputs: TensorDict) -> Tensor:
-        return self.embeddings(inputs["lookup"])
+    def forward(self, inputs: EntityField) -> Tensor:
+        return self.embeddings(inputs.lookup)
 
 
 class ContinuousFieldEmbedder(torch.nn.Module):
@@ -222,7 +222,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        inputs: TensorDict[Float[Tensor, "N L"] | Int[Tensor, "N L"]],
+        inputs: ContinuousField,
     ) -> Float[Tensor, "N L F"]:
         """
         Performs the forward pass of the FourierFeatureEncoder.
@@ -234,8 +234,8 @@ class ContinuousFieldEmbedder(torch.nn.Module):
             Float[Tensor, "N L F"]: The Fourier features of the input.
         """
 
-        values = inputs["values"]
-        indicators = inputs["lookup"]
+        values = inputs.content
+        indicators = inputs.lookup
 
         assert values.shape == indicators.shape, "values and indicators must always have the same shape"
 
@@ -278,14 +278,15 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
 
         embedders: dict[str, torch.nn.Module] = {}
 
-        encoders: dict[str, type] = dict(
+        embedder_map: dict[str, type] = dict(
             discrete=DiscreteFieldEmbedder,
             continuous=ContinuousFieldEmbedder,
             entity=EntityFieldEmbedder,
         )
 
         for field in params.fields:
-            embedders[field.name] = encoders[field.dtype](params=params, field=field)
+            embedder = embedder_map[field.dtype]
+            embedders[field.name] = embedder(params=params, field=field)
 
         self.embedders = torch.nn.ModuleDict(embedders)
 
@@ -607,7 +608,7 @@ def step(
 ) -> Tensor:
     assert strata in ["train", "validate", "test", "predict"]
 
-    predictions, reconstruction = self(batch.inputs)
+    predictions, reconstruction = self.forward(batch.inputs)
 
     log = partial(
         self.log,
@@ -679,7 +680,7 @@ class SequenceModule(lit.LightningModule):
         self.datapath: str | os.PathLike = datapath
 
         self.params: Hyperparameters = params
-        self.save_hyperparameters(asdict(params))
+        self.save_hyperparameters(params.param.values())
 
         self.lr = params.pretrain_lr
 
@@ -783,10 +784,9 @@ class SequenceModule(lit.LightningModule):
         )
 
         for strata in mapping[stage]:
-            del self.pipes[strata]
 
-            self.dataloader[strata].shutdown()
-            del self.dataloader[strata]
+            del self.pipes[strata]
+            del self.dataloaders[strata]
 
     train_dataloader = partialmethod(dataloader, strata="train")
     val_dataloader = partialmethod(dataloader, strata="validate")

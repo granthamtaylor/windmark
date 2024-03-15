@@ -41,26 +41,27 @@ def train_sequence_encoder(
     
     logger = TensorBoardLogger("logs", name="windmark")
 
-    # trainer = Trainer(
-    #     logger=logger,
-    #     default_root_dir=root/'pretrain',
-    #     accelerator="auto",
-    #     devices="auto",
-    #     strategy="auto",
-    #     precision="bf16",
-    #     callbacks = [
-    #         # SpikeDetection(),
-    #         # LearningRateFinder(),
-    #         DeviceStatsMonitor(),
-    #         # EarlyStopping(monitor='pretrain-validate/loss'),
-    #         ModelSummary(4),
-    #         pretrain := ModelCheckpoint(),
-    #         # ThroughputMonitor(lambda x: x[0].batch_size[0]),
+    trainer = Trainer(
+        logger=logger,
+        default_root_dir=root/'pretrain',
+        accelerator="auto",
+        devices="auto",
+        strategy="auto",
+        precision="bf16",
+        fast_dev_run=True,
+        callbacks = [
+            # SpikeDetection(),
+            # LearningRateFinder(),
+            DeviceStatsMonitor(),
+            # EarlyStopping(monitor='pretrain-validate/loss'),
+            ModelSummary(4),
+            pretrain := ModelCheckpoint(),
+            # ThroughputMonitor(lambda x: x[0].batch_size[0]),
             
-    #     ]
-    # )
+        ]
+    )
 
-    # trainer.fit(module)
+    trainer.fit(module)
 
     module.mode = 'finetune'
     trainer = Trainer(
@@ -70,6 +71,7 @@ def train_sequence_encoder(
         devices="auto",
         strategy="auto",
         precision="bf16",
+        fast_dev_run=True,
         callbacks=[
             # SpikeDetection(),
             # LearningRateFinder(),

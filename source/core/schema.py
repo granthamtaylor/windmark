@@ -1,11 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from collections import namedtuple
-from typing import TypeAlias
 import re
 
-from torch import Tensor
-from tensordict import TensorDict
-from tensordict.prototype import tensorclass
+from param import Parameterized
+import param
 from dataclasses_json import dataclass_json
 
 tokens = ["VAL_", "NAN_", "UNK_", "PAD_", "MASK_"]
@@ -40,9 +38,7 @@ class Field:
                 assert self.n_levels is None, "n_levels must be none for entity fields"
 
 
-@dataclass_json
-@dataclass
-class Hyperparameters:
+class Hyperparameters(Parameterized):
     """
     Class representing the hyperparameters for a model.
 
@@ -61,7 +57,6 @@ class Hyperparameters:
         precision (int, optional): fourier feature encoder precision.
         dropout (float, optional): Dropout rate.
         n_quantiles (int, optional): Number of quantiles for continuous fields during pretraining.
-        n_fields (int): Number of unique fields (automatically calculated).
         pretrain_lr (float, optional): Learning rate for pretraining.
         pretrain_sample_rate (float, optional): Sample rate for pretraining.
         pretrain_val_interval (int, optional): Validation interval for pretraining.
@@ -72,117 +67,36 @@ class Hyperparameters:
         finetune_val_interval (int, optional): Validation interval for finetuning.
     """
 
-    fields: list[Field]
+    fields: list[Field] = param.List(item_type=Field)
 
     # architecture hyperparameters
-    batch_size: int = 2
-    n_context: int = 16
-    n_targets: int = 2
-    p_mask_event: float = 0.0
-    p_mask_field: float = 0.0
-    d_field: int = 64
-    n_heads_field_encoder: int = 8
-    n_layers_field_encoder: int = 1
-    n_heads_event_encoder: int = 8
-    n_layers_event_encoder: int = 4
-    precision: int = 8
-    dropout: float = 0.1
-    n_quantiles: int = 8
-    head_shape_log_base: int = 4
-    n_fields: int = field(init=False)
+    batch_size: int = param.Integer(64, bounds=(1, 2048))
+    n_context: int = param.Integer(64, bounds=(1, 2048))
+    n_targets: int = param.Integer(2, bounds=(2, 2048))
+    p_mask_event: float = param.Magnitude(0.0)
+    p_mask_field: float = param.Magnitude(0.0)
+    d_field: int = param.Integer(64, bounds=(2, 256))
+    n_heads_field_encoder: int = param.Integer(8, bounds=(1, 32))
+    n_layers_field_encoder: int = param.Integer(1, bounds=(1, 32))
+    n_heads_event_encoder: int = param.Integer(8, bounds=(1, 32))
+    n_layers_event_encoder: int = param.Integer(4, bounds=(1, 32))
+    precision: int = param.Integer(8, bounds=(2, 512))
+    dropout: float = param.Magnitude(0.1)
+    n_quantiles: int = param.Integer(16, bounds=(1, 512))
+    head_shape_log_base: int = param.Integer(4, bounds=(1, 32))
 
     # pretraining hyperparameters
-    pretrain_lr: float = 0.0001
-    pretrain_sample_rate: float = 0.01
-    pretrain_val_interval: int = 4
+    pretrain_lr: float = param.Magnitude(0.0001)
+    pretrain_sample_rate: float = param.Magnitude(0.01)
+    pretrain_val_interval: int = param.Integer(4, bounds=(1, 32))
 
     # finetuning hyperparameters
-    finetune_lr: float = 0.00001
-    finetune_head_lr_ratio: float = 10.0
-    finetune_sample_rate: float = 1.0
-    finetune_interpolation_rate: float = 0.01
-    finetune_val_interval: int = 1
+    finetune_lr: float = param.Magnitude(0.00001)
+    finetune_head_lr_ratio: float = param.Number(10., bounds=(0, 1000))
+    finetune_sample_rate: float = param.Magnitude(1.0)
+    finetune_interpolation_rate: float = param.Magnitude(0.1)
+    finetune_val_interval: int = param.Integer(1, bounds=(1, 32))
 
-    def __post_init__(self):
-        fieldnames = set([field.name for field in self.fields])
-        self.n_fields = len(fieldnames)
-
-        for reserved in ["sequence_id", "event_id", "event", "event_ids", "size", "labels", "targets"]:
-            assert reserved not in fieldnames, f"{reserved} is a reserved field name"
-
-        assert self.n_fields == len(self.fields), "multiple fields found having the same name"
-        assert self.n_fields > 1
-
-        assert self.batch_size > 0
-        assert self.n_context > 0
-        assert self.n_targets > 1
-        assert self.n_quantiles > 1
-
-        assert self.d_field > 0
-        assert self.n_heads_field_encoder > 0
-        assert self.d_field % self.n_heads_field_encoder == 0
-        assert self.n_heads_event_encoder > 0
-        assert (self.d_field * self.n_context) % self.n_heads_event_encoder == 0
-        assert self.n_layers_field_encoder > 0
-        assert self.n_layers_event_encoder > 0
-        assert 0.0 <= self.dropout < 1.0
-        assert self.precision > 0
-        assert self.head_shape_log_base > 0
-
-        assert 0.0 < self.pretrain_lr < 1.0
-        assert 0.0 < self.pretrain_sample_rate <= 1.0
-        assert self.pretrain_val_interval > 0
-        assert 0.0 <= self.p_mask_event < 1.0
-        assert 0.0 <= self.p_mask_field < 1.0
-
-        assert 0.0 < self.finetune_lr < 1.0
-        assert self.finetune_head_lr_ratio >= 1.0
-        assert 0.0 < self.finetune_sample_rate <= 1.0
-        assert 0.0 <= self.finetune_interpolation_rate <= 1.0
-        assert self.finetune_val_interval > 0
-
-@tensorclass
-class PretrainingData:
-
-    inputs: TensorDict
-    targets: TensorDict
-    
-    @classmethod
-    def from_stream(cls, batch: tuple[TensorDict, TensorDict], batch_size: int):
-        
-        inputs, targets = batch
-        
-        return cls(inputs=inputs, targets=targets, batch_size=[batch_size])
-
-@tensorclass
-class FinetuningData:
-
-    inputs: TensorDict
-    targets: Tensor
-    
-    @classmethod
-    def from_stream(cls, batch: TensorDict, batch_size: int):
-        
-        targets = batch.pop('label')
-        
-        return cls(inputs=batch, targets=targets, batch_size=[batch_size])
-    
-
-@tensorclass
-class InferenceData:
-
-    inputs: TensorDict
-
-    sequence_id: list[str]
-    event_id: list[str]
-    
-    @classmethod
-    def from_stream(cls, batch: TensorDict, batch_size: int):
-
-        sequence_id = batch.pop('sequence_id')
-        event_id = batch.pop('sequence_id')
-        
-        return cls(inputs=batch, sequence_id=sequence_id, event_id=event_id, batch_size=[batch_size])
-
-
-SequenceData: TypeAlias = PretrainingData|FinetuningData|InferenceData
+    @property
+    def n_fields(self) -> int:
+        return len(self.fields)

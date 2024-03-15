@@ -33,3 +33,17 @@ class LabelBalancer:
 
         self.thresholds = list(map(lambda x: x / max(ratio), ratio))
         self.weights = list(map(lambda x: sum(ratio) / (x * size * size), interpolation))
+
+# class ShardManager:
+    
+#     def __init__(self, train: float, validate: float, test: float):
+
+#         assert isclose([train, validate, test])
+        
+#         self.train = (0., train)
+#         self.validate = (train, validate)
+#         self.test = test
+
+#     def find_shard_strata(shard: int, n_shards: int):
+        
+        
