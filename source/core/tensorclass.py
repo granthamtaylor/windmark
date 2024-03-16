@@ -24,7 +24,7 @@ class DiscreteField:
         array = np.array(values, dtype=int)
         lookup = torch.nn.functional.pad(torch.tensor(array), pad=padding, value=PAD_).unsqueeze(0)
         
-        return cls(lookup=lookup, batch_size = [1])
+        return cls(lookup=lookup, batch_size = [params.batch_size])
 
     def mask(self, is_event_masked: Tensor, params: Hyperparameters):
 
@@ -60,11 +60,15 @@ class ContinuousField:
         
         values = np.nan_to_num(np.array(values, dtype=float))
         lookup = np.where(np.isnan(values), PAD_, VAL_)
+        
+        # this effectively creates `1-(1/inf)` to prevent an index error
+        # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
+        dampener = 1 - torch.finfo(torch.half).tiny
 
         return cls(
-            content = torch.nn.functional.pad(torch.tensor(values), pad=padding, value=0.0).float().unsqueeze(0),
+            content = torch.nn.functional.pad(torch.tensor(values), pad=padding, value=0.0).float().unsqueeze(0).mul(dampener),
             lookup = torch.nn.functional.pad(torch.tensor(lookup), pad=padding, value=PAD_).unsqueeze(0),
-            batch_size = [1],
+            batch_size = [params.batch_size],
         )
     
     def mask(self, is_event_masked: Tensor, params: Hyperparameters):
@@ -80,6 +84,7 @@ class ContinuousField:
             self.content *= ~mask
         
     def target(self, params: Hyperparameters) -> Tensor:
+        
         quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(SPECIAL_TOKENS))
         is_not_valued = self.lookup != 0
         return quantiles.masked_scatter(is_not_valued, quantiles)

@@ -1,16 +1,15 @@
 from flytekit import task
 import polars as pl
 
-from source.core import LabelBalancer
+from source.core import LabelBalancer, Hyperparameters
 
 @task
 def rebalance_class_labels(
     ledger: pl.DataFrame,
-    kappa: float,
+    params: Hyperparameters,
 ) -> LabelBalancer:
-    assert "target" in ledger.columns
 
-    assert 0.0 <= kappa <= 1.0
+    assert "target" in ledger.columns
 
     records: dict[str, list[float]] = (
         ledger.get_column("target")
@@ -27,6 +26,6 @@ def rebalance_class_labels(
         counts=records['counts'],
     )
     
-    balancer.interpolate(kappa=kappa)
+    balancer.interpolate(kappa=params.interpolation_rate)
     
     return balancer

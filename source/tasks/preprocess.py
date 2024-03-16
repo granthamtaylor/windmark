@@ -35,7 +35,6 @@ def preprocess_ledger_to_shards(
 
     outpath = Path(fl.current_context().working_directory) / "lifestreams"
     outpath.mkdir(exist_ok=True)
-    print(outpath)
 
     lifestreams = (
         ledger.select(

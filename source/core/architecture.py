@@ -7,7 +7,6 @@ import lightning.pytorch as lit
 import torch
 import torchmetrics
 from beartype import beartype
-from humanize import naturalsize as bytesize
 from jaxtyping import Bool, Float, Int, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from lightning.pytorch.trainer.states import TrainerFn as StageName
@@ -23,76 +22,6 @@ from source.core.schema import SPECIAL_TOKENS, Field, Hyperparameters
 from source.core.utils import LabelBalancer
 from source.core.tensorclass import ContinuousField, DiscreteField, EntityField, SequenceData
 from source.core.mock import mock
-
-def complexity(params: Hyperparameters) -> int:
-    # as per https://pytorch.org/docs/stable/generated/torch.nn.TransformerEncoderLayer.html
-    D_FFN = 2048
-
-    # pretty good assumption you are using FP16 or BF16
-    FP_PRECISION = 16
-
-    def _calculate_bert_memory_complexity(
-        batch_size: int,
-        max_seq_len: int,
-        d_hidden: int,
-        n_heads: int,
-        n_blocks: int,
-        precision: int,
-        d_ffn: int,
-    ) -> int:
-        assert isinstance(batch_size, int), "batch_size must be an integer"
-        assert batch_size > 0, "batch_size must be greater than 0"
-
-        assert isinstance(max_seq_len, int), "max_seq_len must be an integer"
-        assert max_seq_len > 0, "max_seq_len must be greater than 0"
-
-        assert isinstance(d_hidden, int), "d_hidden must be an integer"
-        assert d_hidden > 0, "d_hidden must be greater than 0"
-
-        assert isinstance(n_heads, int), "n_heads must be an integer"
-        assert n_heads > 0, "n_heads must be greater than 0"
-
-        assert isinstance(n_blocks, int), "n_blocks must be an integer"
-        assert n_blocks > 0, "n_blocks must be greater than 0"
-
-        assert isinstance(precision, int), "precision must be an integer"
-        assert precision > 0, "precision must be greater than 0"
-
-        assert isinstance(d_ffn, int), "FFN dim must be an integer"
-        assert d_ffn > 0, "FFN dim must be greater than 0"
-
-        memory = batch_size * max_seq_len * (8 * d_hidden + d_ffn)
-        memory += batch_size * n_heads * max_seq_len * max_seq_len
-
-        # the "3" comes from forward prop, backward prop, and general model overhead
-        memory *= 3 * n_blocks * precision
-
-        return memory
-
-    encoder = partial(
-        _calculate_bert_memory_complexity,
-        precision=FP_PRECISION,
-        d_ffn=D_FFN,
-    )
-
-    field = encoder(
-        batch_size=params.batch_size * params.n_context,
-        max_seq_len=params.n_fields,
-        d_hidden=params.d_field,
-        n_blocks=params.n_layers_field_encoder,
-        n_heads=params.n_heads_field_encoder,
-    )
-
-    event = encoder(
-        batch_size=params.batch_size,
-        max_seq_len=params.n_context,
-        d_hidden=params.n_fields * params.d_field,
-        n_blocks=params.n_layers_event_encoder,
-        n_heads=params.n_heads_event_encoder,
-    )
-
-    return int((field + event) / 8)
-
 
 @jaxtyped(typechecker=beartype)
 def _squarify(tensor: Tensor) -> Tensor:
@@ -241,7 +170,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         assert torch.all(values.mul(indicators).eq(0.0)), "values should be imputed if not null, padded, or masked"
 
-        assert torch.all(values.le(1.0)), "values should be less than or equal to 1.0"
+        assert torch.all(values.lt(1.0)), "values should be less than 1.0"
 
         assert torch.all(values.ge(0.0)), "values should be greater than or equal to 0.0"
 
@@ -627,13 +556,13 @@ def step(
             log(f"{self._mode}-{strata}/{field.name}-loss", loss)
 
         total_loss = torch.stack(losses).sum()
-        log(f"{self._mode}-{strata}/loss", total_loss)
+        log(f"{self._mode}-{strata}/loss", total_loss, prog_bar=True)
         return total_loss
 
     elif self._mode == "finetune":
 
         loss = cross_entropy(predictions, batch.targets, weight=self.weights)
-        log(f"{self._mode}-{strata}/loss", loss)
+        log(f"{self._mode}-{strata}/loss", loss, prog_bar=True)
 
         logits = torch.nn.functional.softmax(predictions)
         for title, metric in self.metrics[f"{strata}_metrics"].items():
@@ -649,7 +578,7 @@ def step(
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]
 
-    print(f"creating dataloader for strata {strata}")
+    print(f"creating {self._mode} dataloader for strata {strata}")
 
     pipe = self.pipes[strata]
     loader = DataLoader(
@@ -680,9 +609,9 @@ class SequenceModule(lit.LightningModule):
         self.datapath: str | os.PathLike = datapath
 
         self.params: Hyperparameters = params
-        self.save_hyperparameters(params.param.values())
+        self.save_hyperparameters(params.values())
 
-        self.lr = params.pretrain_lr
+        self.lr = params.learning_rate
 
         self.modular_field_embedder = ModularAttributeEmbeddingSystem(params=params)
         self.field_encoder = FieldEncoder(params=params)
@@ -718,7 +647,6 @@ class SequenceModule(lit.LightningModule):
             A tuple containing two tensors. The first tensor represents the supervised classification predictions and the second tensor represents the decoded, reconstructed events.
         """
 
-        # FIXME fix device
         field_mask, event_mask = create_attention_masks(inputs, fields=self.params.fields)
 
         fields = self.modular_field_embedder(inputs)
@@ -734,20 +662,7 @@ class SequenceModule(lit.LightningModule):
 
         print(f"configuring optimizer for mode {self._mode}")
 
-        if (self._mode == "pretrain"):
-            lr = self.params.pretrain_lr
-        elif (self._mode == "finetune"):
-            lr = self.params.finetune_lr
-
-        return torch.optim.AdamW(self.parameters(), lr=lr)
-
-    def complexity(self, format: bool = False) -> str | int:
-        n_bytes = complexity(self.params)
-
-        if format:
-            return bytesize(n_bytes)
-        else:
-            return n_bytes
+        return torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=0.01)
 
     training_step = partialmethod(step, strata="train")
     validation_step = partialmethod(step, strata="validate")
@@ -759,7 +674,7 @@ class SequenceModule(lit.LightningModule):
 
         assert stage in ["fit", "validate", "test", "predict"]
 
-        print(f"setting up for stage {stage.value}")
+        print(f"setting up {self._mode} for stage {stage.value}")
 
         mapping = dict(
             fit=["train", "validate"],
@@ -774,7 +689,7 @@ class SequenceModule(lit.LightningModule):
     def teardown(self, stage: StageName):
         assert stage in ["fit", "validate", "test", "predict"]
 
-        print(f"tearing down for stage {stage.value}")
+        print(f"tearing down {self._mode} for stage {stage.value}")
 
         mapping = dict(
             fit=["train", "validate"],

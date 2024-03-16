@@ -38,7 +38,7 @@ def sample(
 
         if (mode == 'pretrain'):
             
-            if params.pretrain_sample_rate < random.random():
+            if params.pretrain.sample_rate < random.random():
                 continue
 
             label = -1
@@ -50,7 +50,7 @@ def sample(
             if label is None:
                 continue
 
-            if params.finetune_sample_rate < random.random():
+            if params.finetune.sample_rate < random.random():
                 continue
 
             if balancer.thresholds[label] < random.random():
@@ -160,10 +160,13 @@ def mask(batch: TensorDict, params: Hyperparameters) -> tuple[TensorDict, Tensor
     return inputs, targets
 
 def stack(batch: list[tuple[TensorDict, torch.Tensor]]):
+    
+    # FIXME something is broken here
 
-    inputs, targets = list(map(list, zip(*batch)))
+    inputs, targets = zip(*batch)
     
     inputs = torch.stack(inputs, dim=0).squeeze(dim=1).auto_batch_size_(batch_dims=1)
+
     targets = torch.stack(targets)
     
     return inputs, targets

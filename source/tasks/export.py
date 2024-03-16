@@ -9,6 +9,6 @@ def export_module_to_onnx(module: SequenceModule):
 
     filepath = Path(fl.current_context().working_directory) / "model.onnx"
 
-    module.to_torchscript(file_path=filepath, method="script")
+    module.to_onnx(file_path=filepath, export_params=True)
 
     # return fl.types.file.FlyteFile(filepath)
