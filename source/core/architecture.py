@@ -10,12 +10,13 @@ from beartype import beartype
 from jaxtyping import Bool, Float, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from lightning.pytorch.trainer.states import TrainerFn as StageName
-from tdigest import TDigest
+from pytdigest import TDigest
 from tensordict import TensorDict
 from torch import Tensor
 from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
+import numpy as np
 import humanize
 
 from source.core.iterops import stream
@@ -559,8 +560,6 @@ def step(
         return total_loss
 
     elif self._mode == "finetune":
-        
-        print(batch.targets)
 
         loss = cross_entropy(predictions, batch.targets, weight=self.weights)
         log(f"{self._mode}-{strata}/loss", loss, prog_bar=True)
@@ -599,7 +598,7 @@ class SequenceModule(lit.LightningModule):
         self,
         datapath: str | os.PathLike,
         params: Hyperparameters,
-        digests: dict[str, TDigest],
+        centroids: dict[str, np.ndarray],
         balancer: LabelBalancer,
     ):
         super().__init__()
@@ -623,13 +622,13 @@ class SequenceModule(lit.LightningModule):
         self.metrics = create_metrics(params=params)
 
         self._mode: str = "pretrain"
-        self.digests: dict[str, TDigest] = digests
         self.balancer = balancer
 
         self.register_buffer('weights', torch.tensor(self.balancer.weights))
 
         self.dataloaders: dict[str, DataLoader] = {}
         self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
+        self.centroids: dict[str, np.ndarray] = centroids
 
         self.example_input_array = mock(params)
 
@@ -672,7 +671,7 @@ class SequenceModule(lit.LightningModule):
     predict_step = partialmethod(step, strata="predict")
 
     def setup(self, stage: StageName):
-        pipe = partial(stream, datapath=self.datapath, mode=self._mode, digests=self.digests, params=self.params, balancer=self.balancer)
+        pipe = partial(stream, datapath=self.datapath, mode=self._mode, centroids=self.centroids, params=self.params, balancer=self.balancer)
 
         assert stage in ["fit", "validate", "test", "predict"]
 

@@ -33,7 +33,7 @@ def pipeline():
 
     fields = fk.map_task(partial(parse, ledger=ledger))(fieldreq=fieldreqs)
 
-    digests = fk.map_task(partial(digest, ledger=ledger, n_slices=10_000))(field=fields)
+    centroids = fk.map_task(partial(digest, ledger=ledger, n_slices=10_000))(field=fields)
 
     params = parameterize(fields=fields, params={})
 
@@ -41,7 +41,7 @@ def pipeline():
 
     lifestreams = preprocess(ledger=ledger, fields=fields, shard_size=1, balancer=balancer)
 
-    train(dataset=lifestreams, params=params, digests=digests, balancer=balancer)
+    train(dataset=lifestreams, params=params, centroids=centroids, balancer=balancer)
 
 if __name__ == "__main__":
     pipeline()

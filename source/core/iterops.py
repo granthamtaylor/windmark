@@ -9,8 +9,9 @@ import torch
 from tensordict import TensorDict
 from torchdata import datapipes
 import fastavro
-from tdigest import TDigest
+from pytdigest import TDigest
 import lightning.pytorch as lit
+import numpy as np
 
 from source.core.schema import (
     SPECIAL_TOKENS,
@@ -116,20 +117,20 @@ def cdf(
     observation: dict[str, list[int] | list[float | None] | list[str | None]],
     params: Hyperparameters,
     digests: dict[str, TDigest],
-) -> dict[str, list[int] | list[float | None] | list[str | None]]:
+) -> dict[str, list[int] | np.ndarray | list[str | None]]:
     
     for field in params.fields:
         
         if field.dtype in ['continuous']:
 
-            digest = digests[field.name]
-            values = observation[field.name]
-            observation[field.name] = list(map(lambda x: digest.cdf(x) if x is not None else 0, values))
+            digest: TDigest = digests[field.name]
+            array = np.array(observation[field.name], dtype=np.float64)
+            observation[field.name] = digest.cdf(array)
 
     return observation
 
 def collate(
-    observation: dict[str, list[int] | list[float | None] | list[str | None]], params: Hyperparameters
+    observation: dict[str, list[int] | np.ndarray | list[str | None]], params: Hyperparameters
 ) -> dict[str, torch.Tensor]:
 
     output = {}
@@ -204,10 +205,12 @@ def stream(
     datapath: str | os.PathLike,
     mode: str,
     masks: str,
-    digests: dict[str, TDigest],
+    centroids: dict[str, np.ndarray],
     params: Hyperparameters,
     balancer: LabelBalancer,
 ) -> datapipes.iter.IterDataPipe:
+    
+    digests = {field: TDigest.of_centroids(centroid) for field, centroid in centroids.items()}
 
     assert mode in ["pretrain", "finetune", "inference"]
     

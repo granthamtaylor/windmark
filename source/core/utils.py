@@ -1,4 +1,3 @@
-import copy
 from math import isclose
 from functools import partial
 
@@ -6,6 +5,7 @@ import torch
 from tensordict import TensorDict
 from rich.console import Console
 from rich.table import Table
+
 
 from source.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField
 

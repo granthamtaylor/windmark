@@ -1,16 +1,18 @@
 import flytekit as fk
 import polars as pl
-from tdigest import TDigest
+from pytdigest import TDigest
+import numpy as np
 
 from source.core.schema import Field
 
 
 @fk.task
-def create_digest_from_ledger(
+def create_digest_centroids_from_ledger(
     ledger: str,
     field: Field,
     n_slices: int = 10_000
-) -> dict[str, TDigest]:
+) -> dict[str, np.ndarray]:
+
     digest = TDigest()
 
     if field.dtype != "continuous":
@@ -25,6 +27,6 @@ def create_digest_from_ledger(
     )
 
     for shard in shards:
-        digest.batch_update(shard.get_column(field.name).to_numpy().astype(float))
+        digest.update(shard.get_column(field.name).to_numpy())
 
-    return {field.name: digest}
+    return {field.name: digest.get_centroids()}

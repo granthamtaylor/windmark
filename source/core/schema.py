@@ -70,10 +70,10 @@ class Hyperparameters(Parameterized):
     
     # pretraining
     n_quantiles: int = param.Integer(16, bounds=(1, 512))
-    p_mask_event: float = param.Magnitude(0.1)
-    p_mask_field: float = param.Magnitude(0.1)
+    p_mask_event: float = param.Magnitude(0.0)
+    p_mask_field: float = param.Magnitude(0.0)
     pretrain: TrainingParameters = param.Parameter(TrainingParameters(
-        max_epochs=2,
+        max_epochs=36,
         sample_rate=0.01,
         check_val_every_n_epoch=8,
         gradient_clip_val=0.05,

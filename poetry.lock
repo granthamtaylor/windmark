@@ -12,16 +12,6 @@ files = [
 ]
 
 [[package]]
-name = "accumulation-tree"
-version = "0.6.2"
-description = "Red/black tree with support for fast accumulation of values in a key range"
-optional = false
-python-versions = "*"
-files = [
-    {file = "accumulation_tree-0.6.2.tar.gz", hash = "sha256:0de0f083ba56a82126d0af5940ba968264b201ab109b43581c6e709968417141"},
-]
-
-[[package]]
 name = "adlfs"
 version = "2024.2.0"
 description = "Access Azure Datalake Gen1 with fsspec and dask"
@@ -3436,6 +3426,21 @@ files = [
 ]
 
 [[package]]
+name = "pytdigest"
+version = "0.1.4"
+description = "Python package for *fast* TDigest calculation."
+optional = false
+python-versions = ">=3.7, <4"
+files = [
+    {file = "pytdigest-0.1.4-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:e29e083ed4564fff0484ad8a9ba2e95d613bdef4d8c04caf05dbf455da76f59d"},
+    {file = "pytdigest-0.1.4.tar.gz", hash = "sha256:573dfee19bb0f26fc1f43d8a571b513f9d8f09ff1add98ce99826357e0070f0d"},
+]
+
+[package.dependencies]
+numpy = ">=1.19.0"
+pandas = ">=1.1.0"
+
+[[package]]
 name = "pytest"
 version = "8.0.2"
 description = "pytest: simple powerful testing with Python"
@@ -3566,16 +3571,6 @@ python-versions = "*"
 files = [
     {file = "pytz-2024.1-py2.py3-none-any.whl", hash = "sha256:328171f4e3623139da4983451950b28e95ac706e13f3f2630a879749e7a8b319"},
     {file = "pytz-2024.1.tar.gz", hash = "sha256:2a29735ea9c18baf14b448846bde5a48030ed267578472d8955cd0e7443a9812"},
-]
-
-[[package]]
-name = "pyudorandom"
-version = "1.0.0"
-description = "Generate pseudorandom numbers by using algebra"
-optional = false
-python-versions = "*"
-files = [
-    {file = "pyudorandom-1.0.0.tar.gz", hash = "sha256:f30a093a0170c15f9c7f87eb29f71f0f5fde995528b7c6dc4606d389e8c37755"},
 ]
 
 [[package]]
@@ -4068,25 +4063,6 @@ files = [
 
 [package.dependencies]
 mpmath = ">=0.19"
-
-[[package]]
-name = "tdigest"
-version = "0.5.2.2"
-description = "T-Digest data structure"
-optional = false
-python-versions = "*"
-files = [
-    {file = "tdigest-0.5.2.2-py2.py3-none-any.whl", hash = "sha256:e32ff6ab62e4defdb93b816c831080d94dfa1efb68a9fa1e7976c237fa9375cb"},
-    {file = "tdigest-0.5.2.2-py3-none-any.whl", hash = "sha256:dd25f8d6e6be002192bba9e4b8c16491d36c10b389f50637818603d1f67c6fb2"},
-    {file = "tdigest-0.5.2.2.tar.gz", hash = "sha256:8deffc8bac024761786f43d9444e3b6c91008cd690323e051f068820a7364d0e"},
-]
-
-[package.dependencies]
-accumulation-tree = "*"
-pyudorandom = "*"
-
-[package.extras]
-tests = ["numpy", "pytest", "pytest-cov", "pytest-timeout"]
 
 [[package]]
 name = "tensorboard"
@@ -4738,4 +4714,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "3.11.8"
-content-hash = "ab5b4cfcc17c1717daa36b122fc5262c42bebe32ce842c633f0b4ade995f2738"
+content-hash = "a6408e2c801f4ce81045be344802fea724e0cbbbf918485bb99e5f219ce978b2"

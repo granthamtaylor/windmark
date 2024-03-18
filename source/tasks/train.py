@@ -1,9 +1,8 @@
 from pathlib import Path
 
-import flytekit as fk
 from funcy import join
+import flytekit as fk
 import torch
-from tdigest import TDigest
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import (
     LearningRateFinder,
@@ -13,6 +12,7 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.profilers import AdvancedProfiler
+import numpy as np
 
 from source.core.schema import Hyperparameters
 from source.core.architecture import SequenceModule
@@ -22,7 +22,7 @@ from source.core.utils import LabelBalancer
 def train_sequence_encoder(
     dataset: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
-    digests: list[dict[str, TDigest]],
+    centroids: list[dict[str, np.ndarray]],
     balancer: LabelBalancer,
 ) -> SequenceModule:
     
@@ -33,7 +33,7 @@ def train_sequence_encoder(
     module = SequenceModule(
         datapath=dataset.path,
         params=params,
-        digests=join(digests),
+        centroids=join(centroids),
         balancer=balancer,
     )
     
