@@ -1,4 +1,13 @@
+import copy
 from math import isclose
+from functools import partial
+
+import torch
+from tensordict import TensorDict
+from rich.console import Console
+from rich.table import Table
+
+from source.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField
 
 class LabelBalancer:
 
@@ -11,10 +20,10 @@ class LabelBalancer:
 
         self.size = len(labels)
 
-        self.labels = labels
-        self.counts = counts
-        self.total = total = sum(counts)
-        self.values = [count / total for count in counts]
+        self.labels: list[str] = labels
+        self.counts: list[int] = counts
+        self.total: int = sum(counts)
+        self.values: list[float] = [count / self.total for count in counts]
 
         assert isclose(sum(self.values), 1.0)
 
@@ -25,25 +34,152 @@ class LabelBalancer:
         size = self.size
         null = 1 / size
 
-        interpolation = [kappa * value + (1 - kappa) * null for value in self.values]
+        self.interpolation: list[float] = [kappa * value + (1 - kappa) * null for value in self.values]
 
-        assert isclose(sum(interpolation), 1.0)
+        assert isclose(sum(self.interpolation), 1.0)
 
-        ratio = [interpol / value for interpol, value in zip(self.values, interpolation)]
+        ratio = [interpol / value for interpol, value in zip(self.values, self.interpolation)]
 
-        self.thresholds = list(map(lambda x: x / max(ratio), ratio))
-        self.weights = list(map(lambda x: sum(ratio) / (x * size * size), interpolation))
+        self.thresholds: list[float] = list(map(lambda x: x / max(ratio), ratio))
+        self.weights: list[float] = list(map(lambda x: sum(ratio) / (x * size * size), self.interpolation))
 
-# class ShardManager:
+    def show(self):
+
+        table = Table(title="Label Balancer")
+
+        table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
+        
+        for label in self.labels:
+            table.add_column(f'"{label}"', style="magenta")
+            
+        def format_percent(values: list[float]) -> list[str]:
+            return list(map(lambda x: f"{x:.4%}", values))
+        
+        def format_numbers(values: list[float]) -> list[str]:
+            return list(map(lambda x: f"{x:.4}", values))
+        
+        def format_integers(values: list[float]) -> list[str]:
+            return list(map(lambda x: f"{x:,}", values))
+
+        table.add_row("Label Counts", *format_integers(self.counts))
+        table.add_row("Population Distribution", *format_percent(self.values))
+        table.add_row("Loss Weights", *format_numbers(self.weights))
+        table.add_row("Sample Thresholds", *format_percent(self.thresholds))
+        table.add_row("Observation Distribution", *format_percent(self.interpolation))
+
+        console = Console()
+        console.print(table)
+
+class ShardManager:
     
-#     def __init__(self, train: float, validate: float, test: float):
+    def __init__(self, train: float, validate: float, test: float):
 
-#         assert isclose([train, validate, test])
+        assert isclose([train, validate, test])
         
-#         self.train = (0., train)
-#         self.validate = (train, validate)
-#         self.test = test
+        self.train = (0., train)
+        self.validate = (train, validate)
+        self.test = test
 
-#     def find_shard_strata(shard: int, n_shards: int):
-        
-        
+    def find_shard_strata(shard: int, n_shards: int):
+        ...
+
+
+def mock(params: Hyperparameters) -> TensorDict:
+    
+    data = {}
+
+    N = params.batch_size
+    L = params.n_context
+
+    is_padded = torch.arange(L).expand(N, L).lt(torch.randint(1, L, [N]).unsqueeze(-1)).bool()
+
+    for field in params.fields:
+        match field.dtype:
+            case "continuous":
+                indicators = torch.randint(0, len(SPECIAL_TOKENS), (N, L))
+                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), indicators)
+                is_empty = padded.eq(getattr(SPECIAL_TOKENS, "VAL_")).long()
+                values = torch.rand(N, L).mul(is_empty)
+                data[field.name] = ContinuousField(content=values, lookup=padded, batch_size=[N])
+
+            case "discrete":
+                values = torch.randint(0, field.n_levels + len(SPECIAL_TOKENS), (N, L))
+                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
+                data[field.name] = DiscreteField(lookup=padded, batch_size=[N])
+
+            case "entity":
+                values = torch.randint(0, L + len(SPECIAL_TOKENS), (N, L))
+                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
+                data[field.name] = EntityField(lookup=padded, batch_size=[N])
+
+    return TensorDict(data, batch_size=N)
+
+
+def complexity(params: Hyperparameters) -> int:
+    # as per https://pytorch.org/docs/stable/generated/torch.nn.TransformerEncoderLayer.html
+    D_FFN = 2048
+
+    # pretty good assumption you are using FP16 or BF16
+    FP_PRECISION = 16
+
+    def _calculate_bert_memory_complexity(
+        batch_size: int,
+        max_seq_len: int,
+        d_hidden: int,
+        n_heads: int,
+        n_blocks: int,
+        precision: int,
+        d_ffn: int,
+    ) -> int:
+        assert isinstance(batch_size, int), "batch_size must be an integer"
+        assert batch_size > 0, "batch_size must be greater than 0"
+
+        assert isinstance(max_seq_len, int), "max_seq_len must be an integer"
+        assert max_seq_len > 0, "max_seq_len must be greater than 0"
+
+        assert isinstance(d_hidden, int), "d_hidden must be an integer"
+        assert d_hidden > 0, "d_hidden must be greater than 0"
+
+        assert isinstance(n_heads, int), "n_heads must be an integer"
+        assert n_heads > 0, "n_heads must be greater than 0"
+
+        assert isinstance(n_blocks, int), "n_blocks must be an integer"
+        assert n_blocks > 0, "n_blocks must be greater than 0"
+
+        assert isinstance(precision, int), "precision must be an integer"
+        assert precision > 0, "precision must be greater than 0"
+
+        assert isinstance(d_ffn, int), "FFN dim must be an integer"
+        assert d_ffn > 0, "FFN dim must be greater than 0"
+
+        memory = batch_size * max_seq_len * (8 * d_hidden + d_ffn)
+        memory += batch_size * n_heads * max_seq_len * max_seq_len
+
+        # the "3" comes from forward prop, backward prop, and general model overhead
+        memory *= 2.5 * n_blocks * precision
+
+        return memory
+
+    encoder = partial(
+        _calculate_bert_memory_complexity,
+        precision=FP_PRECISION,
+        d_ffn=D_FFN,
+    )
+
+    field = encoder(
+        batch_size=params.batch_size * params.n_context,
+        max_seq_len=params.n_fields,
+        d_hidden=params.d_field,
+        n_blocks=params.n_layers_field_encoder,
+        n_heads=params.n_heads_field_encoder,
+    )
+
+    event = encoder(
+        batch_size=params.batch_size,
+        max_seq_len=params.n_context,
+        d_hidden=params.n_fields * params.d_field,
+        n_blocks=params.n_layers_event_encoder,
+        n_heads=params.n_heads_event_encoder,
+    )
+
+    return int((field + event) / 8)

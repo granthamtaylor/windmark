@@ -1,10 +1,11 @@
 from functools import partial
+from pathlib import Path
 
-import flytekit as fl
+import flytekit as fk
 
 from source.tasks import (
+    sanitize,
     fieldreq,
-    read,
     digest,
     parse,
     preprocess,
@@ -14,7 +15,7 @@ from source.tasks import (
     export,
 )
 
-@fl.workflow
+@fk.workflow
 def pipeline():
 
     schema = {
@@ -28,17 +29,17 @@ def pipeline():
     
     fieldreqs = fieldreq(schema=schema)
 
-    df = read(datapath="/home/grantham/Desktop/windmark/data/ledger.subsample.parquet")
+    ledger = sanitize(ledger="/home/grantham/windmark/data/ledger.subsample.parquet")
 
-    fields = fl.map_task(partial(parse, ledger=df))(fieldreq=fieldreqs)
+    fields = fk.map_task(partial(parse, ledger=ledger))(fieldreq=fieldreqs)
 
-    digests = fl.map_task(partial(digest, ledger=df, n_slices=10_000))(field=fields)
-
-    lifestreams = preprocess(ledger=df, fields=fields, n_shards=10)
+    digests = fk.map_task(partial(digest, ledger=ledger, n_slices=10_000))(field=fields)
 
     params = parameterize(fields=fields, params={})
 
-    balancer = rebalance(ledger=df, params=params)
+    balancer = rebalance(ledger=ledger, params=params)
+
+    lifestreams = preprocess(ledger=ledger, fields=fields, shard_size=1, balancer=balancer)
 
     train(dataset=lifestreams, params=params, digests=digests, balancer=balancer)
 

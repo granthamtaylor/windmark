@@ -1,9 +1,9 @@
-import flytekit as fl
+import flytekit as fk
 import polars as pl
 
 from source.core.schema import Field
 
-@fl.task
+@fk.task
 def diagnose(ledger: pl.DataFrame, fields: list[Field]):
 
     assert "sequence_id" in ledger.columns

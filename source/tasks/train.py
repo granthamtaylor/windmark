@@ -6,16 +6,17 @@ import torch
 from tdigest import TDigest
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import (
-    ModelSummary,
     LearningRateFinder,
     DeviceStatsMonitor,
     EarlyStopping,
     ModelCheckpoint,
 )
 from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.profilers import AdvancedProfiler
 
-from source.core import Hyperparameters, SequenceModule, LabelBalancer
-
+from source.core.schema import Hyperparameters
+from source.core.architecture import SequenceModule
+from source.core.utils import LabelBalancer
 
 @fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
 def train_sequence_encoder(
@@ -26,6 +27,8 @@ def train_sequence_encoder(
 ) -> SequenceModule:
     
     assert torch.cuda.is_available()
+    
+    torch.set_float32_matmul_precision('medium')
 
     module = SequenceModule(
         datapath=dataset.path,
@@ -46,15 +49,15 @@ def train_sequence_encoder(
         devices="auto",
         strategy="auto",
         precision="bf16-mixed",
+        profiler=AdvancedProfiler(filename='profile'),
         max_epochs=params.pretrain.max_epochs,
         check_val_every_n_epoch=params.pretrain.check_val_every_n_epoch,
         gradient_clip_val=params.pretrain.gradient_clip_val,
         fast_dev_run=params.dev_mode,
         callbacks = [
-            LearningRateFinder(),
+            # LearningRateFinder(),
             DeviceStatsMonitor(),
             EarlyStopping(monitor='pretrain-validate/loss'),
-            ModelSummary(4),
             pretrain := ModelCheckpoint(),
             
         ]
@@ -78,7 +81,6 @@ def train_sequence_encoder(
             LearningRateFinder(),
             DeviceStatsMonitor(),
             EarlyStopping(monitor='finetune-validate/loss'),
-            ModelSummary(4),
             finetune := ModelCheckpoint(),
         ]
     )

@@ -1,6 +1,6 @@
-from flytekit import task
+import flytekit as fk
 
-@task
+@fk.task
 def create_fieldreqs_from_schema(schema: dict[str, str]) -> list[dict[str, str]]:
 
     fieldreqs = []

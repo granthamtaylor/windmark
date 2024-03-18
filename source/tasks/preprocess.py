@@ -1,24 +1,39 @@
 from pathlib import Path
 
-import flytekit as fl
+import flytekit as fk
 import polars as pl
 
 from source.core.schema import SPECIAL_TOKENS, Field
+from source.core.utils import LabelBalancer
 
 
-@fl.task
+@fk.task
 def preprocess_ledger_to_shards(
-    ledger: pl.DataFrame,
+    ledger: str,
     fields: list[Field],
-    n_shards: int,
-) -> fl.types.directory.FlyteDirectory:
+    shard_size: int,
+    balancer: LabelBalancer,
+) -> fk.types.directory.FlyteDirectory:
+
     assert len(fields) > 0
-    assert n_shards > 0
+    assert shard_size > 0
     
-    print(f'ledger size: {len(ledger)}')
+    lf = pl.scan_parquet(ledger)
+    
+    n_unique = lf.select(pl.len()).collect().item()
 
     def discretize(column: str) -> pl.Expr:
-        return pl.col(column).cast(pl.String).cast(pl.Categorical).to_physical().cast(pl.Int32).alias(column)
+
+        return (
+            pl.col(column)
+            .cast(pl.String)
+            .cast(pl.Categorical)
+            .to_physical()
+            .cast(pl.Int32)
+            .add(len(SPECIAL_TOKENS))
+            .fill_null(getattr(SPECIAL_TOKENS, "UNK_"))
+            .alias(column)
+        )
 
     def format(field: Field) -> pl.Expr:
         match field.dtype:
@@ -26,20 +41,20 @@ def preprocess_ledger_to_shards(
                 return pl.col(field.name)
 
             case "discrete":
-                return discretize(field.name).add(len(SPECIAL_TOKENS)).fill_null(getattr(SPECIAL_TOKENS, "UNK_"))
+                return discretize(field.name)
 
             case "entity":
                 return pl.col(field.name)
 
-    shard_size = ledger.get_column("sequence_id").unique().count() // n_shards
-
-    outpath = Path(fl.current_context().working_directory) / "lifestreams"
+    outpath = Path(fk.current_context().working_directory) / "lifestreams"
     outpath.mkdir(exist_ok=True)
-
+    
+    label_map: dict[str, int] = {label: index for index, label in enumerate(balancer.labels)}
+    
     lifestreams = (
-        ledger.select(
+        lf.select(
             *[format(field) for field in fields],
-            discretize("target"),
+            pl.col("target").replace(label_map).cast(pl.Int32).fill_null(-1),
             "event_id",
             "sequence_id",
             "event_order",
@@ -52,10 +67,13 @@ def preprocess_ledger_to_shards(
             event_ids=pl.col("event_id"),
             target=pl.col("target"),
         )
+        .collect()
         .iter_slices(shard_size)
     )
 
     for index, shard in enumerate(lifestreams):
         shard.write_avro(outpath / f"shard-{index}.avro", name="lifestream")
+    
+    print(f'finished preprocessing {index+1} lifestream files')
 
-    return fl.types.directory.FlyteDirectory(outpath)
+    return fk.types.directory.FlyteDirectory(outpath)

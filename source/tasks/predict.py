@@ -1,14 +1,15 @@
 from pathlib import Path
 
-import flytekit as fl
+import flytekit as fk
 from lightning.pytorch import Trainer
 
-from source.core import SequenceModule, ParquetBatchWriter
+from source.core.architecture import SequenceModule
+from source.core.iterops import ParquetBatchWriter
 
 
-@fl.task
-def predict_sequence_encoder(module: SequenceModule) -> fl.types.file.FlyteFile:
-    outpath = Path(fl.current_context().working_directory) / "lifestreams"
+@fk.task
+def predict_sequence_encoder(module: SequenceModule) -> fk.types.file.FlyteFile:
+    outpath = Path(fk.current_context().working_directory) / "lifestreams"
 
     callbacks = [ParquetBatchWriter(outpath)]
 
@@ -16,4 +17,4 @@ def predict_sequence_encoder(module: SequenceModule) -> fl.types.file.FlyteFile:
 
     trainer.predict(module)
 
-    return fl.types.file.FlyteFile(outpath)
+    return fk.types.file.FlyteFile(outpath)

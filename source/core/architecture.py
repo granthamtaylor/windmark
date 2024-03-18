@@ -7,7 +7,7 @@ import lightning.pytorch as lit
 import torch
 import torchmetrics
 from beartype import beartype
-from jaxtyping import Bool, Float, Int, jaxtyped
+from jaxtyping import Bool, Float, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from lightning.pytorch.trainer.states import TrainerFn as StageName
 from tdigest import TDigest
@@ -16,12 +16,11 @@ from torch import Tensor
 from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
+import humanize
 
 from source.core.iterops import stream
-from source.core.schema import SPECIAL_TOKENS, Field, Hyperparameters
-from source.core.utils import LabelBalancer
-from source.core.tensorclass import ContinuousField, DiscreteField, EntityField, SequenceData
-from source.core.mock import mock
+from source.core.schema import SPECIAL_TOKENS, Field, ContinuousField, DiscreteField, EntityField, SequenceData, Hyperparameters
+from source.core.utils import LabelBalancer, mock, complexity
 
 @jaxtyped(typechecker=beartype)
 def _squarify(tensor: Tensor) -> Tensor:
@@ -560,11 +559,13 @@ def step(
         return total_loss
 
     elif self._mode == "finetune":
+        
+        print(batch.targets)
 
         loss = cross_entropy(predictions, batch.targets, weight=self.weights)
         log(f"{self._mode}-{strata}/loss", loss, prog_bar=True)
 
-        logits = torch.nn.functional.softmax(predictions)
+        logits = torch.nn.functional.softmax(predictions, dim=1)
         for title, metric in self.metrics[f"{strata}_metrics"].items():
             metric(logits, batch.targets)
             log(f"{self._mode}-{strata}/{title}", metric)
@@ -632,7 +633,8 @@ class SequenceModule(lit.LightningModule):
 
         self.example_input_array = mock(params)
 
-        self.flops_per_batch = measure_flops(self, lambda: self.forward(mock(params, batch_size=1)))
+        self.flops_per_batch = measure_flops(self, lambda: self.forward(mock(params)))
+
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N T"], TensorDict]:
@@ -719,3 +721,8 @@ class SequenceModule(lit.LightningModule):
         print(f"setting mode to {mode}")
 
         self._mode = mode
+
+    def show(self):
+
+        memory = humanize.naturalsize(complexity(self.params))
+        flops = humanize.metric(self.flops_per_batch, "V")

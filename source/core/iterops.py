@@ -12,9 +12,19 @@ import fastavro
 from tdigest import TDigest
 import lightning.pytorch as lit
 
-from source.core.schema import SPECIAL_TOKENS, Hyperparameters
+from source.core.schema import (
+    SPECIAL_TOKENS,
+    DiscreteField,
+    ContinuousField,
+    EntityField,
+    PretrainingData,
+    FinetuningData,
+    InferenceData,
+    SequenceData,
+    Hyperparameters
+)
+
 from source.core.utils import LabelBalancer
-from source.core.tensorclass import DiscreteField, ContinuousField, EntityField, PretrainingData, FinetuningData, InferenceData, SequenceData
 
 def read(filename):
     with open(filename, "rb") as f:
@@ -47,7 +57,7 @@ def sample(
 
             label = sequence["target"][event]
 
-            if label is None:
+            if (label is None) or (label == -1):
                 continue
 
             if params.finetune.sample_rate < random.random():
@@ -167,7 +177,7 @@ def stack(batch: list[tuple[TensorDict, torch.Tensor]]):
     
     inputs = torch.stack(inputs, dim=0).squeeze(dim=1).auto_batch_size_(batch_dims=1)
 
-    targets = torch.stack(targets)
+    targets = torch.stack(targets, dim=0)
     
     return inputs, targets
 
@@ -200,6 +210,8 @@ def stream(
 ) -> datapipes.iter.IterDataPipe:
 
     assert mode in ["pretrain", "finetune", "inference"]
+    
+    print(f"creating {mode} datapipe")
 
     return (
         datapipes.iter.FileLister(datapath, masks=masks)

@@ -1,82 +1,48 @@
-<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="983px" height="830px" viewBox="-0.5 -0.5 983 830" content="&lt;mxfile&gt;&lt;diagram id=&quot;LnKvJqbT0HFULMd-5nQp&quot; name=&quot;Page-1&quot;&gt;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&lt;/diagram&gt;&lt;/mxfile&gt;">
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="960px" height="868px" viewBox="-0.5 -0.5 960 868" content="&lt;mxfile&gt;&lt;diagram id=&quot;LnKvJqbT0HFULMd-5nQp&quot; name=&quot;Page-1&quot;&gt;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&lt;/diagram&gt;&lt;/mxfile&gt;">
     <defs/>
     <g>
-        <rect x="294" y="531" width="320" height="260" rx="10.4" ry="10.4" fill="none" stroke="#d6b656" stroke-width="8" pointer-events="all"/>
+        <rect x="211" y="539" width="320" height="260" rx="10.4" ry="10.4" fill="none" stroke="#d6b656" stroke-width="8" pointer-events="all"/>
+        <rect x="346" y="82" width="320" height="320" rx="12.8" ry="12.8" fill="none" stroke="#82b366" stroke-width="7" stroke-dasharray="7 7" pointer-events="all"/>
+        <path d="M 546 352 L 546 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 539 372 L 553 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 466 312 L 465.69 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 458.69 371.96 L 472.69 372.04" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 386 312 L 386.31 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 379.31 372.04 L 393.31 371.96" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 306 352 L 306 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 299 372 L 313 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 226 312 L 225.69 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 218.69 371.96 L 232.69 372.04" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 626 352 L 625.69 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 618.69 371.89 L 632.69 372.11" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 706 312 L 706 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 699 372 L 713 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 786 312 L 785.69 372" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 778.69 371.96 L 792.69 372.04" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="586" y="82" width="80" height="320" rx="3.2" ry="3.2" fill="none" stroke="#82b366" stroke-width="8" pointer-events="all"/>
+        <path d="M 806 122 L 836 122 Q 846 122 847.21 122 L 848.42 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 858.17 122 L 845.17 128.5 L 848.42 122 L 845.17 115.5 Z" fill="#666666" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 163.58 122 L 206 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 153.83 122 L 166.83 115.5 L 163.58 122 L 166.83 128.5 Z" fill="#666666" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 246 122 L 286 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 326 122 L 366 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 406 122 L 446 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 486 122 L 526 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 566 122 L 606 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 646 122 L 766 122" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="226" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="306" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="386" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="466" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="546" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="626" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="786" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="706" cy="122" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
+        <rect x="2" y="95.5" width="146" height="53" fill="none" stroke="none" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
             <switch>
                 <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe flex-start; justify-content: unsafe flex-start; width: 322px; height: 1px; padding-top: 798px; margin-left: 616px;">
-                        <div data-drawio-colors="color: rgb(0, 0, 0); " style="box-sizing: border-box; font-size: 0px; text-align: left;">
-                            <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                <font color="#d6b656">
-                                    Observation
-                                </font>
-                            </div>
-                        </div>
-                    </div>
-                </foreignObject>
-                <text x="616" y="824" fill="rgb(0, 0, 0)" font-family="Helvetica" font-size="26px">
-                    Observation
-                </text>
-            </switch>
-        </g>
-        <rect x="294" y="81" width="320" height="320" rx="12.8" ry="12.8" fill="none" stroke="#82b366" stroke-width="7" stroke-dasharray="7 7" pointer-events="all"/>
-        <path d="M 494 351 L 494 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 487 371 L 501 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 414 311 L 413.69 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 406.69 370.96 L 420.69 371.04" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 334 311 L 334.31 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 327.31 371.04 L 341.31 370.96" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 254 351 L 254 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 247 371 L 261 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 174 311 L 173.69 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 166.69 370.96 L 180.69 371.04" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 574 351 L 573.69 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 566.69 370.89 L 580.69 371.11" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 654 311 L 654 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 647 371 L 661 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 734 311 L 733.69 371" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 726.69 370.96 L 740.69 371.04" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <rect x="534" y="81" width="80" height="320" rx="3.2" ry="3.2" fill="none" stroke="#82b366" stroke-width="8" pointer-events="all"/>
-        <g transform="translate(-0.5 -0.5)">
-            <switch>
-                <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe flex-start; justify-content: unsafe flex-start; width: 82px; height: 1px; padding-top: 408px; margin-left: 616px;">
-                        <div data-drawio-colors="color: #81b365; " style="box-sizing: border-box; font-size: 0px; text-align: left;">
-                            <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(129, 179, 101); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                Context
-                            </div>
-                        </div>
-                    </div>
-                </foreignObject>
-                <text x="616" y="434" fill="#81b365" font-family="Helvetica" font-size="26px">
-                    Context
-                </text>
-            </switch>
-        </g>
-        <path d="M 754 121 L 784 121 Q 794 121 795.21 121 L 796.42 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 806.17 121 L 793.17 127.5 L 796.42 121 L 793.17 114.5 Z" fill="#666666" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 111.58 121 L 154 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 101.83 121 L 114.83 114.5 L 111.58 121 L 114.83 127.5 Z" fill="#666666" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 194 121 L 234 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 274 121 L 314 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 354 121 L 394 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 434 121 L 474 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 514 121 L 554 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 594 121 L 714 121" fill="none" stroke="#666666" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="174" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="254" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="334" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="414" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="494" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="574" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="734" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="654" cy="121" rx="20" ry="20" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/>
-        <rect x="44" y="71" width="60" height="30" fill="none" stroke="none" pointer-events="all"/>
-        <g transform="translate(-0.5 -0.5)">
-            <switch>
-                <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 58px; height: 1px; padding-top: 86px; margin-left: 45px;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 144px; height: 1px; padding-top: 122px; margin-left: 3px;">
                         <div data-drawio-colors="color: #666666; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(102, 102, 102); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
                                 Sequence
@@ -84,17 +50,17 @@
                         </div>
                     </div>
                 </foreignObject>
-                <text x="74" y="94" fill="#666666" font-family="Helvetica" font-size="26px" text-anchor="middle">
-                    Seque...
+                <text x="75" y="130" fill="#666666" font-family="Helvetica" font-size="26px" text-anchor="middle">
+                    Sequence
                 </text>
             </switch>
         </g>
-        <path d="M 484 -239 L 464 -239 Q 454 -239 454 -229 L 454 51 Q 454 61 444 61 L 434 61 Q 424 61 434 61 L 444 61 Q 454 61 454 71 L 454 351 Q 454 361 464 361 L 484 361" fill="none" stroke="#6c8ebf" stroke-width="4" stroke-miterlimit="10" transform="rotate(90,454,61)" pointer-events="all"/>
-        <rect x="424" y="1" width="60" height="30" fill="none" stroke="none" pointer-events="all"/>
+        <path d="M 536 -238 L 516 -238 Q 506 -238 506 -228 L 506 52 Q 506 62 496 62 L 486 62 Q 476 62 486 62 L 496 62 Q 506 62 506 72 L 506 352 Q 506 362 516 362 L 536 362" fill="none" stroke="#6c8ebf" stroke-width="4" stroke-miterlimit="10" transform="rotate(90,506,62)" pointer-events="all"/>
+        <rect x="476" y="2" width="60" height="30" fill="none" stroke="none" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
             <switch>
                 <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 58px; height: 1px; padding-top: 16px; margin-left: 425px;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 58px; height: 1px; padding-top: 17px; margin-left: 477px;">
                         <div data-drawio-colors="color: #6c8ebf; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(108, 142, 191); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
                                 Events
@@ -102,17 +68,17 @@
                         </div>
                     </div>
                 </foreignObject>
-                <text x="454" y="24" fill="#6c8ebf" font-family="Helvetica" font-size="26px" text-anchor="middle">
+                <text x="506" y="25" fill="#6c8ebf" font-family="Helvetica" font-size="26px" text-anchor="middle">
                     Events
                 </text>
             </switch>
         </g>
-        <path d="M 134 151 L 124 151 Q 114 151 114 161 L 114 251 Q 114 261 104 261 L 99 261 Q 94 261 104 261 L 109 261 Q 114 261 114 271 L 114 361 Q 114 371 124 371 L 134 371" fill="none" stroke="#b85450" stroke-width="4" stroke-miterlimit="10" pointer-events="all"/>
-        <rect x="4" y="246" width="60" height="30" fill="none" stroke="none" pointer-events="all"/>
+        <path d="M 186 152 L 176 152 Q 166 152 166 162 L 166 252 Q 166 262 156 262 L 151 262 Q 146 262 156 262 L 161 262 Q 166 262 166 272 L 166 362 Q 166 372 176 372 L 186 372" fill="none" stroke="#b85450" stroke-width="4" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="56" y="247" width="60" height="30" fill="none" stroke="none" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
             <switch>
                 <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 58px; height: 1px; padding-top: 261px; margin-left: 5px;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 58px; height: 1px; padding-top: 262px; margin-left: 57px;">
                         <div data-drawio-colors="color: #b95450; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(185, 84, 80); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
                                 Fields
@@ -120,129 +86,162 @@
                         </div>
                     </div>
                 </foreignObject>
-                <text x="34" y="269" fill="#b95450" font-family="Helvetica" font-size="26px" text-anchor="middle">
+                <text x="86" y="270" fill="#b95450" font-family="Helvetica" font-size="26px" text-anchor="middle">
                     Fields
                 </text>
             </switch>
         </g>
-        <path d="M 173.71 141 L 174 171" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="174" cy="181" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 174 191 L 174 251" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="174" cy="261" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 174 271 L 174 291" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="174" cy="301" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 254.02 141 L 254 211" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="254" cy="221" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <ellipse cx="254" cy="181" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 254 231 L 254 331" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="254" cy="341" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 334 191 L 334 211" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="334" cy="221" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 334 231 L 334 291" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="334" cy="301" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 334.33 141 L 334 171" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="334" cy="181" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 733.71 141 L 734 171" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="734" cy="181" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 573.71 141 L 574 171" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="574" cy="181" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 494.02 141 L 494 171" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="494" cy="181" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 413.71 141 L 414 251" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="414" cy="261" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 494 191 L 494 251" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="494" cy="261" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 494 271 L 494 331" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="494" cy="341" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 414 271 L 414 291" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="414" cy="301" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 574 231 L 574 331" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="574" cy="341" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 574 191 L 574 211" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="574" cy="221" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 654 271 L 654 291" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="654" cy="301" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 734 271 L 734 291" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="734" cy="301" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 654.02 141 L 654 171" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="654" cy="181" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 654 191 L 654 251" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="654" cy="261" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 734 191 L 734 251" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="734" cy="261" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
-        <path d="M 494 751 L 494 771" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 487 771 L 501 771" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 414 751 L 413.69 771" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 406.69 770.89 L 420.69 771.11" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 334 751 L 334 771" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 327 771 L 341 771" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 574 751 L 573.69 771" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 566.69 770.89 L 580.69 771.11" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 334 591 L 334 611" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="334" cy="621" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 334 671 L 334 691" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="334" cy="701" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 334 551 L 334 571" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 341 551 L 327 551" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <ellipse cx="334" cy="581" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 574 551 L 574 571" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 581 551 L 567 551" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <ellipse cx="574" cy="581" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 494 551 L 494 571" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 501 551 L 487 551" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <ellipse cx="494" cy="581" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 414 631 L 414 651" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="414" cy="661" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 494 631 L 494 651" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="494" cy="661" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 494 711 L 494 731" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="494" cy="741" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 414 671 L 414 691" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="414" cy="701" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 574 711 L 574 731" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="574" cy="741" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 574 591 L 574 611" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="574" cy="621" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
-        <path d="M 334 631 L 334 651" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="334" cy="661" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 334 711 L 334 731" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="334" cy="741" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 414 711 L 414 731" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="414" cy="741" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 494 671 L 494 691" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="494" cy="701" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 414 591 L 414 611" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="414" cy="621" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 414 551 L 414 571" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <path d="M 421 551 L 407 551" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
-        <ellipse cx="414" cy="581" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 494 591 L 494 611" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="494" cy="621" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 574 631 L 574 651" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="574" cy="661" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 574 671 L 574 691" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
-        <ellipse cx="574" cy="701" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
-        <path d="M 443.97 424.6 L 462.11 424.4 L 462.58 466.76 L 480.47 466.56 L 453.96 507.5 L 426.55 467.16 L 444.44 466.96 Z" fill="none" stroke="rgb(0, 0, 0)" stroke-opacity="0.2" stroke-width="7" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
-        <path d="M 884 758 L 822.5 758 Q 797.5 758 801.9 733.39 L 827.77 588.61 Q 832.17 564 857.17 564 L 910.83 564 Q 935.83 564 940.23 588.61 L 966.1 733.39 Q 970.5 758 945.5 758 Z" fill="#e1d5e7" stroke="#9673a6" stroke-miterlimit="10" transform="rotate(90,884,661)" pointer-events="all"/>
+        <path d="M 225.71 142 L 226 172" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="226" cy="182" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 226 192 L 226 252" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="226" cy="262" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 226 272 L 226 292" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="226" cy="302" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 306.02 142 L 306 212" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="306" cy="222" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <ellipse cx="306" cy="182" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 306 232 L 306 332" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="306" cy="342" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 386 192 L 386 212" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="386" cy="222" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 386 232 L 386 292" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="386" cy="302" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 386.33 142 L 386 172" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="386" cy="182" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 785.71 142 L 786 172" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="786" cy="182" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 625.71 142 L 626 172" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="626" cy="182" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 546.02 142 L 546 172" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="546" cy="182" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 465.71 142 L 466 252" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="466" cy="262" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 546 192 L 546 252" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="546" cy="262" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 546 272 L 546 332" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="546" cy="342" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 466 272 L 466 292" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="466" cy="302" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 626 232 L 626 332" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="626" cy="342" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 626 192 L 626 212" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="626" cy="222" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 706 272 L 706 292" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="706" cy="302" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 786 272 L 786 292" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="786" cy="302" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 706.02 142 L 706 172" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="706" cy="182" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 706 192 L 706 252" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="706" cy="262" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 786 192 L 786 252" fill="none" stroke="#b85450" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="786" cy="262" rx="10" ry="10" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/>
+        <path d="M 411 759 L 411 779" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 404 779 L 418 779" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 331 759 L 330.69 779" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 323.69 778.89 L 337.69 779.11" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 251 759 L 251 779" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 244 779 L 258 779" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 491 759 L 490.69 779" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 483.69 778.89 L 497.69 779.11" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 251 599 L 251 619" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="251" cy="629" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 251 679 L 251 699" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="251" cy="709" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 251 559 L 251 579" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 258 559 L 244 559" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <ellipse cx="251" cy="589" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 491 559 L 491 579" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 498 559 L 484 559" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <ellipse cx="491" cy="589" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 411 559 L 411 579" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 418 559 L 404 559" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <ellipse cx="411" cy="589" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 331 639 L 331 659" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="331" cy="669" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 411 639 L 411 659" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="411" cy="669" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 411 719 L 411 739" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="411" cy="749" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 331 679 L 331 699" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="331" cy="709" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 491 719 L 491 739" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="491" cy="749" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 491 599 L 491 619" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="491" cy="629" rx="10" ry="10" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/>
+        <path d="M 251 639 L 251 659" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="251" cy="669" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 251 719 L 251 739" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="251" cy="749" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 331 719 L 331 739" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="331" cy="749" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 411 679 L 411 699" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="411" cy="709" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 331 599 L 331 619" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="331" cy="629" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 331 559 L 331 579" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <path d="M 338 559 L 324 559" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="all"/>
+        <ellipse cx="331" cy="589" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 411 599 L 411 619" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="411" cy="629" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 491 639 L 491 659" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="491" cy="669" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 491 679 L 491 699" fill="none" stroke="#d6b656" stroke-width="7" stroke-miterlimit="10" pointer-events="stroke"/>
+        <ellipse cx="491" cy="709" rx="10" ry="10" fill="#d6b656" stroke="none" pointer-events="all"/>
+        <path d="M 360.97 432.6 L 379.11 432.4 L 379.58 474.76 L 397.47 474.56 L 370.96 515.5 L 343.55 475.16 L 361.44 474.96 Z" fill="none" stroke="rgb(0, 0, 0)" stroke-opacity="0.2" stroke-width="7" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <path d="M 827 797 L 765.5 797 Q 740.5 797 743.85 772.23 L 771.81 565.77 Q 775.17 541 800.17 541 L 853.83 541 Q 878.83 541 882.19 565.77 L 910.15 772.23 Q 913.5 797 888.5 797 Z" fill="#e1d5e7" stroke="#9673a6" stroke-width="8" stroke-miterlimit="10" transform="rotate(90,827,669)" pointer-events="all"/>
+        <path d="M 564.5 677.51 L 564.5 659.37 L 624.86 659.37 L 624.86 641.48 L 665.5 668.44 L 624.86 695.4 L 624.86 677.51 Z" fill="none" stroke="rgb(0, 0, 0)" stroke-opacity="0.2" stroke-width="7" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="437.5" y="425" width="107" height="49" fill="none" stroke="none" pointer-events="all"/>
         <g transform="translate(-0.5 -0.5)">
             <switch>
                 <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
-                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 192px; height: 1px; padding-top: 661px; margin-left: 788px;">
-                        <div data-drawio-colors="color: rgb(0, 0, 0); " style="box-sizing: border-box; font-size: 0px; text-align: center;">
-                            <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                <font color="#9673a6" style="font-size: 24px;">
-                                    Sequence Encoder
-                                </font>
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 105px; height: 1px; padding-top: 450px; margin-left: 439px;">
+                        <div data-drawio-colors="color: #81b365; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
+                            <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(129, 179, 101); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
+                                Context
                             </div>
                         </div>
                     </div>
                 </foreignObject>
-                <text x="884" y="665" fill="rgb(0, 0, 0)" font-family="Helvetica" font-size="12px" text-anchor="middle">
-                    Sequence Encoder
+                <text x="491" y="457" fill="#81b365" font-family="Helvetica" font-size="26px" text-anchor="middle">
+                    Context
                 </text>
             </switch>
         </g>
-        <path d="M 647.5 669.51 L 647.5 651.37 L 707.86 651.37 L 707.86 633.48 L 748.5 660.44 L 707.86 687.4 L 707.86 669.51 Z" fill="none" stroke="rgb(0, 0, 0)" stroke-opacity="0.2" stroke-width="7" stroke-linejoin="round" stroke-miterlimit="10" pointer-events="all"/>
+        <rect x="267.25" y="817" width="207.5" height="49" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)">
+            <switch>
+                <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 206px; height: 1px; padding-top: 842px; margin-left: 268px;">
+                        <div data-drawio-colors="color: #d6b656; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
+                            <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(214, 182, 86); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
+                                Observation
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="371" y="849" fill="#d6b656" font-family="Helvetica" font-size="26px" text-anchor="middle">
+                    Observation
+                </text>
+            </switch>
+        </g>
+        <rect x="726" y="644.5" width="207.5" height="49" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)">
+            <switch>
+                <foreignObject pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility" style="overflow: visible; text-align: left;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 206px; height: 1px; padding-top: 669px; margin-left: 727px;">
+                        <div data-drawio-colors="color: #9773a6; " style="box-sizing: border-box; font-size: 0px; text-align: center;">
+                            <div style="display: inline-block; font-size: 26px; font-family: Helvetica; color: rgb(151, 115, 166); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
+                                Sequence Model
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="830" y="677" fill="#9773a6" font-family="Helvetica" font-size="26px" text-anchor="middle">
+                    Sequence Model
+                </text>
+            </switch>
+        </g>
     </g>
     <switch>
         <g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/>

@@ -1,14 +1,14 @@
 from pathlib import Path
 
-import flytekit as fl
+import flytekit as fk
 
-from source.core import SequenceModule
+from source.core.architecture import SequenceModule
 
-@fl.task
+@fk.task
 def export_module_to_onnx(module: SequenceModule):
 
-    filepath = Path(fl.current_context().working_directory) / "model.onnx"
+    filepath = Path(fk.current_context().working_directory) / "model.onnx"
 
     module.to_onnx(file_path=filepath, export_params=True)
 
-    # return fl.types.file.FlyteFile(filepath)
+    # return fk.types.file.FlyteFile(filepath)
