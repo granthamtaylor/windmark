@@ -10,7 +10,6 @@ from beartype import beartype
 from jaxtyping import Bool, Float, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from lightning.pytorch.trainer.states import TrainerFn as StageName
-from pytdigest import TDigest
 from tensordict import TensorDict
 from torch import Tensor
 from torch.nn.functional import cross_entropy
@@ -97,7 +96,7 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         super().__init__()
 
         self.field: Field = field
-        self.embeddings = torch.nn.Embedding(field.n_levels + len(SPECIAL_TOKENS), params.d_field)
+        self.embeddings = torch.nn.Embedding(field.levels + len(SPECIAL_TOKENS), params.d_field)
 
     def forward(self, inputs: DiscreteField) -> Tensor:
         return self.embeddings(inputs.lookup)
@@ -196,7 +195,7 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
     ModularAttributeEmbeddingSystem is a PyTorch module for embedding fields.
     """
 
-    def __init__(self, params: Hyperparameters):
+    def __init__(self, params: Hyperparameters, fields: list[Field]):
         """
         Initialize moduler field embedder.
 
@@ -213,8 +212,8 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
             entity=EntityFieldEmbedder,
         )
 
-        for field in params.fields:
-            embedder = embedder_map[field.dtype]
+        for field in fields:
+            embedder = embedder_map[field.type]
             embedders[field.name] = embedder(params=params, field=field)
 
         self.embedders = torch.nn.ModuleDict(embedders)
@@ -382,7 +381,7 @@ class EventDecoder(torch.nn.Module):
     EventDecoder is a PyTorch module for decoding masked events from their contextualized representations.
     """
 
-    def __init__(self, params: Hyperparameters):
+    def __init__(self, params: Hyperparameters, fields: list[Field]):
         """
         Initialize the event decoder.
 
@@ -394,10 +393,10 @@ class EventDecoder(torch.nn.Module):
 
         projections = {}
 
-        for field in params.fields:
-            match field.dtype:
+        for field in fields:
+            match field.type:
                 case "discrete":
-                    d_target = field.n_levels
+                    d_target = field.levels
 
                 case "entity":
                     d_target = params.n_context
@@ -550,7 +549,7 @@ def step(
 
         losses = []
 
-        for field in self.params.fields:
+        for field in self.fields:
             loss = cross_entropy(reconstruction[field.name], batch.targets[field.name])
             losses.append(loss)
             log(f"{self._mode}-{strata}/{field.name}-loss", loss)
@@ -598,6 +597,7 @@ class SequenceModule(lit.LightningModule):
         self,
         datapath: str | os.PathLike,
         params: Hyperparameters,
+        fields: list[Field],
         centroids: dict[str, np.ndarray],
         balancer: LabelBalancer,
     ):
@@ -609,14 +609,15 @@ class SequenceModule(lit.LightningModule):
         self.datapath: str | os.PathLike = datapath
 
         self.params: Hyperparameters = params
+        self.fields: list[Field] = fields
         self.save_hyperparameters(params.values())
 
         self.lr = params.learning_rate
 
-        self.modular_field_embedder = ModularAttributeEmbeddingSystem(params=params)
+        self.modular_field_embedder = ModularAttributeEmbeddingSystem(params=params, fields=fields)
         self.field_encoder = FieldEncoder(params=params)
         self.event_encoder = EventEncoder(params=params)
-        self.event_decoder = EventDecoder(params=params)
+        self.event_decoder = EventDecoder(params=params, fields=fields)
         self.decision_head = DecisionHead(params=params)
 
         self.metrics = create_metrics(params=params)
@@ -630,9 +631,9 @@ class SequenceModule(lit.LightningModule):
         self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
         self.centroids: dict[str, np.ndarray] = centroids
 
-        self.example_input_array = mock(params)
+        self.example_input_array = sample = mock(params=params, fields=fields)
 
-        self.flops_per_batch = measure_flops(self, lambda: self.forward(mock(params)))
+        self.flops_per_batch = measure_flops(self, lambda: self.forward(sample))
 
 
     @jaxtyped(typechecker=beartype)
@@ -648,7 +649,7 @@ class SequenceModule(lit.LightningModule):
             A tuple containing two tensors. The first tensor represents the supervised classification predictions and the second tensor represents the decoded, reconstructed events.
         """
 
-        field_mask, event_mask = create_attention_masks(inputs, fields=self.params.fields)
+        field_mask, event_mask = create_attention_masks(inputs, fields=self.fields)
 
         fields = self.modular_field_embedder(inputs)
         events = self.field_encoder(fields, mask=field_mask)
@@ -663,7 +664,11 @@ class SequenceModule(lit.LightningModule):
 
         print(f"configuring optimizer for mode {self._mode}")
 
-        return torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=0.01)
+        return torch.optim.AdamW(
+            self.parameters(),
+            lr=self.lr,
+            weight_decay=self.params.weight_decay
+        )
 
     training_step = partialmethod(step, strata="train")
     validation_step = partialmethod(step, strata="validate")
@@ -671,7 +676,15 @@ class SequenceModule(lit.LightningModule):
     predict_step = partialmethod(step, strata="predict")
 
     def setup(self, stage: StageName):
-        pipe = partial(stream, datapath=self.datapath, mode=self._mode, centroids=self.centroids, params=self.params, balancer=self.balancer)
+        pipe = partial(
+            stream,
+            datapath=self.datapath,
+            mode=self._mode,
+            centroids=self.centroids,
+            params=self.params,
+            balancer=self.balancer,
+            fields=self.fields,
+        )
 
         assert stage in ["fit", "validate", "test", "predict"]
 

@@ -7,18 +7,19 @@ from rich.console import Console
 from rich.table import Table
 
 
-from source.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField
+from source.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField, Field
 
 class LabelBalancer:
 
-    def __init__(self, labels: list[str], counts: list[int]):
+    def __init__(self, labels: list[str], counts: list[int], kappa: float):
         
         for count in counts:
             assert count > 0
 
         assert len(labels) == len(counts)
 
-        self.size = len(labels)
+        size: int = len(labels)
+        null: float = 1 / size
 
         self.labels: list[str] = labels
         self.counts: list[int] = counts
@@ -27,25 +28,22 @@ class LabelBalancer:
 
         assert isclose(sum(self.values), 1.0)
 
-    def interpolate(self, kappa: float):
-
         assert 0.0 <= kappa <= 1.0
 
-        size = self.size
-        null = 1 / size
-
-        self.interpolation: list[float] = [kappa * value + (1 - kappa) * null for value in self.values]
+        self.interpolation: list[float] = [kappa * null + (1 - kappa) * value for value in self.values]
 
         assert isclose(sum(self.interpolation), 1.0)
 
-        ratio = [interpol / value for interpol, value in zip(self.values, self.interpolation)]
+        ratio: list[float] = [value / interpol for interpol, value in zip(self.values, self.interpolation)]
 
         self.thresholds: list[float] = list(map(lambda x: x / max(ratio), ratio))
         self.weights: list[float] = list(map(lambda x: sum(ratio) / (x * size * size), self.interpolation))
+        
+        self.kappa: float = kappa
 
     def show(self):
 
-        table = Table(title="Label Balancer")
+        table = Table(title=f"LabelBalancer(kappa={self.kappa:.2%})")
 
         table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
         
@@ -63,9 +61,9 @@ class LabelBalancer:
 
         table.add_row("Label Counts", *format_integers(self.counts))
         table.add_row("Population Distribution", *format_percent(self.values))
-        table.add_row("Loss Weights", *format_numbers(self.weights))
-        table.add_row("Sample Thresholds", *format_percent(self.thresholds))
         table.add_row("Observation Distribution", *format_percent(self.interpolation))
+        table.add_row("Marginal Sample Rate", *format_percent(self.thresholds))
+        table.add_row("Loss Weights", *format_numbers(self.weights))
 
         console = Console()
         console.print(table)
@@ -84,7 +82,7 @@ class ShardManager:
         ...
 
 
-def mock(params: Hyperparameters) -> TensorDict:
+def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict:
     
     data = {}
 
@@ -93,8 +91,8 @@ def mock(params: Hyperparameters) -> TensorDict:
 
     is_padded = torch.arange(L).expand(N, L).lt(torch.randint(1, L, [N]).unsqueeze(-1)).bool()
 
-    for field in params.fields:
-        match field.dtype:
+    for field in fields:
+        match field.type:
             case "continuous":
                 indicators = torch.randint(0, len(SPECIAL_TOKENS), (N, L))
                 padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), indicators)
@@ -103,7 +101,7 @@ def mock(params: Hyperparameters) -> TensorDict:
                 data[field.name] = ContinuousField(content=values, lookup=padded, batch_size=[N])
 
             case "discrete":
-                values = torch.randint(0, field.n_levels + len(SPECIAL_TOKENS), (N, L))
+                values = torch.randint(0, field.levels + len(SPECIAL_TOKENS), (N, L))
                 padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
                 data[field.name] = DiscreteField(lookup=padded, batch_size=[N])
 

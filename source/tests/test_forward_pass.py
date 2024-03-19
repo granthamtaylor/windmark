@@ -11,8 +11,8 @@ from source.core.architecture import SequenceModule
 def discrete_only_inputs() -> tuple[Hyperparameters, TensorDict]:
     
     fields: list[Field] = [
-        Field("is_online", "discrete", n_levels=2),
-        Field("is_foreign", "discrete", n_levels=2),
+        Field("is_online", "discrete", levels=2),
+        Field("is_foreign", "discrete", levels=2),
     ]
     
     params = Hyperparameters(fields=fields)
@@ -60,11 +60,11 @@ def test_continuous_only_forward_pass(continuous_only_inputs):
     assert isinstance(reconstruction, TensorDict)
 
 @pytest.fixture
-def mixed_dtype_inputs() -> tuple[Hyperparameters, TensorDict, dict[str, TDigest]]:
+def mixed_type_inputs() -> tuple[Hyperparameters, TensorDict, dict[str, TDigest]]:
     
     fields: list[Field] = [
-        Field("event_code", "discrete", n_levels=5),
-        Field("is_online", "discrete", n_levels=2),
+        Field("event_code", "discrete", levels=5),
+        Field("is_online", "discrete", levels=2),
         Field("amount", "continuous"),
         Field("timediff", "continuous"),
     ]
@@ -77,9 +77,9 @@ def mixed_dtype_inputs() -> tuple[Hyperparameters, TensorDict, dict[str, TDigest
     
     return params, lifestream, digests
 
-def test_mixed_field_type_forward_pass(mixed_dtype_inputs):
+def test_mixed_field_type_forward_pass(mixed_type_inputs):
     
-    params, lifestream, digests = mixed_dtype_inputs
+    params, lifestream, digests = mixed_type_inputs
     
     module = SequenceModule(datapath='.', params=params, digests=digests)
     

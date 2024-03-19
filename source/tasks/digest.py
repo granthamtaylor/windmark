@@ -15,7 +15,7 @@ def create_digest_centroids_from_ledger(
 
     digest = TDigest()
 
-    if field.dtype != "continuous":
+    if field.type != "continuous":
         return {}
 
     shards = (

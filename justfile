@@ -13,3 +13,6 @@ tensorboard:
 
 doc:
   @poetry run pdoc source/core/architecture.py -o ./docs/site
+
+main:
+  @poetry run python ./source/pipelines/main.py

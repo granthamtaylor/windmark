@@ -1,5 +1,4 @@
 from typing import TypeAlias
-from dataclasses import dataclass
 from collections import namedtuple
 import re
 
@@ -10,7 +9,6 @@ from torch import Tensor
 from tensordict import TensorDict
 from tensordict.prototype import tensorclass
 import numpy as np
-from dataclasses_json import dataclass_json
 from param import Parameterized
 import param
 
@@ -18,31 +16,40 @@ tokens = ["VAL_", "NAN_", "UNK_", "PAD_", "MASK_"]
 SpecialTokens = namedtuple("SpecialTokens", tokens)
 SPECIAL_TOKENS = SpecialTokens(*list(range(len(tokens))))
 
-@dataclass_json
-@dataclass
 class Field:
-    name: str
-    dtype: str
-    n_levels: None | int = None
 
-    def __post_init__(self):
-        assert re.match("^[a-z0-9_]*$", self.name), "name must only contain lowercase letters, numbers, and underscore"
+    n_levels: None|int=None
+    
+    def __init__(self, **fieldinfo):
+        
+        assert len(fieldinfo), 'enter one field name and type'
+        
+        self.name, self.type = fieldinfo.popitem()
+        
+        assert self.type in [
+            'continuous', 'discrete', 'entity'
+        ]
+    
+    @property
+    def levels(self):
 
-        if isinstance(self.n_levels, float):
-            self.n_levels = int(self.n_levels)
+        return self.n_levels
 
-        assert self.dtype in ["discrete", "continuous", "entity"]
+    @levels.setter
+    def levels(self, value: int):
+        
+        assert isinstance(value, int), 'value must be of type int'
+        assert self.type == 'discrete', 'only discrete fields can have this attribute'
+        
+        self.n_levels = value
+    
+    @property
+    def is_valid(self):
 
-        match self.dtype:
-            case "discrete":
-                assert isinstance(self.n_levels, int), "n_levels must be an int for discrete fields"
-                assert self.n_levels > 0, "n_levels must be greater than 0"
-
-            case "continuous":
-                assert self.n_levels is None, "n_levels must be none for continuous fields"
-
-            case "entity":
-                assert self.n_levels is None, "n_levels must be none for entity fields"    
+        if self.type == 'discrete':
+            return isinstance(self.n_levels, int)
+        else:
+            return True
 
 class TrainingParameters(Parameterized):
 
@@ -54,10 +61,11 @@ class TrainingParameters(Parameterized):
 class Hyperparameters(Parameterized):
 
     dev_mode: bool = param.Boolean(False)
-    fields: list[Field] = param.List(item_type=Field)
     learning_rate: float = param.Magnitude(0.0001)
+    weight_decay: float = param.Magnitude(0.001)
 
     # architecture hyperparameters
+    n_fields: int = param.Integer(bounds=(0, 128))
     batch_size: int = param.Integer(128, bounds=(1, 2048))
     n_context: int = param.Integer(128, bounds=(1, 2048))
     d_field: int = param.Integer(64, bounds=(2, 256))
@@ -70,8 +78,8 @@ class Hyperparameters(Parameterized):
     
     # pretraining
     n_quantiles: int = param.Integer(16, bounds=(1, 512))
-    p_mask_event: float = param.Magnitude(0.0)
-    p_mask_field: float = param.Magnitude(0.0)
+    p_mask_event: float = param.Magnitude(0.1)
+    p_mask_field: float = param.Magnitude(0.1)
     pretrain: TrainingParameters = param.Parameter(TrainingParameters(
         max_epochs=36,
         sample_rate=0.01,
@@ -82,20 +90,14 @@ class Hyperparameters(Parameterized):
     # finetuning
     n_targets: int = param.Integer(2, bounds=(2, 2048))
     freeze_epochs: int = param.Integer(1, bounds=(1, 128))
-    interpolation_rate: float = param.Magnitude(0.075)
+    interpolation_rate: float = param.Magnitude(0.125)
     head_shape_log_base: int = param.Integer(4, bounds=(1, 32))
     finetune: TrainingParameters = param.Parameter(TrainingParameters(
         max_epochs=72,
-        sample_rate=0.1,
+        sample_rate=0.05,
         check_val_every_n_epoch=1,
         gradient_clip_val=0.05,
     ))
-
-
-    @property
-    def n_fields(self) -> int:
-
-        return len(self.fields)
 
     def values(self):
 

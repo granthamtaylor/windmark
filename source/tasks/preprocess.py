@@ -19,8 +19,6 @@ def preprocess_ledger_to_shards(
     assert shard_size > 0
     
     lf = pl.scan_parquet(ledger)
-    
-    n_unique = lf.select(pl.len()).collect().item()
 
     def discretize(column: str) -> pl.Expr:
 
@@ -36,7 +34,7 @@ def preprocess_ledger_to_shards(
         )
 
     def format(field: Field) -> pl.Expr:
-        match field.dtype:
+        match field.type:
             case "continuous":
                 return pl.col(field.name)
 

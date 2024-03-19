@@ -6,22 +6,22 @@ from source.core.schema import Field
 @fk.task
 def parse_field_from_ledger(
     ledger: str,
-    fieldreq: dict[str, str],
+    field: Field,
 ) -> Field:
     
     lf = pl.scan_parquet(ledger)
+
+    assert field.name in lf.columns, f'column {field.name} is not available'
+
+    if field.type == "discrete":
+
+        field.levels = (
+            lf.select(field.name)
+            .collect()
+            .get_column(field.name)
+            .n_unique()
+        )
     
-    name = fieldreq["name"]
-    dtype = fieldreq["dtype"]
+    assert field.is_valid
 
-    assert name in lf.columns, f'column {name} is not available'
-    assert dtype in ["discrete", "continuous", "entity"]
-
-    if dtype == "discrete":
-        n_levels = (
-            lf.select(name).collect().get_column(name).n_unique())
-
-    else:
-        n_levels = None
-
-    return Field(name, dtype, n_levels)
+    return field

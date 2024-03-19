@@ -27,9 +27,8 @@ def rebalance_class_labels(
     balancer = LabelBalancer(
         labels=records['labels'],
         counts=records['counts'],
+        kappa=params.interpolation_rate,
     )
-    
-    balancer.interpolate(kappa=params.interpolation_rate)
     
     balancer.show()
     

@@ -14,7 +14,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.profilers import AdvancedProfiler
 import numpy as np
 
-from source.core.schema import Hyperparameters
+from source.core.schema import Hyperparameters, Field
 from source.core.architecture import SequenceModule
 from source.core.utils import LabelBalancer
 
@@ -22,6 +22,7 @@ from source.core.utils import LabelBalancer
 def train_sequence_encoder(
     dataset: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
+    fields: list[Field],
     centroids: list[dict[str, np.ndarray]],
     balancer: LabelBalancer,
 ) -> SequenceModule:
@@ -32,6 +33,7 @@ def train_sequence_encoder(
 
     module = SequenceModule(
         datapath=dataset.path,
+        fields=fields,
         params=params,
         centroids=join(centroids),
         balancer=balancer,
@@ -80,7 +82,7 @@ def train_sequence_encoder(
         callbacks=[
             LearningRateFinder(),
             DeviceStatsMonitor(),
-            EarlyStopping(monitor='finetune-validate/loss'),
+            # EarlyStopping(monitor='finetune-validate/loss'),
             finetune := ModelCheckpoint(),
         ]
     )

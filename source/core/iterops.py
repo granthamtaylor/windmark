@@ -22,7 +22,8 @@ from source.core.schema import (
     FinetuningData,
     InferenceData,
     SequenceData,
-    Hyperparameters
+    Hyperparameters,
+    Field
 )
 
 from source.core.utils import LabelBalancer
@@ -38,6 +39,7 @@ def read(filename):
 def sample(
     sequence: dict,
     params: Hyperparameters,
+    fields: list[Field],
     balancer: LabelBalancer,
     mode: str,
 ) -> list[dict[str, int | float | None]]:
@@ -78,7 +80,7 @@ def sample(
             label=label,
         )
 
-        for field in params.fields:
+        for field in fields:
             observation[field.name] = sequence[field.name][window]
 
         observations.append(observation)
@@ -88,14 +90,15 @@ def sample(
 
 def hash(
     observation: dict[str, list[int] | list[float | None] | list[str | None]],
+    fields: list[Field],
     params: Hyperparameters,
 ) -> dict[str, list[int] | list[float | None] | list[str | None]]:
     
     token_map = SPECIAL_TOKENS._asdict()
     
-    for field in params.fields:
+    for field in fields:
         
-        if field.dtype in ['entity']:
+        if field.type in ['entity']:
         
             field = observation[field.name]
 
@@ -115,13 +118,13 @@ def hash(
 
 def cdf(
     observation: dict[str, list[int] | list[float | None] | list[str | None]],
-    params: Hyperparameters,
+    fields: list[Field],
     digests: dict[str, TDigest],
 ) -> dict[str, list[int] | np.ndarray | list[str | None]]:
     
-    for field in params.fields:
+    for field in fields:
         
-        if field.dtype in ['continuous']:
+        if field.type in ['continuous']:
 
             digest: TDigest = digests[field.name]
             array = np.array(observation[field.name], dtype=np.float64)
@@ -130,7 +133,8 @@ def cdf(
     return observation
 
 def collate(
-    observation: dict[str, list[int] | np.ndarray | list[str | None]], params: Hyperparameters
+    observation: dict[str, list[int] | np.ndarray | list[str | None]], params: Hyperparameters,
+    fields: list[Field]
 ) -> dict[str, torch.Tensor]:
 
     output = {}
@@ -141,34 +145,15 @@ def collate(
         entity=EntityField,
     )
 
-    for field in params.fields:
+    for field in fields:
         values = observation[field.name]
-        tensorclass = tensorclass_map[field.dtype]
+        tensorclass = tensorclass_map[field.type]
         output[field.name] = tensorclass.collate(values, params=params)
 
     inputs = TensorDict(output, batch_size=1)
     labels = torch.tensor(observation["label"])
 
     return inputs, labels
-
-def mask(batch: TensorDict, params: Hyperparameters) -> tuple[TensorDict, TensorDict]:
-    
-    inputs, _ = batch
-    
-    N, L = (params.batch_size, params.n_context)
-    
-    targets = {}
-
-    is_event_masked = torch.rand(N, L).lt(params.p_mask_event)
-
-    for field in params.fields:
-
-        targets[field.name] = inputs[field.name].target(params=params)
-        inputs[field.name].mask(is_event_masked, params=params)
-        
-    targets = TensorDict(targets, batch_size=params.batch_size)
-
-    return inputs, targets
 
 def stack(batch: list[tuple[TensorDict, torch.Tensor]]):
     
@@ -182,14 +167,42 @@ def stack(batch: list[tuple[TensorDict, torch.Tensor]]):
     
     return inputs, targets
 
+def mask(
+    batch: TensorDict,
+    params: Hyperparameters,
+    fields: list[Field],
+) -> tuple[TensorDict, TensorDict]:
+    
+    inputs, _ = batch
+    
+    N, L = (params.batch_size, params.n_context)
+    
+    targets = {}
+
+    is_event_masked = torch.rand(N, L).lt(params.p_mask_event)
+
+    for field in fields:
+
+        targets[field.name] = inputs[field.name].target(params=params)
+        inputs[field.name].mask(is_event_masked, params=params)
+        
+    targets = TensorDict(targets, batch_size=params.batch_size)
+
+    return inputs, targets
+
 def to_tensorclass(
     batch: tuple[TensorDict, torch.Tensor],
     params: Hyperparameters,
+    fields: list[Field],
     mode: str,
 ) -> SequenceData:
     
     if mode == 'pretrain':
-        batch: tuple[TensorDict, TensorDict] = mask(batch, params=params)
+        batch: tuple[TensorDict, TensorDict] = mask(
+            batch=batch,
+            params=params,
+            fields=fields
+        )
     
     tensorclass_map = dict(
         pretrain=PretrainingData,
@@ -206,6 +219,7 @@ def stream(
     mode: str,
     masks: str,
     centroids: dict[str, np.ndarray],
+    fields: list[Field],
     params: Hyperparameters,
     balancer: LabelBalancer,
 ) -> datapipes.iter.IterDataPipe:
@@ -215,6 +229,8 @@ def stream(
     assert mode in ["pretrain", "finetune", "inference"]
     
     print(f"creating {mode} datapipe")
+    
+    sampler = partial(sample, fields=fields, params=params, balancer=balancer, mode=mode)
 
     return (
         datapipes.iter.FileLister(datapath, masks=masks)
@@ -222,14 +238,14 @@ def stream(
         .sharding_filter()
         .flatmap(read)
         .shuffle()
-        .flatmap(partial(sample, params=params, balancer=balancer, mode=mode))
-        .map(partial(cdf, params=params, digests=digests))
-        .map(partial(hash, params=params))
+        .flatmap(sampler)
+        .map(partial(cdf, fields=fields, digests=digests))
+        .map(partial(hash, fields=fields, params=params))
         .shuffle()
-        .map(partial(collate, params=params))
+        .map(partial(collate, fields=fields, params=params))
         .batch(params.batch_size, drop_last=True)
         .map(stack)
-        .map(partial(to_tensorclass, params=params, mode=mode))
+        .map(partial(to_tensorclass, params=params, fields=fields, mode=mode))
     )
 
 
