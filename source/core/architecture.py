@@ -604,7 +604,11 @@ class SequenceModule(lit.LightningModule):
         super().__init__()
 
         assert os.path.exists(datapath)
+
         assert isinstance(params, Hyperparameters)
+
+        for field in fields:
+            assert field.is_valid, f'field {field.name} is not valid'
 
         self.datapath: str | os.PathLike = datapath
 
@@ -672,7 +676,7 @@ class SequenceModule(lit.LightningModule):
 
     training_step = partialmethod(step, strata="train")
     validation_step = partialmethod(step, strata="validate")
-    testing_step = partialmethod(step, strata="test")
+    test_step = partialmethod(step, strata="test")
     predict_step = partialmethod(step, strata="predict")
 
     def setup(self, stage: StageName):
@@ -697,12 +701,13 @@ class SequenceModule(lit.LightningModule):
             predict=["predict"],
         )
 
-        for strata in mapping[stage]:
-            self.pipes[strata] = pipe(masks="*.avro")
+
+        for strata in mapping[stage]:            
+            dataset = (strata if strata != "predict" else "test")
+            self.pipes[strata] = pipe(masks=f"{dataset}-*.avro")
 
     def teardown(self, stage: StageName):
         assert stage in ["fit", "validate", "test", "predict"]
-
         print(f"tearing down {self._mode} for stage {stage.value}")
 
         mapping = dict(

@@ -1,11 +1,11 @@
-from math import isclose
+import math
 from functools import partial
 
 import torch
 from tensordict import TensorDict
 from rich.console import Console
 from rich.table import Table
-
+import polars as pl
 
 from source.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField, Field
 
@@ -26,13 +26,13 @@ class LabelBalancer:
         self.total: int = sum(counts)
         self.values: list[float] = [count / self.total for count in counts]
 
-        assert isclose(sum(self.values), 1.0)
+        assert math.isclose(sum(self.values), 1.0)
 
         assert 0.0 <= kappa <= 1.0
 
         self.interpolation: list[float] = [kappa * null + (1 - kappa) * value for value in self.values]
 
-        assert isclose(sum(self.interpolation), 1.0)
+        assert math.isclose(sum(self.interpolation), 1.0)
 
         ratio: list[float] = [value / interpol for interpol, value in zip(self.values, self.interpolation)]
 
@@ -67,19 +67,6 @@ class LabelBalancer:
 
         console = Console()
         console.print(table)
-
-class ShardManager:
-    
-    def __init__(self, train: float, validate: float, test: float):
-
-        assert isclose([train, validate, test])
-        
-        self.train = (0., train)
-        self.validate = (train, validate)
-        self.test = test
-
-    def find_shard_strata(shard: int, n_shards: int):
-        ...
 
 
 def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict:
@@ -181,3 +168,59 @@ def complexity(params: Hyperparameters) -> int:
     )
 
     return int((field + event) / 8)
+
+class SplitManager:
+
+    def __init__(
+        self,
+        train: float,
+        validate: float,
+        test: float,
+    ):
+
+        self.train: float = train
+        self.validate: float = validate
+        self.test: float = test
+        
+        for split in [train, validate, test]:
+
+            assert isinstance(split, float)
+            assert 0.05 < split < 1.0
+        
+        self.ranges: dict[str, tuple[float, float]] = dict(
+            train=(0.0, train),
+            validate=(train, train + validate),
+            test=(train + validate, 1.0),
+        )
+    
+        assert math.isclose(sum([train, validate, test]), 1.0)
+
+class SequenceManager:
+
+    def __init__(
+        self,
+        n_sequences: int,
+        n_events: int,
+        shard_size: int,
+        params: Hyperparameters,
+        balancer: LabelBalancer,
+        split: SplitManager,
+    ):
+        
+        self.n_sequences: int = n_sequences
+        self.n_events: int = n_events
+        self.shard_size: int = shard_size
+
+        self.params: Hyperparameters = params
+        self.balancer: LabelBalancer = balancer
+        self.split: SplitManager = split
+        
+        # expected pretraining steps per epoch
+        print(split.train * n_events * params.pretrain.sample_rate / params.batch_size)
+        
+        n_labeled_events = 0
+        # expected finetuning steps per epoch
+        for label_count, label_sample_rate in zip(balancer.counts, balancer.thresholds):
+            n_labeled_events += label_count * label_sample_rate
+
+        print(split.train * n_labeled_events * params.finetune.sample_rate / params.batch_size)

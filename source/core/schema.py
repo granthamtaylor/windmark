@@ -18,17 +18,23 @@ SPECIAL_TOKENS = SpecialTokens(*list(range(len(tokens))))
 
 class Field:
 
-    n_levels: None|int=None
     
     def __init__(self, **fieldinfo):
         
         assert len(fieldinfo), 'enter one field name and type'
+        
+        self.name: str
+        self.type: str
+        self.n_levels: None|int=None
         
         self.name, self.type = fieldinfo.popitem()
         
         assert self.type in [
             'continuous', 'discrete', 'entity'
         ]
+        
+        assert re.match(r'^[a-z][a-z0-9_]*$', self.name), f'invalid field name {self.name}'
+
     
     @property
     def levels(self):
@@ -65,8 +71,8 @@ class Hyperparameters(Parameterized):
     weight_decay: float = param.Magnitude(0.001)
 
     # architecture hyperparameters
-    n_fields: int = param.Integer(bounds=(0, 128))
-    batch_size: int = param.Integer(128, bounds=(1, 2048))
+    n_fields: int = param.Integer(bounds=(0, 128), default=None, allow_None=False)
+    batch_size: int = param.Integer(32, bounds=(1, 2048))
     n_context: int = param.Integer(128, bounds=(1, 2048))
     d_field: int = param.Integer(64, bounds=(2, 256))
     n_heads_field_encoder: int = param.Integer(16, bounds=(1, 32))
@@ -81,7 +87,7 @@ class Hyperparameters(Parameterized):
     p_mask_event: float = param.Magnitude(0.1)
     p_mask_field: float = param.Magnitude(0.1)
     pretrain: TrainingParameters = param.Parameter(TrainingParameters(
-        max_epochs=36,
+        max_epochs=8,
         sample_rate=0.01,
         check_val_every_n_epoch=8,
         gradient_clip_val=0.05,
@@ -93,8 +99,8 @@ class Hyperparameters(Parameterized):
     interpolation_rate: float = param.Magnitude(0.125)
     head_shape_log_base: int = param.Integer(4, bounds=(1, 32))
     finetune: TrainingParameters = param.Parameter(TrainingParameters(
-        max_epochs=72,
-        sample_rate=0.05,
+        max_epochs=8,
+        sample_rate=0.1,
         check_val_every_n_epoch=1,
         gradient_clip_val=0.05,
     ))
@@ -218,7 +224,6 @@ class FinetuningData:
         inputs, targets = batch
         
         return cls(inputs=inputs, targets=targets, batch_size=[batch_size])
-    
 
 @tensorclass
 class InferenceData:

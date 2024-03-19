@@ -10,8 +10,8 @@ from source.tasks import (
     parse,
     preprocess,
     rebalance,
-    train,
-    export,
+    fit,
+    manager
 )
 
 @fk.workflow
@@ -32,13 +32,15 @@ def pipeline():
 
     fields = fk.map_task(partial(parse, ledger=ledger))(field=fields)
 
-    centroids = fk.map_task(partial(digest, ledger=ledger, n_slices=10_000))(field=fields)
+    centroids = fk.map_task(partial(digest, ledger=ledger, slice_size=10_000))(field=fields)
 
     balancer = rebalance(ledger=ledger, params=params)
+    
+    manager(ledger=ledger, shard_size=1, balancer=balancer, params=params)
 
-    lifestreams = preprocess(ledger=ledger, fields=fields, shard_size=1, balancer=balancer)
+    lifestreams = preprocess(ledger=ledger, fields=fields, balancer=balancer)
 
-    train(dataset=lifestreams, fields=fields, params=params, centroids=centroids, balancer=balancer)
+    fit(dataset=lifestreams, fields=fields, params=params, centroids=centroids, balancer=balancer)
 
 if __name__ == "__main__":
     pipeline()

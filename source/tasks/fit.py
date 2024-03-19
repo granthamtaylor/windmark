@@ -4,12 +4,7 @@ from funcy import join
 import flytekit as fk
 import torch
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import (
-    LearningRateFinder,
-    DeviceStatsMonitor,
-    EarlyStopping,
-    ModelCheckpoint,
-)
+from lightning.pytorch.callbacks import LearningRateFinder, EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.profilers import AdvancedProfiler
 import numpy as np
@@ -19,7 +14,7 @@ from source.core.architecture import SequenceModule
 from source.core.utils import LabelBalancer
 
 @fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
-def train_sequence_encoder(
+def fit_sequence_encoder(
     dataset: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
     fields: list[Field],
@@ -57,8 +52,7 @@ def train_sequence_encoder(
         gradient_clip_val=params.pretrain.gradient_clip_val,
         fast_dev_run=params.dev_mode,
         callbacks = [
-            # LearningRateFinder(),
-            DeviceStatsMonitor(),
+            LearningRateFinder(),
             EarlyStopping(monitor='pretrain-validate/loss'),
             pretrain := ModelCheckpoint(),
             
@@ -66,6 +60,7 @@ def train_sequence_encoder(
     )
 
     trainer.fit(module)
+    trainer.test(module)
 
     module.mode = 'finetune'
     trainer = Trainer(
@@ -81,12 +76,12 @@ def train_sequence_encoder(
         fast_dev_run=params.dev_mode,
         callbacks=[
             LearningRateFinder(),
-            DeviceStatsMonitor(),
-            # EarlyStopping(monitor='finetune-validate/loss'),
+            EarlyStopping(monitor='finetune-validate/loss'),
             finetune := ModelCheckpoint(),
         ]
     )
 
     trainer.fit(module)
+    trainer.test(module)
 
     return module

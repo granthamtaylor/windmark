@@ -10,7 +10,7 @@ from source.core.schema import Field
 def create_digest_centroids_from_ledger(
     ledger: str,
     field: Field,
-    n_slices: int = 10_000
+    slice_size: int = 10_000
 ) -> dict[str, np.ndarray]:
 
     digest = TDigest()
@@ -23,7 +23,7 @@ def create_digest_centroids_from_ledger(
         .select(field.name)
         .filter(pl.col(field.name).is_not_null())
         .collect(streaming=True)
-        .iter_slices(n_slices)
+        .iter_slices(slice_size)
     )
 
     for shard in shards:
