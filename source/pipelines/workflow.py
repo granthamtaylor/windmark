@@ -2,7 +2,7 @@ from functools import partial
 
 import flytekit as fk
 
-from source.core.schema import Field, Hyperparameters
+from source.core.schema import Schema, Hyperparameters
 
 from source.tasks import (
     sanitize,
@@ -17,21 +17,22 @@ from source.tasks import (
 @fk.workflow
 def pipeline():
 
-    fields = [
-        Field(use_chip="discrete"),
-        Field(merchant_state="discrete"),
-        Field(merchant_city="discrete"),
-        Field(merchant_name="entity"),
-        Field(mcc="discrete"),
-        Field(amount="continuous"),
-        Field(timedelta="continuous"),
-    ]
+    schema = Schema(
+        use_chip="discrete",
+        merchant_state="discrete",
+        merchant_city="discrete",
+        merchant_name="entity",
+        mcc="discrete",
+        amount="continuous",
+        timedelta="continuous",
+        timestamp="temporal",
+    )
     
-    params = Hyperparameters(n_fields=len(fields))
+    params = Hyperparameters(n_fields=len(schema))
 
     ledger = sanitize(ledger="/home/grantham/windmark/data/ledger.parquet")
 
-    fields = fk.map_task(partial(parse, ledger=ledger))(field=fields)
+    fields = fk.map_task(partial(parse, ledger=ledger))(field=schema.fields)
 
     centroids = fk.map_task(partial(digest, ledger=ledger, slice_size=10_000))(field=fields)
 

@@ -29,13 +29,10 @@ class Field:
         self.name, self.type = fieldinfo.popitem()
         
         assert self.type in [
-            'continuous', 'discrete', 'entity'
+            'continuous', 'discrete', 'entity', 'temporal'
         ]
         
         assert re.match(r'^[a-z][a-z0-9_]*$', self.name), f'invalid field name {self.name}'
-
-    def __len__(self) -> int:
-        return len(self.fields)
     
     @property
     def levels(self):
@@ -64,25 +61,17 @@ class Schema:
         
         self.fields: list[Field] = []
         
-        for field in fields.items():
-            self.fields.append(Field(**field))
-
-class TrainingParameters(Parameterized):
-
-    max_epochs: int = param.Integer(4, bounds=(1, 1024))
-    sample_rate: float = param.Magnitude(0.001)
-    check_val_every_n_epoch: int = param.Integer(1, bounds=(1, 32))
-    gradient_clip_val: float = param.Magnitude(0.05)
+        for name, dtype in fields.items():
+            self.fields.append(Field(**{name: dtype}))
+            
+    def __len__(self) -> int:
+        return len(self.fields)
 
 class Hyperparameters(Parameterized):
 
-    dev_mode: bool = param.Boolean(False)
-    learning_rate: float = param.Magnitude(0.0001)
-    weight_decay: float = param.Magnitude(0.001)
-
-    # architecture hyperparameters
+    # architectural
     n_fields: int = param.Integer(bounds=(0, 128), default=None, allow_None=False)
-    batch_size: int = param.Integer(64, bounds=(1, 2048))
+    batch_size: int = param.Integer(192, bounds=(1, 2048))
     n_context: int = param.Integer(128, bounds=(1, 2048))
     d_field: int = param.Integer(64, bounds=(2, 256))
     n_heads_field_encoder: int = param.Integer(16, bounds=(1, 32))
@@ -91,44 +80,31 @@ class Hyperparameters(Parameterized):
     n_layers_event_encoder: int = param.Integer(8, bounds=(1, 32))
     precision: int = param.Integer(8, bounds=(2, 512))
     dropout: float = param.Magnitude(0.1)
+
+    # general fitting
+    dev_mode: bool = param.Boolean(False)
+    learning_rate: float = param.Magnitude(0.0001)
+    weight_decay: float = param.Magnitude(0.001)
+    gradient_clip_val: float = param.Magnitude(0.05)
+    max_epochs: int = param.Integer(64, bounds=(1, 256))
     
     # pretraining
     n_quantiles: int = param.Integer(16, bounds=(1, 512))
     p_mask_event: float = param.Magnitude(0.05)
     p_mask_field: float = param.Magnitude(0.05)
-    pretrain: TrainingParameters = param.Parameter(TrainingParameters(
-        max_epochs=196,
-        sample_rate=0.005,
-        check_val_every_n_epoch=2,
-        gradient_clip_val=0.05,
-    ))
+    pretrain_sample_rate: float = param.Magnitude(0.005)
 
     # finetuning
     n_targets: int = param.Integer(2, bounds=(2, 2048))
     freeze_epochs: int = param.Integer(1, bounds=(1, 128))
     interpolation_rate: float = param.Magnitude(0.125)
     head_shape_log_base: int = param.Integer(4, bounds=(1, 32))
-    finetune: TrainingParameters = param.Parameter(TrainingParameters(
-        max_epochs=32,
-        sample_rate=0.1,
-        check_val_every_n_epoch=1,
-        gradient_clip_val=0.05,
-    ))
+    finetune_sample_rate: float = param.Magnitude(0.02)
 
-    def values(self):
+    @property
+    def values(self) -> dict[str, float|int|bool]:
 
-        output = self.param.values()
-        
-        del output['name']
-
-        output['pretrain'] = self.finetune.param.values()
-        del output['pretrain']['name']
-
-        output['finetune'] = self.finetune.param.values()
-        del output['finetune']['name']
-        
-        return output
-
+        return self.param.values()
 
 
 @jaxtyped(typechecker=beartype)
@@ -232,9 +208,18 @@ class ContinuousField:
             is_masked=is_masked,
             batch_size=self.batch_size
         )
-        
 
-TensorField: TypeAlias = ContinuousField|DiscreteField|EntityField
+@jaxtyped(typechecker=beartype)
+@tensorclass
+class TemporalField:
+
+    lookup: Int[Tensor, "N L"]
+    content: Float[Tensor, "N L"]
+
+    collate = ContinuousField.collate
+    mask = ContinuousField.mask
+
+TensorField: TypeAlias = ContinuousField|DiscreteField|EntityField|TemporalField
 
 @jaxtyped(typechecker=beartype)
 @tensorclass

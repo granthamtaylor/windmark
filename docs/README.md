@@ -1,6 +1,6 @@
 - [x] Entity Field Types
+- [x] Temporal Field Types
 - [ ] Neighborhood Smoothing Loss
-- [ ] Temporal Field Types
 - [ ] Create API
 - [ ] Stress test scalability
 - [ ] Create data quality checks

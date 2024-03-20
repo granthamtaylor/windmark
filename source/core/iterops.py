@@ -18,6 +18,7 @@ from source.core.schema import (
     DiscreteField,
     ContinuousField,
     EntityField,
+    TemporalField,
     PretrainingData,
     FinetuningData,
     InferenceData,
@@ -50,7 +51,7 @@ def sample(
 
         if (mode == 'pretrain'):
             
-            if params.pretrain.sample_rate < random.random():
+            if params.pretrain_sample_rate < random.random():
                 continue
 
             label = -1
@@ -62,7 +63,7 @@ def sample(
             if (label is None) or (label == -1):
                 continue
 
-            if params.finetune.sample_rate < random.random():
+            if params.finetune_sample_rate < random.random():
                 continue
 
             if balancer.thresholds[label] < random.random():
@@ -120,7 +121,7 @@ def cdf(
     
     for field in fields:
         
-        if field.type in ['continuous']:
+        if field.type in ['continuous', 'temporal']:
 
             digest: TDigest = digests[field.name]
             array = np.array(observation[field.name], dtype=np.float64)
@@ -139,6 +140,7 @@ def collate(
         discrete=DiscreteField,
         continuous=ContinuousField,
         entity=EntityField,
+        temporal=TemporalField,
     )
 
     for field in fields:

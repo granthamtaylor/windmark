@@ -15,12 +15,19 @@ def create_digest_centroids_from_ledger(
 
     digest = TDigest()
 
-    if field.type != "continuous":
+    if field.type not in ["continuous", "temporal"]:
         return {}
+
+
+    def format(field: Field) -> pl.Expr:
+        if field.type == 'continuous':
+            return pl.col(field.name)
+        else:
+            return pl.col(field.name).dt.epoch(time_unit="s")
 
     shards = (
         pl.scan_parquet(ledger)
-        .select(field.name)
+        .select(format(field))
         .filter(pl.col(field.name).is_not_null())
         .collect(streaming=True)
         .iter_slices(slice_size)

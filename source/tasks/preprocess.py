@@ -36,6 +36,9 @@ def preprocess_ledger_to_shards(
             case "continuous":
                 return pl.col(field.name)
 
+            case "temporal":
+                return pl.col(field.name).dt.epoch(time_unit="s")
+
             case "discrete":
                 return discretize(field.name)
 

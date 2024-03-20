@@ -80,7 +80,7 @@ def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict:
 
     for field in fields:
         match field.type:
-            case "continuous":
+            case "continuous" | "temporal":
                 indicators = torch.randint(0, len(SPECIAL_TOKENS), (N, L))
                 padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), indicators)
                 is_empty = padded.eq(getattr(SPECIAL_TOKENS, "VAL_")).long()
@@ -216,11 +216,11 @@ class SequenceManager:
         self.split: SplitManager = split
         
         # expected pretraining steps per epoch
-        print(split.train * n_events * params.pretrain.sample_rate / params.batch_size)
+        print(split.train * n_events * params.pretrain_sample_rate / params.batch_size)
         
         n_labeled_events = 0
         # expected finetuning steps per epoch
         for label_count, label_sample_rate in zip(balancer.counts, balancer.thresholds):
             n_labeled_events += label_count * label_sample_rate
 
-        print(split.train * n_labeled_events * params.finetune.sample_rate / params.batch_size)
+        print(split.train * n_labeled_events * params.finetune_sample_rate / params.batch_size)

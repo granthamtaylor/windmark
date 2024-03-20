@@ -189,6 +189,15 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         return projections + positional
 
+class TemporalFieldEmbedder(ContinuousFieldEmbedder):
+    """
+    TemporalFieldEmbedder is a PyTorch module that encodes features using Fourier features.
+
+    Attributes:
+        linear (torch.nn.Linear): A linear layer for transforming the input.
+        positional (torch.nn.Embedding): An embedding layer for positional encoding.
+        weights (Tensor): The weights for the Fourier features.
+    """
 
 class ModularAttributeEmbeddingSystem(torch.nn.Module):
     """
@@ -210,6 +219,7 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
             discrete=DiscreteFieldEmbedder,
             continuous=ContinuousFieldEmbedder,
             entity=EntityFieldEmbedder,
+            temporal=TemporalFieldEmbedder,
         )
 
         for field in fields:
@@ -402,6 +412,9 @@ class EventDecoder(torch.nn.Module):
                     d_target = params.n_context
 
                 case "continuous":
+                    d_target = params.n_quantiles
+
+                case "temporal":
                     d_target = params.n_quantiles
 
             projections[field.name] = torch.nn.Conv1d(
@@ -617,7 +630,7 @@ class SequenceModule(lit.LightningModule):
 
         self.params: Hyperparameters = params
         self.fields: list[Field] = fields
-        self.save_hyperparameters(params.values())
+        self.save_hyperparameters(params.values)
 
         self.lr = params.learning_rate
 
