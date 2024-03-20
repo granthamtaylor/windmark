@@ -550,7 +550,10 @@ def step(
         losses = []
 
         for field in self.fields:
-            loss = cross_entropy(reconstruction[field.name], batch.targets[field.name])
+            
+            values = reconstruction[field.name]
+            targets = batch.targets[field.name]
+            loss = cross_entropy(values, targets.lookup, reduction='none').mul(targets.is_masked).mean()
             losses.append(loss)
             log(f"{self._mode}-{strata}/{field.name}-loss", loss)
 

@@ -40,7 +40,7 @@ def preprocess_ledger_to_shards(
                 return discretize(field.name)
 
             case "entity":
-                return pl.col(field.name)
+                return pl.col(field.name).fill_null('UNK_')
 
     split = SplitManager(0.5, 0.25, 0.25)
 

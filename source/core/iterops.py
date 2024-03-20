@@ -35,7 +35,6 @@ def read(filename):
 
     return records
 
-
 def sample(
     sequence: dict,
     params: Hyperparameters,
@@ -87,40 +86,37 @@ def sample(
 
     return observations
 
-
 def hash(
-    observation: dict[str, list[int] | list[float | None] | list[str | None]],
+    observation: dict[str, list[int] | list[float | None] | list[str]],
     fields: list[Field],
     params: Hyperparameters,
-) -> dict[str, list[int] | list[float | None] | list[str | None]]:
+) -> dict[str, list[int] | list[float | None]]:
     
-    token_map = SPECIAL_TOKENS._asdict()
+    offset = len(SPECIAL_TOKENS)
     
     for field in fields:
         
-        if field.type in ['entity']:
+        if (field.type == 'entity'):
         
-            field = observation[field.name]
+            values: list[str] = observation[field.name]
 
-            unique = set(field)
+            unique = set(values)
 
-            [unique.remove(token) for token in token_map.keys()]
-
-            integers = random.sample(range(len(token_map), params.n_context + len(token_map)), len(unique))
+            integers = random.sample(range(offset, params.n_context + offset), len(unique))
 
             mapping = dict(zip(unique, integers))
 
-            mapping.update(token_map)
+            mapping.update({'UNK_': getattr(SPECIAL_TOKENS, 'UNK_')})
 
-            observation[field.name] = [mapping[token] for token in field]
+            observation[field.name] = list(map(lambda value: mapping[value], values))
 
     return observation
 
 def cdf(
-    observation: dict[str, list[int] | list[float | None] | list[str | None]],
+    observation: dict[str, list[int] | list[float | None]],
     fields: list[Field],
     digests: dict[str, TDigest],
-) -> dict[str, list[int] | np.ndarray | list[str | None]]:
+) -> dict[str, list[int] | np.ndarray]:
     
     for field in fields:
         
@@ -133,7 +129,7 @@ def cdf(
     return observation
 
 def collate(
-    observation: dict[str, list[int] | np.ndarray | list[str | None]], params: Hyperparameters,
+    observation: dict[str, list[int] | np.ndarray], params: Hyperparameters,
     fields: list[Field]
 ) -> dict[str, torch.Tensor]:
 
@@ -183,8 +179,7 @@ def mask(
 
     for field in fields:
 
-        targets[field.name] = inputs[field.name].target(params=params)
-        inputs[field.name].mask(is_event_masked, params=params)
+        targets[field.name] = inputs[field.name].mask(is_event_masked, params=params)
         
     targets = TensorDict(targets, batch_size=params.batch_size)
 
@@ -247,7 +242,6 @@ def stream(
         .map(stack)
         .map(partial(to_tensorclass, params=params, fields=fields, mode=mode))
     )
-
 
 class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
     def __init__(self, outpath: str | os.PathLike):

@@ -21,6 +21,7 @@ def pipeline():
         Field(use_chip="discrete"),
         Field(merchant_state="discrete"),
         Field(merchant_city="discrete"),
+        Field(merchant_name="entity"),
         Field(mcc="discrete"),
         Field(amount="continuous"),
         Field(timedelta="continuous"),
@@ -28,7 +29,7 @@ def pipeline():
     
     params = Hyperparameters(n_fields=len(fields))
 
-    ledger = sanitize(ledger="/home/grantham/windmark/data/ledger.subsample.parquet")
+    ledger = sanitize(ledger="/home/grantham/windmark/data/ledger.parquet")
 
     fields = fk.map_task(partial(parse, ledger=ledger))(field=fields)
 

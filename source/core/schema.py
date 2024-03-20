@@ -3,7 +3,7 @@ from collections import namedtuple
 import re
 
 from beartype import beartype
-from jaxtyping import Float, Int, jaxtyped
+from jaxtyping import Float, Int, Bool, jaxtyped
 import torch
 from torch import Tensor
 from tensordict import TensorDict
@@ -18,7 +18,6 @@ SPECIAL_TOKENS = SpecialTokens(*list(range(len(tokens))))
 
 class Field:
 
-    
     def __init__(self, **fieldinfo):
         
         assert len(fieldinfo), 'enter one field name and type'
@@ -35,6 +34,8 @@ class Field:
         
         assert re.match(r'^[a-z][a-z0-9_]*$', self.name), f'invalid field name {self.name}'
 
+    def __len__(self) -> int:
+        return len(self.fields)
     
     @property
     def levels(self):
@@ -57,6 +58,15 @@ class Field:
         else:
             return True
 
+class Schema:
+    
+    def __init__(self, **fields):
+        
+        self.fields: list[Field] = []
+        
+        for field in fields.items():
+            self.fields.append(Field(**field))
+
 class TrainingParameters(Parameterized):
 
     max_epochs: int = param.Integer(4, bounds=(1, 1024))
@@ -72,7 +82,7 @@ class Hyperparameters(Parameterized):
 
     # architecture hyperparameters
     n_fields: int = param.Integer(bounds=(0, 128), default=None, allow_None=False)
-    batch_size: int = param.Integer(32, bounds=(1, 2048))
+    batch_size: int = param.Integer(64, bounds=(1, 2048))
     n_context: int = param.Integer(128, bounds=(1, 2048))
     d_field: int = param.Integer(64, bounds=(2, 256))
     n_heads_field_encoder: int = param.Integer(16, bounds=(1, 32))
@@ -84,12 +94,12 @@ class Hyperparameters(Parameterized):
     
     # pretraining
     n_quantiles: int = param.Integer(16, bounds=(1, 512))
-    p_mask_event: float = param.Magnitude(0.1)
-    p_mask_field: float = param.Magnitude(0.1)
+    p_mask_event: float = param.Magnitude(0.05)
+    p_mask_field: float = param.Magnitude(0.05)
     pretrain: TrainingParameters = param.Parameter(TrainingParameters(
-        max_epochs=8,
-        sample_rate=0.01,
-        check_val_every_n_epoch=8,
+        max_epochs=196,
+        sample_rate=0.005,
+        check_val_every_n_epoch=2,
         gradient_clip_val=0.05,
     ))
 
@@ -99,7 +109,7 @@ class Hyperparameters(Parameterized):
     interpolation_rate: float = param.Magnitude(0.125)
     head_shape_log_base: int = param.Integer(4, bounds=(1, 32))
     finetune: TrainingParameters = param.Parameter(TrainingParameters(
-        max_epochs=8,
+        max_epochs=32,
         sample_rate=0.1,
         check_val_every_n_epoch=1,
         gradient_clip_val=0.05,
@@ -119,12 +129,23 @@ class Hyperparameters(Parameterized):
         
         return output
 
+
+
+@jaxtyped(typechecker=beartype)
+@tensorclass
+class TargetField:
+    
+    lookup: Int[Tensor, "N L"]
+    is_masked: Bool[Tensor, "N L"]
+    
+
+@jaxtyped(typechecker=beartype)
 @tensorclass
 class DiscreteField:
     lookup: Int[Tensor, "N L"]
 
     @classmethod
-    def collate(cls, values: list[int], params: Hyperparameters):
+    def collate(cls, values: list[int], params: Hyperparameters) -> "DiscreteField":
         
         PAD_ = getattr(SPECIAL_TOKENS, "PAD_")
         padding = (params.n_context - len(values), 0)
@@ -134,19 +155,26 @@ class DiscreteField:
         
         return cls(lookup=lookup, batch_size = [1])
 
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters):
+    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
         N, L = (params.batch_size, params.n_context)
         mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
-        
-        is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
-        
-        for mask in [is_field_masked, is_event_masked]:
-            self.lookup.masked_scatter_(mask, mask_token)
-            
-    def target(self, params: Hyperparameters) -> Tensor:
-        return self.lookup
 
+        is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
+        is_masked = is_field_masked.logical_or(is_event_masked)
+        
+        targets = self.lookup.clone()
+
+        self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
+
+        return TargetField(
+            lookup=targets,
+            is_masked=is_masked,
+            batch_size=self.batch_size,
+        )
+
+
+@jaxtyped(typechecker=beartype)
 @tensorclass
 class EntityField:
     lookup: Int[Tensor, "N L"]
@@ -154,13 +182,14 @@ class EntityField:
     collate = DiscreteField.collate
     mask = DiscreteField.mask
 
+@jaxtyped(typechecker=beartype)
 @tensorclass
 class ContinuousField:
     lookup: Int[Tensor, "N L"]
     content: Float[Tensor, "N L"]
 
     @classmethod
-    def collate(cls, values, params: Hyperparameters):
+    def collate(cls, values, params: Hyperparameters) -> "ContinuousField":
         
         padding = (params.n_context - len(values), 0)
         PAD_ = getattr(SPECIAL_TOKENS, "PAD_")
@@ -179,26 +208,35 @@ class ContinuousField:
             batch_size = [1],
         )
     
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters):
+    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
         N, L = (params.batch_size, params.n_context)
         mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
         
+        # fine out what to mask
         is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
-        
-        for mask in [is_field_masked, is_event_masked]:
+        is_masked = is_field_masked | is_event_masked
 
-            self.lookup.masked_scatter_(mask, mask_token)
-            self.content *= ~mask
-        
-    def target(self, params: Hyperparameters) -> Tensor:
-        
+        # creating discrete targets
         quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(SPECIAL_TOKENS))
-        is_not_valued = self.lookup != 0
-        return quantiles.masked_scatter(is_not_valued, quantiles)
+        is_not_valued = (self.lookup != 0)
+        targets = quantiles.masked_scatter(is_not_valued, quantiles)
+
+        # mask original values
+        self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
+        self.content *= ~is_masked
+        
+        # return SSL target
+        return TargetField(
+            lookup=targets,
+            is_masked=is_masked,
+            batch_size=self.batch_size
+        )
+        
 
 TensorField: TypeAlias = ContinuousField|DiscreteField|EntityField
 
+@jaxtyped(typechecker=beartype)
 @tensorclass
 class PretrainingData:
 
@@ -212,6 +250,7 @@ class PretrainingData:
         
         return cls(inputs=inputs, targets=targets, batch_size=[batch_size])
 
+@jaxtyped(typechecker=beartype)
 @tensorclass
 class FinetuningData:
 
@@ -225,6 +264,7 @@ class FinetuningData:
         
         return cls(inputs=inputs, targets=targets, batch_size=[batch_size])
 
+@jaxtyped(typechecker=beartype)
 @tensorclass
 class InferenceData:
 
