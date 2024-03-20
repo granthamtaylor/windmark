@@ -30,7 +30,7 @@ def pipeline():
     
     params = Hyperparameters(n_fields=len(schema))
 
-    ledger = sanitize(ledger="/home/grantham/windmark/data/ledger.parquet")
+    ledger = sanitize(ledger="/home/grantham/windmark/data/ledger.subsample.parquet")
 
     fields = fk.map_task(partial(parse, ledger=ledger))(field=schema.fields)
 

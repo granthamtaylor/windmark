@@ -90,6 +90,7 @@ class Hyperparameters(Parameterized):
     
     # pretraining
     n_quantiles: int = param.Integer(16, bounds=(1, 512))
+    sigma: float = param.Number(1.0, bounds=(0., 32.))
     p_mask_event: float = param.Magnitude(0.05)
     p_mask_field: float = param.Magnitude(0.05)
     pretrain_sample_rate: float = param.Magnitude(0.005)

@@ -1,7 +1,7 @@
 - [x] Entity Field Types
 - [x] Temporal Field Types
-- [ ] Neighborhood Smoothing Loss
+- [x] Neighborhood Smoothing Loss
+- [ ] Model inference step
 - [ ] Create API
 - [ ] Stress test scalability
 - [ ] Create data quality checks
-- [ ] Model inference step

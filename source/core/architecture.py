@@ -7,7 +7,7 @@ import lightning.pytorch as lit
 import torch
 import torchmetrics
 from beartype import beartype
-from jaxtyping import Bool, Float, jaxtyped
+from jaxtyping import Bool, Float, Int, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from lightning.pytorch.trainer.states import TrainerFn as StageName
 from tensordict import TensorDict
@@ -25,7 +25,6 @@ from source.core.utils import LabelBalancer, mock, complexity
 @jaxtyped(typechecker=beartype)
 def _squarify(tensor: Tensor) -> Tensor:
     return ~(tensor.unsqueeze(-1) & tensor.unsqueeze(-2))
-
 
 @jaxtyped(typechecker=beartype)
 def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Tensor, Tensor]:
@@ -48,7 +47,6 @@ def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Ten
     event_mask = ~is_null.amin(-1)
 
     return (_squarify(field_mask), _squarify(event_mask))
-
 
 class LearnedTensor(torch.nn.Module):
     """
@@ -84,7 +82,6 @@ class LearnedTensor(torch.nn.Module):
 
         return self.tensor
 
-
 class DiscreteFieldEmbedder(torch.nn.Module):
     def __init__(self, params: Hyperparameters, field: Field):
         """
@@ -101,7 +98,6 @@ class DiscreteFieldEmbedder(torch.nn.Module):
     def forward(self, inputs: DiscreteField) -> Tensor:
         return self.embeddings(inputs.lookup)
 
-
 class EntityFieldEmbedder(torch.nn.Module):
     def __init__(self, params: Hyperparameters, field: Field):
         super().__init__()
@@ -117,7 +113,6 @@ class EntityFieldEmbedder(torch.nn.Module):
 
     def forward(self, inputs: EntityField) -> Tensor:
         return self.embeddings(inputs.lookup)
-
 
 class ContinuousFieldEmbedder(torch.nn.Module):
     """
@@ -253,7 +248,6 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
         # N L F C
         return stacked.permute(0, 1, 3, 2)
 
-
 class FieldEncoder(torch.nn.Module):
     """
     FieldEncoder is a PyTorch module for encoding fields.
@@ -323,7 +317,6 @@ class FieldEncoder(torch.nn.Module):
         # N L FC
         return events
 
-
 class EventEncoder(torch.nn.Module):
     """
     EventEncoder is a PyTorch module for encoding events.
@@ -384,7 +377,6 @@ class EventEncoder(torch.nn.Module):
         sequence, events = encoded.split((1, L), dim=1)
 
         return sequence.squeeze(dim=1), events
-
 
 class EventDecoder(torch.nn.Module):
     """
@@ -516,6 +508,40 @@ class DecisionHead(torch.nn.Module):
 
         return self.mlp(inputs)
 
+def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset: int) -> Float[torch.Tensor, "N L ?"]:
+
+    device = targets.device
+
+    N, L = targets.size()
+
+    range_tensor = torch.arange(0, params.n_quantiles+offset, device=device).float()
+    
+    # expand and reshape to match the batch and sequence dimensions
+    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0).expand(N, L, params.n_quantiles+offset)
+    labels_expanded = targets.float().unsqueeze(-1)
+    
+    # create gaussian distribution for each label in the sequence
+    gaussian = torch.exp(-0.5 * ((range_tensor - labels_expanded) ** 2) / params.sigma**2)
+    gaussian /= gaussian.sum(dim=-1, keepdim=True)
+    
+    # one-hot encoding for labels at or below the threshold
+    one_hot = torch.zeros_like(gaussian).scatter_(-1, targets.unsqueeze(-1), 1.0)
+    
+    # determine which labels are above the threshold
+    is_above_threshold = targets > offset
+    
+    # prevent gaussian bleeding for labels above the threshold
+    start_bleed = torch.zeros_like(targets, dtype=torch.float32) + offset + 1
+    start_positions = torch.where(is_above_threshold, start_bleed, targets.float())
+    prevent_bleed_mask = range_tensor >= start_positions.unsqueeze(-1)
+    
+    # re-normalize
+    gaussian_masked = gaussian * prevent_bleed_mask.float()
+    gaussian_masked /= gaussian_masked.sum(dim=-1, keepdim=True)
+    
+    # combine using the condition
+    return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot)
+
 
 def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
     metrics = dict(
@@ -566,7 +592,18 @@ def step(
             
             values = reconstruction[field.name]
             targets = batch.targets[field.name]
-            loss = cross_entropy(values, targets.lookup, reduction='none').mul(targets.is_masked).mean()
+            
+            # smoothen the targets for continuous fields
+            if field.type in ['continuous', 'temporal']:
+                labels = smoothen(targets=targets.lookup, params=self.params, offset=len(SPECIAL_TOKENS))
+            else:
+                labels = targets.lookup
+
+            labels = labels.reshape(self.params.batch_size * self.params.n_context, -1).squeeze()
+            is_masked = targets.is_masked.reshape(self.params.batch_size * self.params.n_context, -1)
+            values = values.reshape(self.params.batch_size * self.params.n_context, -1)
+
+            loss = cross_entropy(values, labels, reduction='none').mul(is_masked).mean()
             losses.append(loss)
             log(f"{self._mode}-{strata}/{field.name}-loss", loss)
 
