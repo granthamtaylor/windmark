@@ -18,7 +18,7 @@ from torchdata import datapipes
 import numpy as np
 import humanize
 
-from source.core.iterops import stream
+from source.core.iterops import stream, collate
 from source.core.schema import SPECIAL_TOKENS, Field, ContinuousField, DiscreteField, EntityField, SequenceData, Hyperparameters
 from source.core.utils import LabelBalancer, mock, complexity
 
@@ -445,7 +445,6 @@ class EventDecoder(torch.nn.Module):
         # N, L, ?
         return TensorDict(events, batch_size=N)
 
-
 class DecisionHead(torch.nn.Module):
     """
     A PyTorch module representing a classification head. This module is used to map the encoded fields to the target classes.
@@ -508,7 +507,8 @@ class DecisionHead(torch.nn.Module):
 
         return self.mlp(inputs)
 
-def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset: int) -> Float[torch.Tensor, "N L ?"]:
+@jaxtyped(typechecker=beartype)
+def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset: int) -> Float[torch.Tensor, "N L _"]:
 
     device = targets.device
 
@@ -542,7 +542,6 @@ def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset:
     # combine using the condition
     return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot)
 
-
 def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
     metrics = dict(
         ap=torchmetrics.AveragePrecision,
@@ -566,7 +565,6 @@ def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
             stratas[strata][name] = Metric(**config)
 
     return stratas
-
 
 def step(
     self: "SequenceModule",
@@ -626,7 +624,6 @@ def step(
     elif self._mode == "inference":
         return predictions
 
-
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]
 
@@ -634,11 +631,12 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
 
     pipe = self.pipes[strata]
     loader = DataLoader(
-        pipe, 
-        batch_size=None, 
-        num_workers=15, 
-        collate_fn=lambda x: x,
-        pin_memory=False,
+        pipe,
+        batch_size=self.params.batch_size, 
+        num_workers=28,
+        collate_fn=collate,
+        pin_memory=True,
+        drop_last=True,
     )
     self.dataloaders[strata] = loader
 
@@ -646,6 +644,7 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
 
 
 class SequenceModule(lit.LightningModule):
+
     def __init__(
         self,
         datapath: str | os.PathLike,
@@ -691,7 +690,6 @@ class SequenceModule(lit.LightningModule):
         self.example_input_array = sample = mock(params=params, fields=fields)
 
         self.flops_per_batch = measure_flops(self, lambda: self.forward(sample))
-
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N T"], TensorDict]:

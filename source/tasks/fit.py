@@ -6,7 +6,6 @@ import torch
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import LearningRateFinder, EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
-from lightning.pytorch.profilers import AdvancedProfiler
 import numpy as np
 
 from source.core.schema import Hyperparameters, Field
@@ -46,13 +45,12 @@ def fit_sequence_encoder(
         devices="auto",
         strategy="auto",
         precision="bf16-mixed",
-        profiler=AdvancedProfiler(filename='profile'),
         max_epochs=params.max_epochs,
         gradient_clip_val=params.gradient_clip_val,
         fast_dev_run=params.dev_mode,
         callbacks = [
             LearningRateFinder(),
-            # EarlyStopping(monitor='pretrain-validate/loss'),
+            EarlyStopping(monitor='pretrain-validate/loss'),
             pretrain := ModelCheckpoint(),
             
         ]
@@ -74,7 +72,7 @@ def fit_sequence_encoder(
         fast_dev_run=params.dev_mode,
         callbacks=[
             LearningRateFinder(),
-            # EarlyStopping(monitor='finetune-validate/loss'),
+            EarlyStopping(monitor='finetune-validate/loss'),
             finetune := ModelCheckpoint(),
         ]
     )

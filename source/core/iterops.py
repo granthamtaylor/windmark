@@ -129,7 +129,7 @@ def cdf(
 
     return observation
 
-def collate(
+def bundle(
     observation: dict[str, list[int] | np.ndarray], params: Hyperparameters,
     fields: list[Field]
 ) -> dict[str, torch.Tensor]:
@@ -153,18 +153,6 @@ def collate(
 
     return inputs, labels
 
-def stack(batch: list[tuple[TensorDict, torch.Tensor]]):
-    
-    # FIXME something is broken here
-
-    inputs, targets = zip(*batch)
-    
-    inputs = torch.stack(inputs, dim=0).squeeze(dim=1).auto_batch_size_(batch_dims=1)
-
-    targets = torch.stack(targets, dim=0)
-    
-    return inputs, targets
-
 def mask(
     batch: TensorDict,
     params: Hyperparameters,
@@ -173,7 +161,7 @@ def mask(
     
     inputs, _ = batch
     
-    N, L = (params.batch_size, params.n_context)
+    N, L = (1, params.n_context)
     
     targets = {}
 
@@ -183,7 +171,7 @@ def mask(
 
         targets[field.name] = inputs[field.name].mask(is_event_masked, params=params)
         
-    targets = TensorDict(targets, batch_size=params.batch_size)
+    targets = TensorDict(targets, batch_size=1)
 
     return inputs, targets
 
@@ -200,16 +188,15 @@ def to_tensorclass(
             params=params,
             fields=fields
         )
+
     
-    tensorclass_map = dict(
+    tensorclasses = dict(
         pretrain=PretrainingData,
         finetune=FinetuningData,
         inference=InferenceData,
     )
-
-    tensorclass = tensorclass_map[mode]
     
-    return tensorclass.from_stream(batch, batch_size=params.batch_size)
+    return tensorclasses[mode].from_stream(batch)
 
 def stream(
     datapath: str | os.PathLike,
@@ -239,11 +226,13 @@ def stream(
         .map(partial(cdf, fields=fields, digests=digests))
         .map(partial(hash, fields=fields, params=params))
         .shuffle()
-        .map(partial(collate, fields=fields, params=params))
-        .batch(params.batch_size, drop_last=True)
-        .map(stack)
+        .map(partial(bundle, fields=fields, params=params))
         .map(partial(to_tensorclass, params=params, fields=fields, mode=mode))
     )
+    
+def collate(batch: list[SequenceData]) -> SequenceData:
+    
+    return torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)
 
 class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
     def __init__(self, outpath: str | os.PathLike):

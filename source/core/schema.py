@@ -71,7 +71,7 @@ class Hyperparameters(Parameterized):
 
     # architectural
     n_fields: int = param.Integer(bounds=(0, 128), default=None, allow_None=False)
-    batch_size: int = param.Integer(192, bounds=(1, 2048))
+    batch_size: int = param.Integer(72, bounds=(1, 2048))
     n_context: int = param.Integer(128, bounds=(1, 2048))
     d_field: int = param.Integer(64, bounds=(2, 256))
     n_heads_field_encoder: int = param.Integer(16, bounds=(1, 32))
@@ -90,17 +90,17 @@ class Hyperparameters(Parameterized):
     
     # pretraining
     n_quantiles: int = param.Integer(16, bounds=(1, 512))
-    sigma: float = param.Number(1.0, bounds=(0., 32.))
+    sigma: float = param.Number(1.0, bounds=(0., 32))
     p_mask_event: float = param.Magnitude(0.05)
     p_mask_field: float = param.Magnitude(0.05)
-    pretrain_sample_rate: float = param.Magnitude(0.005)
+    pretrain_sample_rate: float = param.Magnitude(0.01)
 
     # finetuning
     n_targets: int = param.Integer(2, bounds=(2, 2048))
     freeze_epochs: int = param.Integer(1, bounds=(1, 128))
     interpolation_rate: float = param.Magnitude(0.125)
     head_shape_log_base: int = param.Integer(4, bounds=(1, 32))
-    finetune_sample_rate: float = param.Magnitude(0.02)
+    finetune_sample_rate: float = param.Magnitude(0.1)
 
     @property
     def values(self) -> dict[str, float|int|bool]:
@@ -119,6 +119,7 @@ class TargetField:
 @jaxtyped(typechecker=beartype)
 @tensorclass
 class DiscreteField:
+
     lookup: Int[Tensor, "N L"]
 
     @classmethod
@@ -134,7 +135,7 @@ class DiscreteField:
 
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
-        N, L = (params.batch_size, params.n_context)
+        N, L = (1, params.n_context)
         mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
 
         is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
@@ -154,6 +155,7 @@ class DiscreteField:
 @jaxtyped(typechecker=beartype)
 @tensorclass
 class EntityField:
+
     lookup: Int[Tensor, "N L"]
 
     collate = DiscreteField.collate
@@ -187,7 +189,7 @@ class ContinuousField:
     
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
-        N, L = (params.batch_size, params.n_context)
+        N, L = (1, params.n_context)
         mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
         
         # fine out what to mask
@@ -230,11 +232,11 @@ class PretrainingData:
     targets: TensorDict[Tensor]
     
     @classmethod
-    def from_stream(cls, batch: tuple[TensorDict, TensorDict], batch_size: int):
+    def from_stream(cls, batch: tuple[TensorDict, TensorDict]):
         
         inputs, targets = batch
         
-        return cls(inputs=inputs, targets=targets, batch_size=[batch_size])
+        return cls(inputs=inputs, targets=targets, batch_size=[1])
 
 @jaxtyped(typechecker=beartype)
 @tensorclass
@@ -244,11 +246,13 @@ class FinetuningData:
     targets: Tensor
     
     @classmethod
-    def from_stream(cls, batch: tuple[TensorDict, Tensor], batch_size: int):
+    def from_stream(cls, batch: tuple[TensorDict, Tensor]):
         
         inputs, targets = batch
+
+        targets = targets.unsqueeze(0)
         
-        return cls(inputs=inputs, targets=targets, batch_size=[batch_size])
+        return cls(inputs=inputs, targets=targets, batch_size=[1])
 
 @jaxtyped(typechecker=beartype)
 @tensorclass
@@ -262,14 +266,14 @@ class InferenceData:
     # event_id: list[str]
     
     @classmethod
-    def from_stream(cls, batch: tuple[TensorDict, Tensor], batch_size: int):
+    def from_stream(cls, batch: tuple[TensorDict, Tensor]):
         
         inputs, _ = batch
 
         # sequence_id = batch.pop('sequence_id')
         # event_id = batch.pop('sequence_id')
         
-        return cls(inputs=inputs, batch_size=[batch_size])
+        return cls(inputs=inputs, batch_size=[1])
 
 
 SequenceData: TypeAlias = PretrainingData|FinetuningData|InferenceData
