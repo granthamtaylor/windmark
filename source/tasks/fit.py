@@ -11,6 +11,7 @@ import numpy as np
 from source.core.schema import Hyperparameters, Field
 from source.core.architecture import SequenceModule
 from source.core.utils import LabelBalancer
+from source.core.iterops import ParquetBatchWriter
 
 @fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
 def fit_sequence_encoder(
@@ -37,10 +38,9 @@ def fit_sequence_encoder(
     root.mkdir()
     
     logger = TensorBoardLogger("logs", name="windmark")
-
-    trainer = Trainer(
+    
+    config = dict(
         logger=logger,
-        default_root_dir=root/'pretrain',
         accelerator="auto",
         devices="auto",
         strategy="auto",
@@ -48,36 +48,39 @@ def fit_sequence_encoder(
         max_epochs=params.max_epochs,
         gradient_clip_val=params.gradient_clip_val,
         fast_dev_run=params.dev_mode,
+    )
+
+    trainer = Trainer(
+        **config,
+        default_root_dir=root/'pretrain',
         callbacks = [
             LearningRateFinder(),
             EarlyStopping(monitor='pretrain-validate/loss'),
             pretrain := ModelCheckpoint(),
-            
         ]
     )
 
     trainer.fit(module)
     trainer.test(module)
 
-    module.mode = 'finetune'
+    module.mode = ('finetune')
+
     trainer = Trainer(
-        logger=logger,
+        **config,
         default_root_dir=root/'finetune',
-        accelerator="auto",
-        devices="auto",
-        strategy="auto",
-        precision="bf16-mixed",
-        max_epochs=params.max_epochs,
-        gradient_clip_val=params.gradient_clip_val,
-        fast_dev_run=params.dev_mode,
         callbacks=[
             LearningRateFinder(),
             EarlyStopping(monitor='finetune-validate/loss'),
+            ParquetBatchWriter('outpath'),
             finetune := ModelCheckpoint(),
         ]
     )
 
     trainer.fit(module)
     trainer.test(module)
+    
+    # module.mode = ('inference')
+
+    # trainer.predict(module)
 
     return module

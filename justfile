@@ -16,3 +16,6 @@ doc:
 
 main:
   @poetry run python ./source/pipelines/main.py
+
+compile:
+  typst compile docs/content/motivations.typst --root=docs

@@ -86,7 +86,7 @@ class Hyperparameters(Parameterized):
     learning_rate: float = param.Magnitude(0.0001)
     weight_decay: float = param.Magnitude(0.001)
     gradient_clip_val: float = param.Magnitude(0.05)
-    max_epochs: int = param.Integer(64, bounds=(1, 256))
+    max_epochs: int = param.Integer(2, bounds=(1, 256))
     
     # pretraining
     n_quantiles: int = param.Integer(16, bounds=(1, 512))

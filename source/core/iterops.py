@@ -129,7 +129,7 @@ def cdf(
 
     return observation
 
-def bundle(
+def treeify(
     observation: dict[str, list[int] | np.ndarray], params: Hyperparameters,
     fields: list[Field]
 ) -> dict[str, torch.Tensor]:
@@ -175,7 +175,7 @@ def mask(
 
     return inputs, targets
 
-def to_tensorclass(
+def package(
     batch: tuple[TensorDict, torch.Tensor],
     params: Hyperparameters,
     fields: list[Field],
@@ -226,17 +226,20 @@ def stream(
         .map(partial(cdf, fields=fields, digests=digests))
         .map(partial(hash, fields=fields, params=params))
         .shuffle()
-        .map(partial(bundle, fields=fields, params=params))
-        .map(partial(to_tensorclass, params=params, fields=fields, mode=mode))
+        .map(partial(treeify, fields=fields, params=params))
+        .map(partial(package, params=params, fields=fields, mode=mode))
     )
     
 def collate(batch: list[SequenceData]) -> SequenceData:
     
     return torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)
 
+
 class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
+
     def __init__(self, outpath: str | os.PathLike):
         super().__init__("batch")
+
         self.outpath = outpath
         self._destination_file_exists: bool = False
 
@@ -246,19 +249,22 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
         module: lit.LightningModule,
         prediction: torch.Tensor,
         batch_indices: Sequence[int] | None,
-        batch: SequenceData,
+        batch: InferenceData,
         batch_index: int,
         dataloader_index: int,
     ) -> None:
-        df = pl.DataFrame(
-            prediction=prediction,
-            sequence_id=batch[("meta", "sequence_id")],
-            event_id=batch[("meta", "event_id")],
-        ).to_arrow()
+        
+        labels = module.balancer.labels
+        array = prediction.transpose(0, 1).float().cpu().detach().numpy()
+
+        df = pl.from_numpy(array, schema=labels, orient="col")
+        
 
         if self._destination_file_exists:
-            fastparquet.write(self.outpath, df, append=True)
+            pass
+            # fastparquet.write(self.outpath, df, append=True)
 
         else:
-            fastparquet.write(self.outpath, df)
+            # fastparquet.write(self.outpath, df)
+            print(df)
             self._destination_file_exists = True
