@@ -108,7 +108,7 @@ def hash(
 
             mapping = dict(zip(unique, integers))
 
-            mapping.update({'UNK_': int(SpecialTokens.UNK)})
+            mapping.update({'UNK_': SpecialTokens.UNK})
 
             observation[field.name] = list(map(lambda value: mapping[value], values))
 

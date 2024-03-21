@@ -81,19 +81,19 @@ def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict:
         match field.type:
             case "continuous" | "temporal":
                 indicators = torch.randint(0, len(SpecialTokens), (N, L))
-                padded = torch.where(is_padded, int(SpecialTokens.PAD), indicators)
-                is_empty = padded.eq(int(SpecialTokens.VAL)).long()
+                padded = torch.where(is_padded, SpecialTokens.PAD, indicators)
+                is_empty = padded.eq(SpecialTokens.VAL).long()
                 values = torch.rand(N, L).mul(is_empty)
                 data[field.name] = ContinuousField(content=values, lookup=padded, batch_size=[N])
 
             case "discrete":
                 values = torch.randint(0, field.levels + len(SpecialTokens), (N, L))
-                padded = torch.where(is_padded, int(SpecialTokens.PAD), values)
+                padded = torch.where(is_padded, SpecialTokens.PAD, values)
                 data[field.name] = DiscreteField(lookup=padded, batch_size=[N])
 
             case "entity":
                 values = torch.randint(0, L + len(SpecialTokens), (N, L))
-                padded = torch.where(is_padded, int(SpecialTokens.PAD), values)
+                padded = torch.where(is_padded, SpecialTokens.PAD, values)
                 data[field.name] = EntityField(lookup=padded, batch_size=[N])
 
     return TensorDict(data, batch_size=N)

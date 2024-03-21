@@ -27,7 +27,7 @@ def preprocess_ledger_to_shards(
             .to_physical()
             .cast(pl.Int32)
             .add(len(SpecialTokens))
-            .fill_null(int(SpecialTokens.UNK))
+            .fill_null(SpecialTokens.UNK)
             .alias(column)
         )
 

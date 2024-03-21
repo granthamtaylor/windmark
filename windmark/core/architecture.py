@@ -33,9 +33,9 @@ def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Ten
     for field in fields:
         values = inputs[(field.name, "lookup")]
 
-        is_padded = values.eq(int(SpecialTokens.PAD))
-        is_nan = values.eq(int(SpecialTokens.NAN))
-        is_unknown = values.eq(int(SpecialTokens.UNK))
+        is_padded = values.eq(SpecialTokens.PAD)
+        is_nan = values.eq(SpecialTokens.NAN)
+        is_unknown = values.eq(SpecialTokens.UNK)
 
         is_null.append(is_padded | is_nan | is_unknown)
 

@@ -123,18 +123,17 @@ class DiscreteField:
     @classmethod
     def collate(cls, values: list[int], params: Hyperparameters) -> "DiscreteField":
         
-        PAD_ = int(SpecialTokens.PAD)
         padding = (params.n_context - len(values), 0)
 
         array = np.array(values, dtype=int)
-        lookup = torch.nn.functional.pad(torch.tensor(array), pad=padding, value=PAD_).unsqueeze(0)
+        lookup = torch.nn.functional.pad(torch.tensor(array), pad=padding, value=SpecialTokens.PAD).unsqueeze(0)
         
         return cls(lookup=lookup, batch_size = [1])
 
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
         N, L = (1, params.n_context)
-        mask_token = torch.full((N, L), int(SpecialTokens.MASK))
+        mask_token = torch.full((N, L), SpecialTokens.MASK)
 
         is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
         is_masked = is_field_masked.logical_or(is_event_masked)
@@ -169,11 +168,9 @@ class ContinuousField:
     def collate(cls, values, params: Hyperparameters) -> "ContinuousField":
         
         padding = (params.n_context - len(values), 0)
-        PAD_ = int(SpecialTokens.PAD)
-        VAL_ = int(SpecialTokens.VAL)
         
         values = np.nan_to_num(np.array(values, dtype=float))
-        lookup = np.where(np.isnan(values), PAD_, VAL_)
+        lookup = np.where(np.isnan(values), SpecialTokens.PAD, SpecialTokens.VAL)
         
         # this effectively creates `1-(1/inf)` to prevent an index error
         # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
@@ -181,14 +178,14 @@ class ContinuousField:
 
         return cls(
             content = torch.nn.functional.pad(torch.tensor(values), pad=padding, value=0.0).float().unsqueeze(0).mul(dampener),
-            lookup = torch.nn.functional.pad(torch.tensor(lookup), pad=padding, value=PAD_).unsqueeze(0),
+            lookup = torch.nn.functional.pad(torch.tensor(lookup), pad=padding, value=SpecialTokens.PAD).unsqueeze(0),
             batch_size = [1],
         )
     
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
         N, L = (1, params.n_context)
-        mask_token = torch.full((N, L), int(SpecialTokens.MASK))
+        mask_token = torch.full((N, L), SpecialTokens.MASK)
         
         # fine out what to mask
         is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
