@@ -3,7 +3,7 @@ from pathlib import Path
 import flytekit as fk
 import polars as pl
 
-from windmark.core.schema import SPECIAL_TOKENS, Field
+from windmark.core.schema import SpecialTokens, Field
 from windmark.core.utils import LabelBalancer, SplitManager
 
 
@@ -26,8 +26,8 @@ def preprocess_ledger_to_shards(
             .cast(pl.Categorical)
             .to_physical()
             .cast(pl.Int32)
-            .add(len(SPECIAL_TOKENS))
-            .fill_null(getattr(SPECIAL_TOKENS, "UNK_"))
+            .add(len(SpecialTokens))
+            .fill_null(int(SpecialTokens.UNK))
             .alias(column)
         )
 

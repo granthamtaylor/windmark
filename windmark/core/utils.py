@@ -6,7 +6,7 @@ from tensordict import TensorDict
 from rich.console import Console
 from rich.table import Table
 
-from windmark.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField, Field
+from windmark.core.schema import Hyperparameters, SpecialTokens, DiscreteField, ContinuousField, EntityField, Field
 
 class LabelBalancer:
 
@@ -80,20 +80,20 @@ def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict:
     for field in fields:
         match field.type:
             case "continuous" | "temporal":
-                indicators = torch.randint(0, len(SPECIAL_TOKENS), (N, L))
-                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), indicators)
-                is_empty = padded.eq(getattr(SPECIAL_TOKENS, "VAL_")).long()
+                indicators = torch.randint(0, len(SpecialTokens), (N, L))
+                padded = torch.where(is_padded, int(SpecialTokens.PAD), indicators)
+                is_empty = padded.eq(int(SpecialTokens.VAL)).long()
                 values = torch.rand(N, L).mul(is_empty)
                 data[field.name] = ContinuousField(content=values, lookup=padded, batch_size=[N])
 
             case "discrete":
-                values = torch.randint(0, field.levels + len(SPECIAL_TOKENS), (N, L))
-                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
+                values = torch.randint(0, field.levels + len(SpecialTokens), (N, L))
+                padded = torch.where(is_padded, int(SpecialTokens.PAD), values)
                 data[field.name] = DiscreteField(lookup=padded, batch_size=[N])
 
             case "entity":
-                values = torch.randint(0, L + len(SPECIAL_TOKENS), (N, L))
-                padded = torch.where(is_padded, getattr(SPECIAL_TOKENS, "PAD_"), values)
+                values = torch.randint(0, L + len(SpecialTokens), (N, L))
+                padded = torch.where(is_padded, int(SpecialTokens.PAD), values)
                 data[field.name] = EntityField(lookup=padded, batch_size=[N])
 
     return TensorDict(data, batch_size=N)

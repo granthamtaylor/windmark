@@ -15,7 +15,7 @@ import lightning.pytorch as lit
 import numpy as np
 
 from windmark.core.schema import (
-    SPECIAL_TOKENS,
+    SpecialTokens,
     DiscreteField,
     ContinuousField,
     EntityField,
@@ -94,7 +94,7 @@ def hash(
     params: Hyperparameters,
 ) -> dict[str, list[int] | list[float | None]]:
     
-    offset = len(SPECIAL_TOKENS)
+    offset = len(SpecialTokens)
     
     for field in fields:
         
@@ -108,7 +108,7 @@ def hash(
 
             mapping = dict(zip(unique, integers))
 
-            mapping.update({'UNK_': getattr(SPECIAL_TOKENS, 'UNK_')})
+            mapping.update({'UNK_': int(SpecialTokens.UNK)})
 
             observation[field.name] = list(map(lambda value: mapping[value], values))
 

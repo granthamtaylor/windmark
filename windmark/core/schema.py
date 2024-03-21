@@ -1,5 +1,5 @@
 from typing import TypeAlias
-from collections import namedtuple
+from enum import IntEnum
 import re
 
 from beartype import beartype
@@ -11,17 +11,13 @@ from tensordict.prototype import tensorclass
 import numpy as np
 import pydantic
 
-# class SpecialTokens(IntEnum):
+class SpecialTokens(IntEnum):
 
-#     VAL = 0
-#     NAN = 1
-#     UNK = 2
-#     PAD = 3
-#     MASK = 4
-
-tokens = ["VAL_", "NAN_", "UNK_", "PAD_", "MASK_"]
-SpecialTokens = namedtuple("SpecialTokens", tokens)
-SPECIAL_TOKENS = SpecialTokens(*list(range(len(tokens))))
+    VAL = 0
+    NAN = 1
+    UNK = 2
+    PAD = 3
+    MASK = 4
 
 class Field:
 
@@ -127,7 +123,7 @@ class DiscreteField:
     @classmethod
     def collate(cls, values: list[int], params: Hyperparameters) -> "DiscreteField":
         
-        PAD_ = getattr(SPECIAL_TOKENS, "PAD_")
+        PAD_ = int(SpecialTokens.PAD)
         padding = (params.n_context - len(values), 0)
 
         array = np.array(values, dtype=int)
@@ -138,7 +134,7 @@ class DiscreteField:
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
         N, L = (1, params.n_context)
-        mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
+        mask_token = torch.full((N, L), int(SpecialTokens.MASK))
 
         is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
         is_masked = is_field_masked.logical_or(is_event_masked)
@@ -173,8 +169,8 @@ class ContinuousField:
     def collate(cls, values, params: Hyperparameters) -> "ContinuousField":
         
         padding = (params.n_context - len(values), 0)
-        PAD_ = getattr(SPECIAL_TOKENS, "PAD_")
-        VAL_ = getattr(SPECIAL_TOKENS, "VAL_")
+        PAD_ = int(SpecialTokens.PAD)
+        VAL_ = int(SpecialTokens.VAL)
         
         values = np.nan_to_num(np.array(values, dtype=float))
         lookup = np.where(np.isnan(values), PAD_, VAL_)
@@ -192,14 +188,14 @@ class ContinuousField:
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
 
         N, L = (1, params.n_context)
-        mask_token = torch.full((N, L), getattr(SPECIAL_TOKENS, "MASK_"))
+        mask_token = torch.full((N, L), int(SpecialTokens.MASK))
         
         # fine out what to mask
         is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
         is_masked = is_field_masked | is_event_masked
 
         # creating discrete targets
-        quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(SPECIAL_TOKENS))
+        quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(SpecialTokens))
         is_not_valued = (self.lookup != 0)
         targets = quantiles.masked_scatter(is_not_valued, quantiles)
 

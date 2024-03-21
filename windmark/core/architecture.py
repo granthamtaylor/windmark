@@ -19,7 +19,7 @@ import numpy as np
 import humanize
 
 from windmark.core.iterops import stream, collate
-from windmark.core.schema import SPECIAL_TOKENS, Field, ContinuousField, DiscreteField, EntityField, SequenceData, Hyperparameters
+from windmark.core.schema import SpecialTokens, Field, ContinuousField, DiscreteField, EntityField, SequenceData, Hyperparameters
 from windmark.core.utils import LabelBalancer, mock, complexity
 
 @jaxtyped(typechecker=beartype)
@@ -33,9 +33,9 @@ def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Ten
     for field in fields:
         values = inputs[(field.name, "lookup")]
 
-        is_padded = values.eq(getattr(SPECIAL_TOKENS, "PAD_"))
-        is_nan = values.eq(getattr(SPECIAL_TOKENS, "NAN_"))
-        is_unknown = values.eq(getattr(SPECIAL_TOKENS, "UNK_"))
+        is_padded = values.eq(int(SpecialTokens.PAD))
+        is_nan = values.eq(int(SpecialTokens.NAN))
+        is_unknown = values.eq(int(SpecialTokens.UNK))
 
         is_null.append(is_padded | is_nan | is_unknown)
 
@@ -93,7 +93,7 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         super().__init__()
 
         self.field: Field = field
-        self.embeddings = torch.nn.Embedding(field.levels + len(SPECIAL_TOKENS), params.d_field)
+        self.embeddings = torch.nn.Embedding(field.levels + len(SpecialTokens), params.d_field)
 
     def forward(self, inputs: DiscreteField) -> Tensor:
         return self.embeddings(inputs.lookup)
@@ -109,7 +109,7 @@ class EntityFieldEmbedder(torch.nn.Module):
         """
 
         self.field: Field = field
-        self.embeddings = torch.nn.Embedding(params.n_context + len(SPECIAL_TOKENS), params.d_field)
+        self.embeddings = torch.nn.Embedding(params.n_context + len(SpecialTokens), params.d_field)
 
     def forward(self, inputs: EntityField) -> Tensor:
         return self.embeddings(inputs.lookup)
@@ -136,7 +136,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         self.field: Field = field
         self.linear = torch.nn.Linear(2 * params.precision, params.d_field)
-        self.positional = torch.nn.Embedding(len(SPECIAL_TOKENS), params.d_field)
+        self.positional = torch.nn.Embedding(len(SpecialTokens), params.d_field)
 
         weights = torch.logspace(-params.precision, 1, params.precision, base=2).mul(math.pi).unsqueeze(dim=0)
 
@@ -411,7 +411,7 @@ class EventDecoder(torch.nn.Module):
 
             projections[field.name] = torch.nn.Conv1d(
                 in_channels=params.n_fields * params.d_field,
-                out_channels=d_target + len(SPECIAL_TOKENS),
+                out_channels=d_target + len(SpecialTokens),
                 kernel_size=1,
             )
 
@@ -593,7 +593,7 @@ def step(
             
             # smoothen the targets for continuous fields
             if field.type in ['continuous', 'temporal']:
-                labels = smoothen(targets=targets.lookup, params=self.params, offset=len(SPECIAL_TOKENS))
+                labels = smoothen(targets=targets.lookup, params=self.params, offset=len(SpecialTokens))
             else:
                 labels = targets.lookup
 
