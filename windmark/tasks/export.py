@@ -2,7 +2,7 @@ from pathlib import Path
 
 import flytekit as fk
 
-from source.core.architecture import SequenceModule
+from windmark.core.architecture import SequenceModule
 
 @fk.task
 def export_module_to_onnx(module: SequenceModule):

@@ -1,8 +1,8 @@
 import flytekit as fk
 import polars as pl
 
-from source.core.utils import LabelBalancer
-from source.core.schema import Hyperparameters
+from windmark.core.utils import LabelBalancer
+from windmark.core.schema import Hyperparameters
 
 @fk.task
 def rebalance_class_labels(

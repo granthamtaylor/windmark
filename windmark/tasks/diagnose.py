@@ -1,7 +1,7 @@
 import flytekit as fk
 import polars as pl
 
-from source.core.schema import Field
+from windmark.core.schema import Field
 
 @fk.task
 def diagnose(ledger: pl.DataFrame, fields: list[Field]):

@@ -3,8 +3,8 @@ from pathlib import Path
 import flytekit as fk
 from lightning.pytorch import Trainer
 
-from source.core.architecture import SequenceModule
-from source.core.iterops import ParquetBatchWriter
+from windmark.core.architecture import SequenceModule
+from windmark.core.iterops import ParquetBatchWriter
 
 
 @fk.task

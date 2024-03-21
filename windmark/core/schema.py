@@ -9,8 +9,9 @@ from torch import Tensor
 from tensordict import TensorDict
 from tensordict.prototype import tensorclass
 import numpy as np
-from param import Parameterized
-import param
+import pydantic
+from rich.console import Console
+from rich.table import Table
 
 tokens = ["VAL_", "NAN_", "UNK_", "PAD_", "MASK_"]
 SpecialTokens = namedtuple("SpecialTokens", tokens)
@@ -28,9 +29,8 @@ class Field:
         
         self.name, self.type = fieldinfo.popitem()
         
-        assert self.type in [
-            'continuous', 'discrete', 'entity', 'temporal'
-        ]
+        assert self.type in ['continuous', 'discrete', 'entity', 'temporal'], \
+            'field type must be "continuous", "discrete", "entity", or "temporal"'
         
         assert re.match(r'^[a-z][a-z0-9_]*$', self.name), f'invalid field name {self.name}'
     
@@ -59,54 +59,88 @@ class Schema:
     
     def __init__(self, **fields):
         
+        assert len(fields) > 1, 'must pass in at least two fields'
+        
         self.fields: list[Field] = []
         
         for name, dtype in fields.items():
             self.fields.append(Field(**{name: dtype}))
             
     def __len__(self) -> int:
+
         return len(self.fields)
 
-class Hyperparameters(Parameterized):
-
+class Hyperparameters(pydantic.BaseModel):
     # architectural
-    n_fields: int = param.Integer(bounds=(0, 128), default=None, allow_None=False)
-    batch_size: int = param.Integer(72, bounds=(1, 2048))
-    n_context: int = param.Integer(128, bounds=(1, 2048))
-    d_field: int = param.Integer(64, bounds=(2, 256))
-    n_heads_field_encoder: int = param.Integer(16, bounds=(1, 32))
-    n_layers_field_encoder: int = param.Integer(2, bounds=(1, 32))
-    n_heads_event_encoder: int = param.Integer(16, bounds=(1, 32))
-    n_layers_event_encoder: int = param.Integer(8, bounds=(1, 32))
-    precision: int = param.Integer(8, bounds=(2, 512))
-    dropout: float = param.Magnitude(0.1)
+    n_fields: int = pydantic.Field(..., gt=0, lt=129)
+    batch_size: int = pydantic.Field(72, gt=0, lt=2049)
+    n_context: int = pydantic.Field(128, gt=0, lt=2049)
+    d_field: int = pydantic.Field(64, gt=1, lt=257)
+    precision: int = pydantic.Field(8, gt=1, lt=513)
+    n_heads_field_encoder: int = pydantic.Field(16, gt=0, lt=33)
+    n_layers_field_encoder: int = pydantic.Field(2, gt=0, lt=33)
+    n_heads_event_encoder: int = pydantic.Field(16, gt=0, lt=33)
+    n_layers_event_encoder: int = pydantic.Field(8, gt=0, lt=33)
+    dropout: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
 
     # general fitting
-    dev_mode: bool = param.Boolean(False)
-    learning_rate: float = param.Magnitude(0.0001)
-    weight_decay: float = param.Magnitude(0.001)
-    gradient_clip_val: float = param.Magnitude(0.05)
-    max_epochs: int = param.Integer(2, bounds=(1, 256))
+    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
+    weight_decay: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
+    gradient_clip_val: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    max_epochs: int = pydantic.Field(1, gt=0, lt=257)
     
     # pretraining
-    n_quantiles: int = param.Integer(16, bounds=(1, 512))
-    sigma: float = param.Number(1.0, bounds=(0., 32))
-    p_mask_event: float = param.Magnitude(0.05)
-    p_mask_field: float = param.Magnitude(0.05)
-    pretrain_sample_rate: float = param.Magnitude(0.01)
+    n_quantiles: int = pydantic.Field(16, gt=0, lt=513)
+    sigma: float = pydantic.Field(1.0, gt=0.0, lt=33.0)
+    p_mask_event: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    p_mask_field: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    pretrain_sample_rate: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
 
     # finetuning
-    n_targets: int = param.Integer(2, bounds=(2, 2048))
-    freeze_epochs: int = param.Integer(1, bounds=(1, 128))
-    interpolation_rate: float = param.Magnitude(0.125)
-    head_shape_log_base: int = param.Integer(4, bounds=(1, 32))
-    finetune_sample_rate: float = param.Magnitude(0.1)
+    n_targets: int = pydantic.Field(2, gt=1, lt=2049)
+    freeze_epochs: int = pydantic.Field(1, gt=0, lt=129)
+    interpolation_rate: float = pydantic.Field(0.125, gt=0.0, lt=1.0)
+    head_shape_log_base: int = pydantic.Field(4, gt=0, lt=33)
+    finetune_sample_rate: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
 
     @property
     def values(self) -> dict[str, float|int|bool]:
 
-        return self.param.values()
+        params = self.param.values()
+        del params['name']
+        
+        return params
+        
 
+    def show(self):
+        
+        table = Table(title="Hyperparameters")
+
+        table.add_column("Hyperparameter", justify="right", style="cyan", no_wrap=True)
+        
+        table.add_column('Value', style="magenta")
+            
+        def format_percent(values: list[float]) -> list[str]:
+            return list(map(lambda x: f"{x:.4%}", values))
+        
+        def format_numbers(values: list[float]) -> list[str]:
+            return list(map(lambda x: f"{x:.4}", values))
+        
+        def format_integers(values: list[float]) -> list[str]:
+            return list(map(lambda x: f"{x:,}", values))
+
+        # table.add_row("Label Counts", *format_integers(self.counts))
+        # table.add_row("Population Distribution", *format_percent(self.values))
+        # table.add_row("Observation Distribution", *format_percent(self.interpolation))
+        # table.add_row("Marginal Sample Rate", *format_percent(self.thresholds))
+        # table.add_row("Loss Weights", *format_numbers(self.weights))
+
+        
+        for param, value in self.values.items():
+            table.add_row(param, str(value))
+
+        console = Console()
+        console.print(table)
 
 @jaxtyped(typechecker=beartype)
 @tensorclass
@@ -232,9 +266,9 @@ class PretrainingData:
     targets: TensorDict[Tensor]
     
     @classmethod
-    def from_stream(cls, batch: tuple[TensorDict, TensorDict]):
+    def from_stream(cls, batch: tuple[TensorDict, TensorDict, tuple[str, str]]):
         
-        inputs, targets = batch
+        inputs, targets, _ = batch
         
         return cls(inputs=inputs, targets=targets, batch_size=[1])
 
@@ -246,9 +280,9 @@ class FinetuningData:
     targets: Tensor
     
     @classmethod
-    def from_stream(cls, batch: tuple[TensorDict, Tensor]):
+    def from_stream(cls, batch: tuple[TensorDict, Tensor, tuple[str, str]]):
         
-        inputs, targets = batch
+        inputs, targets, _ = batch
 
         targets = targets.unsqueeze(0)
         
@@ -259,21 +293,14 @@ class FinetuningData:
 class InferenceData:
 
     inputs: TensorDict[TensorField]
-    
-    # FIXME fix sequence id / event id
-
-    # sequence_id: list[str]
-    # event_id: list[str]
+    meta: tuple[str, str]
     
     @classmethod
-    def from_stream(cls, batch: tuple[TensorDict, Tensor]):
+    def from_stream(cls, batch: tuple[TensorDict, Tensor, tuple[str, str]]):
         
-        inputs, _ = batch
-
-        # sequence_id = batch.pop('sequence_id')
-        # event_id = batch.pop('sequence_id')
+        inputs, _, meta = batch
         
-        return cls(inputs=inputs, batch_size=[1])
+        return cls(inputs=inputs, meta=meta, batch_size=[1])
 
 
 SequenceData: TypeAlias = PretrainingData|FinetuningData|InferenceData

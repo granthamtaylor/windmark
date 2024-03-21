@@ -8,10 +8,10 @@ from lightning.pytorch.callbacks import LearningRateFinder, EarlyStopping, Model
 from lightning.pytorch.loggers import TensorBoardLogger
 import numpy as np
 
-from source.core.schema import Hyperparameters, Field
-from source.core.architecture import SequenceModule
-from source.core.utils import LabelBalancer
-from source.core.iterops import ParquetBatchWriter
+from windmark.core.schema import Hyperparameters, Field
+from windmark.core.architecture import SequenceModule
+from windmark.core.utils import LabelBalancer
+from windmark.core.iterops import ParquetBatchWriter
 
 @fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
 def fit_sequence_encoder(
@@ -47,40 +47,40 @@ def fit_sequence_encoder(
         precision="bf16-mixed",
         max_epochs=params.max_epochs,
         gradient_clip_val=params.gradient_clip_val,
-        fast_dev_run=params.dev_mode,
     )
 
     trainer = Trainer(
         **config,
         default_root_dir=root/'pretrain',
         callbacks = [
-            LearningRateFinder(),
+            # LearningRateFinder(),
             EarlyStopping(monitor='pretrain-validate/loss'),
             pretrain := ModelCheckpoint(),
-        ]
-    )
-
-    trainer.fit(module)
-    trainer.test(module)
-
-    module.mode = ('finetune')
-
-    trainer = Trainer(
-        **config,
-        default_root_dir=root/'finetune',
-        callbacks=[
-            LearningRateFinder(),
-            EarlyStopping(monitor='finetune-validate/loss'),
             ParquetBatchWriter('outpath'),
-            finetune := ModelCheckpoint(),
         ]
     )
 
     trainer.fit(module)
-    trainer.test(module)
-    
-    # module.mode = ('inference')
+    # trainer.test(module)
 
-    # trainer.predict(module)
+    # module.mode = ('finetune')
+
+    # trainer = Trainer(
+    #     **config,
+    #     default_root_dir=root/'finetune',
+    #     callbacks=[
+    #         LearningRateFinder(),
+    #         EarlyStopping(monitor='finetune-validate/loss'),
+    #         ParquetBatchWriter('outpath'),
+    #         finetune := ModelCheckpoint(),
+    #     ]
+    # )
+
+    # trainer.fit(module)
+    # trainer.test(module)
+    
+    module.mode = ('inference')
+
+    trainer.predict(module)
 
     return module

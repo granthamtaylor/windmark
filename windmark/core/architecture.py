@@ -18,9 +18,9 @@ from torchdata import datapipes
 import numpy as np
 import humanize
 
-from source.core.iterops import stream, collate
-from source.core.schema import SPECIAL_TOKENS, Field, ContinuousField, DiscreteField, EntityField, SequenceData, Hyperparameters
-from source.core.utils import LabelBalancer, mock, complexity
+from windmark.core.iterops import stream, collate
+from windmark.core.schema import SPECIAL_TOKENS, Field, ContinuousField, DiscreteField, EntityField, SequenceData, Hyperparameters
+from windmark.core.utils import LabelBalancer, mock, complexity
 
 @jaxtyped(typechecker=beartype)
 def _squarify(tensor: Tensor) -> Tensor:
@@ -614,15 +614,15 @@ def step(
         loss = cross_entropy(predictions, batch.targets, weight=self.weights)
         log(f"{self._mode}-{strata}/loss", loss, prog_bar=True)
 
-        logits = torch.nn.functional.softmax(predictions, dim=1)
+        probabilities = torch.nn.functional.softmax(predictions, dim=1)
         for title, metric in self.metrics[f"{strata}_metrics"].items():
-            metric(logits, batch.targets)
+            metric(probabilities, batch.targets)
             log(f"{self._mode}-{strata}/{title}", metric)
 
         return loss
 
     elif self._mode == "inference":
-        return predictions
+        return torch.nn.functional.softmax(predictions, dim=1)
 
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]

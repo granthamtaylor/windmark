@@ -3,8 +3,8 @@ from pathlib import Path
 import flytekit as fk
 import polars as pl
 
-from source.core.schema import SPECIAL_TOKENS, Field
-from source.core.utils import LabelBalancer, SplitManager
+from windmark.core.schema import SPECIAL_TOKENS, Field
+from windmark.core.utils import LabelBalancer, SplitManager
 
 
 @fk.task

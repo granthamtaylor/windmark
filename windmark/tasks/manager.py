@@ -1,8 +1,8 @@
 import flytekit as fk
 import polars as pl
 
-from source.core.schema import Hyperparameters
-from source.core.utils import SplitManager, SequenceManager, LabelBalancer
+from windmark.core.schema import Hyperparameters
+from windmark.core.utils import SplitManager, SequenceManager, LabelBalancer
 
 @fk.task
 def create_sequence_manager(

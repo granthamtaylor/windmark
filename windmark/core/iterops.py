@@ -3,6 +3,7 @@ import random
 from typing import Sequence
 from functools import partial
 
+import msgspec
 import fastparquet
 import polars as pl
 import torch
@@ -13,7 +14,7 @@ from pytdigest import TDigest
 import lightning.pytorch as lit
 import numpy as np
 
-from source.core.schema import (
+from windmark.core.schema import (
     SPECIAL_TOKENS,
     DiscreteField,
     ContinuousField,
@@ -27,7 +28,7 @@ from source.core.schema import (
     Field
 )
 
-from source.core.utils import LabelBalancer
+from windmark.core.utils import LabelBalancer
 
 def read(filename):
     with open(filename, "rb") as f:
@@ -88,7 +89,7 @@ def sample(
     return observations
 
 def hash(
-    observation: dict[str, list[int] | list[float | None] | list[str]],
+    observation: dict[str, str | list[int] | list[float | None] | list[str]],
     fields: list[Field],
     params: Hyperparameters,
 ) -> dict[str, list[int] | list[float | None]]:
@@ -114,7 +115,7 @@ def hash(
     return observation
 
 def cdf(
-    observation: dict[str, list[int] | list[float | None]],
+    observation: dict[str, str | list[int] | list[float | None]],
     fields: list[Field],
     digests: dict[str, TDigest],
 ) -> dict[str, list[int] | np.ndarray]:
@@ -130,9 +131,10 @@ def cdf(
     return observation
 
 def treeify(
-    observation: dict[str, list[int] | np.ndarray], params: Hyperparameters,
+    observation: dict[str, list[int] | np.ndarray],
+    params: Hyperparameters,
     fields: list[Field]
-) -> dict[str, torch.Tensor]:
+) -> tuple[TensorDict, torch.Tensor, tuple[str, str]]:
 
     output = {}
 
@@ -150,16 +152,17 @@ def treeify(
 
     inputs = TensorDict(output, batch_size=1)
     labels = torch.tensor(observation["label"])
+    meta = observation['sequence_id'], observation['event_id']
 
-    return inputs, labels
+    return inputs, labels, meta
 
 def mask(
-    batch: TensorDict,
+    observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
     params: Hyperparameters,
     fields: list[Field],
-) -> tuple[TensorDict, TensorDict]:
+) -> tuple[TensorDict, TensorDict, tuple[str, str]]:
     
-    inputs, _ = batch
+    inputs, _, meta = observation
     
     N, L = (1, params.n_context)
     
@@ -173,30 +176,29 @@ def mask(
         
     targets = TensorDict(targets, batch_size=1)
 
-    return inputs, targets
+    return inputs, targets, meta
 
 def package(
-    batch: tuple[TensorDict, torch.Tensor],
+    observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
     params: Hyperparameters,
     fields: list[Field],
     mode: str,
 ) -> SequenceData:
     
     if mode == 'pretrain':
-        batch: tuple[TensorDict, TensorDict] = mask(
-            batch=batch,
+        observation: tuple[TensorDict, TensorDict, tuple[str, str]] = mask(
+            observation=observation,
             params=params,
             fields=fields
         )
 
-    
     tensorclasses = dict(
         pretrain=PretrainingData,
         finetune=FinetuningData,
         inference=InferenceData,
     )
     
-    return tensorclasses[mode].from_stream(batch)
+    return tensorclasses[mode].from_stream(observation)
 
 def stream(
     datapath: str | os.PathLike,
@@ -232,7 +234,12 @@ def stream(
     
 def collate(batch: list[SequenceData]) -> SequenceData:
     
-    return torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)
+    stacked = torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)
+    
+    if isinstance(stacked, InferenceData):
+        stacked.meta = [observation.meta for observation in batch]
+    
+    return stacked
 
 
 class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
@@ -240,7 +247,7 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
     def __init__(self, outpath: str | os.PathLike):
         super().__init__("batch")
 
-        self.outpath = outpath
+        self.outpath = ("/home/grantham/windmark/data/predictions.parquet")
         self._destination_file_exists: bool = False
 
     def write_on_batch_end(
@@ -253,18 +260,27 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
         batch_index: int,
         dataloader_index: int,
     ) -> None:
-        
-        labels = module.balancer.labels
-        array = prediction.transpose(0, 1).float().cpu().detach().numpy()
 
-        df = pl.from_numpy(array, schema=labels, orient="col")
+        array = prediction.float().cpu().detach().numpy()
+
+        df = (
+            pl.DataFrame({
+                "meta": batch.meta,
+                "predictions": array,
+            })
+            .select(
+                pl.col('predictions').map_elements(lambda x: msgspec.json.encode(x.to_list())),
+                sequence_id=pl.col("meta").list.first(),
+                event_id=pl.col("meta").list.last()
+            )
+            .to_pandas()
+        )
         
 
         if self._destination_file_exists:
-            pass
-            # fastparquet.write(self.outpath, df, append=True)
+            fastparquet.write(self.outpath, df, append=True)
 
         else:
-            # fastparquet.write(self.outpath, df)
             print(df)
+            fastparquet.write(self.outpath, df)
             self._destination_file_exists = True

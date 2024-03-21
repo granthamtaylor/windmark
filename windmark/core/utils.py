@@ -5,9 +5,8 @@ import torch
 from tensordict import TensorDict
 from rich.console import Console
 from rich.table import Table
-import polars as pl
 
-from source.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField, Field
+from windmark.core.schema import Hyperparameters, SPECIAL_TOKENS, DiscreteField, ContinuousField, EntityField, Field
 
 class LabelBalancer:
 
@@ -216,11 +215,17 @@ class SequenceManager:
         self.split: SplitManager = split
         
         # expected pretraining steps per epoch
-        print(split.train * n_events * params.pretrain_sample_rate / params.batch_size)
+        pretraining_steps = int(split.train * n_events * params.pretrain_sample_rate / params.batch_size)
         
         n_labeled_events = 0
-        # expected finetuning steps per epoch
         for label_count, label_sample_rate in zip(balancer.counts, balancer.thresholds):
             n_labeled_events += label_count * label_sample_rate
 
-        print(split.train * n_labeled_events * params.finetune_sample_rate / params.batch_size)
+        # expected finetuning steps per epoch
+        finetuning_steps = int(split.train * n_labeled_events * params.finetune_sample_rate / params.batch_size)
+
+        inference_steps = int(split.test * n_events / params.batch_size )
+        
+        print(f"Expected number of pretraining steps: {pretraining_steps}")
+        print(f"Expected number of finetuning steps: {finetuning_steps}")
+        print(f"Expected number of inference steps: {inference_steps}")

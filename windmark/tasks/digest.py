@@ -3,7 +3,7 @@ import polars as pl
 from pytdigest import TDigest
 import numpy as np
 
-from source.core.schema import Field
+from windmark.core.schema import Field
 
 
 @fk.task
