@@ -666,7 +666,7 @@ class SequenceModule(lit.LightningModule):
 
         self.params: Hyperparameters = params
         self.fields: list[Field] = fields
-        self.save_hyperparameters(params.values)
+        self.save_hyperparameters(params.dict())
 
         self.lr = params.learning_rate
 

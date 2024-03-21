@@ -10,8 +10,14 @@ from tensordict import TensorDict
 from tensordict.prototype import tensorclass
 import numpy as np
 import pydantic
-from rich.console import Console
-from rich.table import Table
+
+# class SpecialTokens(IntEnum):
+
+#     VAL = 0
+#     NAN = 1
+#     UNK = 2
+#     PAD = 3
+#     MASK = 4
 
 tokens = ["VAL_", "NAN_", "UNK_", "PAD_", "MASK_"]
 SpecialTokens = namedtuple("SpecialTokens", tokens)
@@ -71,76 +77,38 @@ class Schema:
         return len(self.fields)
 
 class Hyperparameters(pydantic.BaseModel):
+
     # architectural
-    n_fields: int = pydantic.Field(..., gt=0, lt=129)
-    batch_size: int = pydantic.Field(72, gt=0, lt=2049)
-    n_context: int = pydantic.Field(128, gt=0, lt=2049)
-    d_field: int = pydantic.Field(64, gt=1, lt=257)
-    precision: int = pydantic.Field(8, gt=1, lt=513)
-    n_heads_field_encoder: int = pydantic.Field(16, gt=0, lt=33)
-    n_layers_field_encoder: int = pydantic.Field(2, gt=0, lt=33)
-    n_heads_event_encoder: int = pydantic.Field(16, gt=0, lt=33)
-    n_layers_event_encoder: int = pydantic.Field(8, gt=0, lt=33)
-    dropout: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
+    n_fields: int = pydantic.Field(..., gt=1, lt=129, description="Number of unique fields")
+    batch_size: int = pydantic.Field(72, gt=0, lt=2049, description="Batch size for training (how many observations per step")
+    n_context: int = pydantic.Field(128, gt=0, lt=2049, description="Context size (how many events per observation)")
+    d_field: int = pydantic.Field(64, gt=1, lt=257, description="Hidden dimension per field")
+    precision: int = pydantic.Field(8, gt=1, lt=513, description="Precision of fourier feature encoders")
+    n_heads_field_encoder: int = pydantic.Field(16, gt=0, lt=33, description="Number of heads in field encoder", )
+    n_layers_field_encoder: int = pydantic.Field(2, gt=0, lt=33, description="Number of layers in field encoder")
+    n_heads_event_encoder: int = pydantic.Field(16, gt=0, lt=33, description="Number of heads in event encoder", )
+    n_layers_event_encoder: int = pydantic.Field(8, gt=0, lt=33, description="Number of layers in event encoder")
+    dropout: float = pydantic.Field(0.1, gt=0.0, lt=1.0, description="Dropout rate")
 
     # general fitting
-    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
-    weight_decay: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
-    gradient_clip_val: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
-    max_epochs: int = pydantic.Field(1, gt=0, lt=257)
+    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0, description="Learning rate (will be overwritten)")
+    weight_decay: float = pydantic.Field(0.001, gt=0.0, lt=1.0, description="Optimizer weight decay")
+    gradient_clip_val: float = pydantic.Field(0.05, gt=0.0, lt=1.0, description="Gradient clipping threshold")
+    max_epochs: int = pydantic.Field(1, gt=0, lt=257, description="Maximum number of epochs for pretraining and finetuning")
     
     # pretraining
-    n_quantiles: int = pydantic.Field(16, gt=0, lt=513)
-    sigma: float = pydantic.Field(1.0, gt=0.0, lt=33.0)
-    p_mask_event: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
-    p_mask_field: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
-    pretrain_sample_rate: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
+    n_quantiles: int = pydantic.Field(16, gt=0, lt=513, description="Number of quantiles for continuous and temporal field")
+    sigma: float = pydantic.Field(1.0, gt=0.0, lt=33.0, description="Smoothing factor of continuous fields' self-supervised")
+    p_mask_event: float = pydantic.Field(0.05, gt=0.0, lt=1.0, description="Probability of masking any event")
+    p_mask_field: float = pydantic.Field(0.05, gt=0.0, lt=1.0, description="Probability of masking any field")
+    pretrain_sample_rate: float = pydantic.Field(0.001, gt=0.0, lt=1.0, description="Proportion of events to sample from during pretraining")
 
     # finetuning
-    n_targets: int = pydantic.Field(2, gt=1, lt=2049)
-    freeze_epochs: int = pydantic.Field(1, gt=0, lt=129)
-    interpolation_rate: float = pydantic.Field(0.125, gt=0.0, lt=1.0)
-    head_shape_log_base: int = pydantic.Field(4, gt=0, lt=33)
-    finetune_sample_rate: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
-
-    @property
-    def values(self) -> dict[str, float|int|bool]:
-
-        params = self.param.values()
-        del params['name']
-        
-        return params
-        
-
-    def show(self):
-        
-        table = Table(title="Hyperparameters")
-
-        table.add_column("Hyperparameter", justify="right", style="cyan", no_wrap=True)
-        
-        table.add_column('Value', style="magenta")
-            
-        def format_percent(values: list[float]) -> list[str]:
-            return list(map(lambda x: f"{x:.4%}", values))
-        
-        def format_numbers(values: list[float]) -> list[str]:
-            return list(map(lambda x: f"{x:.4}", values))
-        
-        def format_integers(values: list[float]) -> list[str]:
-            return list(map(lambda x: f"{x:,}", values))
-
-        # table.add_row("Label Counts", *format_integers(self.counts))
-        # table.add_row("Population Distribution", *format_percent(self.values))
-        # table.add_row("Observation Distribution", *format_percent(self.interpolation))
-        # table.add_row("Marginal Sample Rate", *format_percent(self.thresholds))
-        # table.add_row("Loss Weights", *format_numbers(self.weights))
-
-        
-        for param, value in self.values.items():
-            table.add_row(param, str(value))
-
-        console = Console()
-        console.print(table)
+    n_targets: int = pydantic.Field(2, gt=1, lt=2049, description="Number of supervised classification targets")
+    freeze_epochs: int = pydantic.Field(1, gt=0, lt=129, description="Number of epochs to freeze encoder while finetuning")
+    interpolation_rate: float = pydantic.Field(0.125, gt=0.0, lt=1.0, description="Interpolation rate of imbalanced classification labels")
+    head_shape_log_base: int = pydantic.Field(4, gt=0, lt=33, description="How quickly to converge sequence representation")
+    finetune_sample_rate: float = pydantic.Field(0.1, gt=0.0, lt=1.0, description="Proportion of events to sample from during finetuning")
 
 @jaxtyped(typechecker=beartype)
 @tensorclass
