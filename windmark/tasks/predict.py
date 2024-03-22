@@ -4,7 +4,7 @@ import flytekit as fk
 from lightning.pytorch import Trainer
 
 from windmark.core.architecture import SequenceModule
-from windmark.core.iterops import ParquetBatchWriter
+from windmark.core.callbacks import ParquetBatchWriter
 
 
 @fk.task

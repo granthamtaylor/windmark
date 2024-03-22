@@ -4,6 +4,7 @@ from collections import OrderedDict
 from functools import partial, partialmethod
 
 import lightning.pytorch as lit
+import numpy as np
 import torch
 import torchmetrics
 from beartype import beartype
@@ -15,38 +16,47 @@ from torch import Tensor
 from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
-import numpy as np
-import humanize
 
-from windmark.core.iterops import stream, collate
-from windmark.core.schema import SpecialTokens, Field, ContinuousField, DiscreteField, EntityField, SequenceData, Hyperparameters
-from windmark.core.utils import LabelBalancer, mock, complexity
+from windmark.core.managers import ClassificationManager
+from windmark.core.operators import collate, stream, mock
+from windmark.core.structs import (
+    ContinuousField,
+    DiscreteField,
+    EntityField,
+    Field,
+    Hyperparameters,
+    SequenceData,
+    Tokens,
+)
+
 
 @jaxtyped(typechecker=beartype)
 def _squarify(tensor: Tensor) -> Tensor:
     return ~(tensor.unsqueeze(-1) & tensor.unsqueeze(-2))
 
+
 @jaxtyped(typechecker=beartype)
 def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Tensor, Tensor]:
-    is_null = []
+    is_not_valued = []
 
     for field in fields:
         values = inputs[(field.name, "lookup")]
 
-        is_padded = values.eq(SpecialTokens.PAD)
-        is_nan = values.eq(SpecialTokens.NAN)
-        is_unknown = values.eq(SpecialTokens.UNK)
+        is_padded = values.eq(Tokens.PAD)
+        is_nan = values.eq(Tokens.NAN)
+        is_unknown = values.eq(Tokens.UNK)
 
-        is_null.append(is_padded | is_nan | is_unknown)
+        is_not_valued.append(is_padded | is_nan | is_unknown)
 
-    is_null = torch.stack(is_null, dim=-1)
+    is_not_valued = torch.stack(is_not_valued, dim=-1)
 
-    N, L, F = is_null.shape
+    N, L, F = is_not_valued.shape
 
-    field_mask = ~is_null.view(N * L, F)
-    event_mask = ~is_null.amin(-1)
+    field_mask = ~is_not_valued.view(N * L, F)
+    event_mask = ~is_not_valued.amin(-1)
 
     return (_squarify(field_mask), _squarify(event_mask))
+
 
 class LearnedTensor(torch.nn.Module):
     """
@@ -82,6 +92,7 @@ class LearnedTensor(torch.nn.Module):
 
         return self.tensor
 
+
 class DiscreteFieldEmbedder(torch.nn.Module):
     def __init__(self, params: Hyperparameters, field: Field):
         """
@@ -93,10 +104,11 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         super().__init__()
 
         self.field: Field = field
-        self.embeddings = torch.nn.Embedding(field.levels + len(SpecialTokens), params.d_field)
+        self.embeddings = torch.nn.Embedding(field.levels + len(Tokens), params.d_field)
 
     def forward(self, inputs: DiscreteField) -> Tensor:
         return self.embeddings(inputs.lookup)
+
 
 class EntityFieldEmbedder(torch.nn.Module):
     def __init__(self, params: Hyperparameters, field: Field):
@@ -109,10 +121,11 @@ class EntityFieldEmbedder(torch.nn.Module):
         """
 
         self.field: Field = field
-        self.embeddings = torch.nn.Embedding(params.n_context + len(SpecialTokens), params.d_field)
+        self.embeddings = torch.nn.Embedding(params.n_context + len(Tokens), params.d_field)
 
     def forward(self, inputs: EntityField) -> Tensor:
         return self.embeddings(inputs.lookup)
+
 
 class ContinuousFieldEmbedder(torch.nn.Module):
     """
@@ -136,7 +149,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         self.field: Field = field
         self.linear = torch.nn.Linear(2 * params.precision, params.d_field)
-        self.positional = torch.nn.Embedding(len(SpecialTokens), params.d_field)
+        self.positional = torch.nn.Embedding(len(Tokens), params.d_field)
 
         weights = torch.logspace(-params.precision, 1, params.precision, base=2).mul(math.pi).unsqueeze(dim=0)
 
@@ -184,6 +197,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         return projections + positional
 
+
 class TemporalFieldEmbedder(ContinuousFieldEmbedder):
     """
     TemporalFieldEmbedder is a PyTorch module that encodes features using Fourier features.
@@ -193,6 +207,7 @@ class TemporalFieldEmbedder(ContinuousFieldEmbedder):
         positional (torch.nn.Embedding): An embedding layer for positional encoding.
         weights (Tensor): The weights for the Fourier features.
     """
+
 
 class ModularAttributeEmbeddingSystem(torch.nn.Module):
     """
@@ -248,6 +263,7 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
         # N L F C
         return stacked.permute(0, 1, 3, 2)
 
+
 class FieldEncoder(torch.nn.Module):
     """
     FieldEncoder is a PyTorch module for encoding fields.
@@ -262,10 +278,9 @@ class FieldEncoder(torch.nn.Module):
         """
 
         super().__init__()
-        
-        
+
         identity = torch.eye(params.n_fields).bool().unsqueeze(0)
-        self.register_buffer('identity', identity)
+        self.register_buffer("identity", identity)
 
         self.H = params.n_heads_field_encoder
 
@@ -316,6 +331,7 @@ class FieldEncoder(torch.nn.Module):
 
         # N L FC
         return events
+
 
 class EventEncoder(torch.nn.Module):
     """
@@ -378,6 +394,7 @@ class EventEncoder(torch.nn.Module):
 
         return sequence.squeeze(dim=1), events
 
+
 class EventDecoder(torch.nn.Module):
     """
     EventDecoder is a PyTorch module for decoding masked events from their contextualized representations.
@@ -411,7 +428,7 @@ class EventDecoder(torch.nn.Module):
 
             projections[field.name] = torch.nn.Conv1d(
                 in_channels=params.n_fields * params.d_field,
-                out_channels=d_target + len(SpecialTokens),
+                out_channels=d_target + len(Tokens),
                 kernel_size=1,
             )
 
@@ -444,6 +461,7 @@ class EventDecoder(torch.nn.Module):
 
         # N, L, ?
         return TensorDict(events, batch_size=N)
+
 
 class DecisionHead(torch.nn.Module):
     """
@@ -507,40 +525,42 @@ class DecisionHead(torch.nn.Module):
 
         return self.mlp(inputs)
 
+
+# FIXME does this belong here on in "operators.py"? It feels out of place
 @jaxtyped(typechecker=beartype)
 def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset: int) -> Float[torch.Tensor, "N L _"]:
-
     device = targets.device
 
     N, L = targets.size()
 
-    range_tensor = torch.arange(0, params.n_quantiles+offset, device=device).float()
-    
+    range_tensor = torch.arange(0, params.n_quantiles + offset, device=device).float()
+
     # expand and reshape to match the batch and sequence dimensions
-    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0).expand(N, L, params.n_quantiles+offset)
+    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0).expand(N, L, params.n_quantiles + offset)
     labels_expanded = targets.float().unsqueeze(-1)
-    
+
     # create gaussian distribution for each label in the sequence
     gaussian = torch.exp(-0.5 * ((range_tensor - labels_expanded) ** 2) / params.sigma**2)
     gaussian /= gaussian.sum(dim=-1, keepdim=True)
-    
+
     # one-hot encoding for labels at or below the threshold
     one_hot = torch.zeros_like(gaussian).scatter_(-1, targets.unsqueeze(-1), 1.0)
-    
+
     # determine which labels are above the threshold
     is_above_threshold = targets > offset
-    
+
     # prevent gaussian bleeding for labels above the threshold
     start_bleed = torch.zeros_like(targets, dtype=torch.float32) + offset + 1
     start_positions = torch.where(is_above_threshold, start_bleed, targets.float())
     prevent_bleed_mask = range_tensor >= start_positions.unsqueeze(-1)
-    
+
     # re-normalize
     gaussian_masked = gaussian * prevent_bleed_mask.float()
     gaussian_masked /= gaussian_masked.sum(dim=-1, keepdim=True)
-    
+
     # combine using the condition
     return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot)
+
 
 def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
     metrics = dict(
@@ -566,6 +586,7 @@ def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
 
     return stratas
 
+
 def step(
     self: "SequenceModule",
     batch: SequenceData,
@@ -583,17 +604,15 @@ def step(
     )
 
     if self._mode == "pretrain":
-
         losses = []
 
         for field in self.fields:
-            
             values = reconstruction[field.name]
             targets = batch.targets[field.name]
-            
+
             # smoothen the targets for continuous fields
-            if field.type in ['continuous', 'temporal']:
-                labels = smoothen(targets=targets.lookup, params=self.params, offset=len(SpecialTokens))
+            if field.type in ["continuous", "temporal"]:
+                labels = smoothen(targets=targets.lookup, params=self.params, offset=len(Tokens))
             else:
                 labels = targets.lookup
 
@@ -601,7 +620,7 @@ def step(
             is_masked = targets.is_masked.reshape(self.params.batch_size * self.params.n_context, -1)
             values = values.reshape(self.params.batch_size * self.params.n_context, -1)
 
-            loss = cross_entropy(values, labels, reduction='none').mul(is_masked).mean()
+            loss = cross_entropy(values, labels, reduction="none").mul(is_masked).mean()
             losses.append(loss)
             log(f"{self._mode}-{strata}/{field.name}-loss", loss)
 
@@ -610,7 +629,6 @@ def step(
         return total_loss
 
     elif self._mode == "finetune":
-
         loss = cross_entropy(predictions, batch.targets, weight=self.weights)
         log(f"{self._mode}-{strata}/loss", loss, prog_bar=True)
 
@@ -624,6 +642,7 @@ def step(
     elif self._mode == "inference":
         return torch.nn.functional.softmax(predictions, dim=1)
 
+
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]
 
@@ -632,7 +651,7 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     pipe = self.pipes[strata]
     loader = DataLoader(
         pipe,
-        batch_size=self.params.batch_size, 
+        batch_size=self.params.batch_size,
         num_workers=28,
         collate_fn=collate,
         pin_memory=True,
@@ -644,14 +663,13 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
 
 
 class SequenceModule(lit.LightningModule):
-
     def __init__(
         self,
         datapath: str | os.PathLike,
         params: Hyperparameters,
         fields: list[Field],
         centroids: dict[str, np.ndarray],
-        balancer: LabelBalancer,
+        balancer: ClassificationManager,
     ):
         super().__init__()
 
@@ -660,7 +678,7 @@ class SequenceModule(lit.LightningModule):
         assert isinstance(params, Hyperparameters)
 
         for field in fields:
-            assert field.is_valid, f'field {field.name} is not valid'
+            assert field.is_valid, f"field {field.name} is not valid"
 
         self.datapath: str | os.PathLike = datapath
 
@@ -681,7 +699,7 @@ class SequenceModule(lit.LightningModule):
         self._mode: str = "pretrain"
         self.balancer = balancer
 
-        self.register_buffer('weights', torch.tensor(self.balancer.weights))
+        self.register_buffer("weights", torch.tensor(self.balancer.weights))
 
         self.dataloaders: dict[str, DataLoader] = {}
         self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
@@ -716,14 +734,9 @@ class SequenceModule(lit.LightningModule):
         return predictions, reconstructions
 
     def configure_optimizers(self) -> torch.optim.AdamW:
-
         print(f"configuring optimizer for mode {self._mode}")
 
-        return torch.optim.AdamW(
-            self.parameters(),
-            lr=self.lr,
-            weight_decay=self.params.weight_decay
-        )
+        return torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.params.weight_decay)
 
     training_step = partialmethod(step, strata="train")
     validation_step = partialmethod(step, strata="validate")
@@ -752,9 +765,8 @@ class SequenceModule(lit.LightningModule):
             predict=["predict"],
         )
 
-
-        for strata in mapping[stage]:            
-            dataset = (strata if strata != "predict" else "test")
+        for strata in mapping[stage]:
+            dataset = strata if strata != "predict" else "test"
             self.pipes[strata] = pipe(masks=f"{dataset}-*.avro")
 
     def teardown(self, stage: StageName):
@@ -769,7 +781,6 @@ class SequenceModule(lit.LightningModule):
         )
 
         for strata in mapping[stage]:
-
             del self.pipes[strata]
             del self.dataloaders[strata]
 
@@ -790,7 +801,6 @@ class SequenceModule(lit.LightningModule):
 
         self._mode = mode
 
-    def show(self):
-
-        memory = humanize.naturalsize(complexity(self.params))
-        flops = humanize.metric(self.flops_per_batch, "V")
+    # def show(self):
+    #     memory = humanize.naturalsize(complexity(self.params))
+    #     flops = humanize.metric(self.flops_per_batch, "Flops")

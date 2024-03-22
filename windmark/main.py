@@ -1,10 +1,8 @@
+from windmark.core.structs import Hyperparameters, Schema
 from windmark.pipelines.workflow import pipeline
-from windmark.core.schema import Schema, Hyperparameters
 
-
-if __name__ == '__main__':
-    
-    ledger = ("/home/grantham/windmark/data/ledger.subsample.parquet")
+if __name__ == "__main__":
+    ledger = "/home/grantham/windmark/data/ledger.subsample.parquet"
 
     schema = Schema(
         use_chip="discrete",
@@ -17,8 +15,6 @@ if __name__ == '__main__':
         timestamp="temporal",
     )
 
-    params = Hyperparameters(
-        n_fields=len(schema)
-    )
-    
+    params = Hyperparameters(n_fields=len(schema))
+
     pipeline(fields=schema.fields, ledger_path=ledger, params=params)

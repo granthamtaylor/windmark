@@ -1,17 +1,18 @@
 from pathlib import Path
 
-from funcy import join
 import flytekit as fk
-import torch
-from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import LearningRateFinder, EarlyStopping, ModelCheckpoint
-from lightning.pytorch.loggers import TensorBoardLogger
 import numpy as np
+import torch
+from funcy import join
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.loggers import TensorBoardLogger
 
-from windmark.core.schema import Hyperparameters, Field
 from windmark.core.architecture import SequenceModule
-from windmark.core.utils import LabelBalancer
-from windmark.core.iterops import ParquetBatchWriter
+from windmark.core.callbacks import ParquetBatchWriter
+from windmark.core.managers import ClassificationManager
+from windmark.core.structs import Field, Hyperparameters
+
 
 @fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
 def fit_sequence_encoder(
@@ -19,12 +20,11 @@ def fit_sequence_encoder(
     params: Hyperparameters,
     fields: list[Field],
     centroids: list[dict[str, np.ndarray]],
-    balancer: LabelBalancer,
+    balancer: ClassificationManager,
 ) -> SequenceModule:
-    
     assert torch.cuda.is_available()
-    
-    torch.set_float32_matmul_precision('medium')
+
+    torch.set_float32_matmul_precision("medium")
 
     module = SequenceModule(
         datapath=dataset.path,
@@ -33,12 +33,12 @@ def fit_sequence_encoder(
         centroids=join(centroids),
         balancer=balancer,
     )
-    
+
     root = Path(fk.current_context().working_directory) / "checkpoints"
     root.mkdir()
-    
+
     logger = TensorBoardLogger("logs", name="windmark")
-    
+
     config = dict(
         logger=logger,
         accelerator="auto",
@@ -51,14 +51,16 @@ def fit_sequence_encoder(
 
     trainer = Trainer(
         **config,
-        default_root_dir=root/'pretrain',
-        callbacks = [
+        default_root_dir=root / "pretrain",
+        callbacks=[
             # LearningRateFinder(),
-            EarlyStopping(monitor='pretrain-validate/loss'),
+            EarlyStopping(monitor="pretrain-validate/loss"),
             pretrain := ModelCheckpoint(),
-            ParquetBatchWriter('outpath'),
-        ]
+            ParquetBatchWriter("outpath"),
+        ],
     )
+
+    print(pretrain)
 
     trainer.fit(module)
     # trainer.test(module)
@@ -78,8 +80,8 @@ def fit_sequence_encoder(
 
     # trainer.fit(module)
     # trainer.test(module)
-    
-    module.mode = ('inference')
+
+    module.mode = "inference"
 
     trainer.predict(module)
 

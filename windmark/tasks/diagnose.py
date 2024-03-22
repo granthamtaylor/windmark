@@ -1,11 +1,11 @@
 import flytekit as fk
 import polars as pl
 
-from windmark.core.schema import Field
+from windmark.core.structs import Field
+
 
 @fk.task
 def diagnose(ledger: pl.DataFrame, fields: list[Field]):
-
     assert "sequence_id" in ledger.columns
     assert "event_id" in ledger.columns
     assert "order" in ledger.columns
@@ -34,4 +34,3 @@ def diagnose(ledger: pl.DataFrame, fields: list[Field]):
     assert ledger.get_column("sequence_id").null_count() == 0
     assert ledger.get_column("event_id").null_count() == 0
     assert ledger.get_column("event_order").null_count() == 0
-
