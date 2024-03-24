@@ -23,6 +23,7 @@ from windmark.core.structs import (
     ContinuousField,
     DiscreteField,
     EntityField,
+    TemporalField,
     Field,
     Hyperparameters,
     SequenceData,
@@ -37,23 +38,21 @@ def _squarify(tensor: Tensor) -> Tensor:
 
 @jaxtyped(typechecker=beartype)
 def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Tensor, Tensor]:
-    is_not_valued = []
+    is_non_valued = []
 
     for field in fields:
         values = inputs[(field.name, "lookup")]
 
         is_padded = values.eq(Tokens.PAD)
-        is_nan = values.eq(Tokens.NAN)
         is_unknown = values.eq(Tokens.UNK)
+        is_non_valued.append(is_padded | is_unknown)
 
-        is_not_valued.append(is_padded | is_nan | is_unknown)
+    is_non_valued = torch.stack(is_non_valued, dim=-1)
 
-    is_not_valued = torch.stack(is_not_valued, dim=-1)
+    N, L, F = is_non_valued.shape
 
-    N, L, F = is_not_valued.shape
-
-    field_mask = ~is_not_valued.view(N * L, F)
-    event_mask = ~is_not_valued.amin(-1)
+    field_mask = ~is_non_valued.view(N * L, F)
+    event_mask = ~is_non_valued.amin(-1)
 
     return (_squarify(field_mask), _squarify(event_mask))
 
@@ -158,7 +157,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        inputs: ContinuousField,
+        inputs: ContinuousField | TemporalField,
     ) -> Float[Tensor, "N L F"]:
         """
         Performs the forward pass of the FourierFeatureEncoder.
@@ -688,9 +687,14 @@ class SequenceModule(lit.LightningModule):
 
         self.lr = params.learning_rate
 
-        self.modular_field_embedder = ModularAttributeEmbeddingSystem(params=params, fields=fields)
-        self.field_encoder = FieldEncoder(params=params)
-        self.event_encoder = EventEncoder(params=params)
+        self.body = torch.nn.ModuleDict(
+            dict(
+                modular_field_embedder=ModularAttributeEmbeddingSystem(params=params, fields=fields),
+                field_encoder=FieldEncoder(params=params),
+                event_encoder=EventEncoder(params=params),
+            )
+        )
+
         self.event_decoder = EventDecoder(params=params, fields=fields)
         self.decision_head = DecisionHead(params=params)
 
@@ -724,19 +728,19 @@ class SequenceModule(lit.LightningModule):
 
         field_mask, event_mask = create_attention_masks(inputs, fields=self.fields)
 
-        fields = self.modular_field_embedder(inputs)
-        events = self.field_encoder(fields, mask=field_mask)
-        sequence, representations = self.event_encoder(events, mask=event_mask)
+        fields = self.body.modular_field_embedder(inputs)
+        events = self.body.field_encoder(fields, mask=field_mask)
+        sequence, representations = self.body.event_encoder(events, mask=event_mask)
 
         predictions = self.decision_head(sequence)
         reconstructions = self.event_decoder(representations)
 
         return predictions, reconstructions
 
-    def configure_optimizers(self) -> torch.optim.AdamW:
+    def configure_optimizers(self) -> torch.optim.Optimizer:
         print(f"configuring optimizer for mode {self._mode}")
-
-        return torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.params.weight_decay)
+        parameters = filter(lambda p: p.requires_grad, self.parameters())
+        return torch.optim.AdamW(parameters, lr=self.lr, weight_decay=self.params.weight_decay)
 
     training_step = partialmethod(step, strata="train")
     validation_step = partialmethod(step, strata="validate")

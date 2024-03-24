@@ -1,7 +1,8 @@
 - [x] Entity Field Types
 - [x] Temporal Field Types
 - [x] Neighborhood Smoothing Loss
-- [ ] Model inference step
-- [ ] Create API
+- [x] Model inference step
+- [x] Create API
 - [ ] Stress test scalability
 - [ ] Create data quality checks
+- [ ] Freeze encoder during finetuning

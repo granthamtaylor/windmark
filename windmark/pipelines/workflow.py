@@ -25,7 +25,3 @@ def pipeline(
     lifestreams = preprocess(ledger=ledger, fields=parsed_fields, balancer=balancer)
 
     fit(dataset=lifestreams, fields=parsed_fields, params=params, centroids=centroids, balancer=balancer)
-
-
-if __name__ == "__main__":
-    pipeline()

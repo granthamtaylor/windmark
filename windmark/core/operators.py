@@ -22,6 +22,7 @@ from windmark.core.structs import (
     SequenceData,
     Tokens,
     TemporalField,
+    TensorField,
 )
 
 
@@ -39,8 +40,8 @@ def sample(
     fields: list[Field],
     balancer: ClassificationManager,
     mode: str,
-) -> list[dict[str, int | float | None]]:
-    observations: list[dict[str, int | float | None]] = []
+) -> list[dict[str, str | list[int] | list[float | None] | list[str]]]:
+    observations = []
 
     for event in range(sequence["size"]):
         if mode == "pretrain":
@@ -84,7 +85,7 @@ def hash(
     observation: dict[str, str | list[int] | list[float | None] | list[str]],
     fields: list[Field],
     params: Hyperparameters,
-) -> dict[str, list[int] | list[float | None]]:
+) -> dict[str, str | list[int] | list[float | None]]:
     offset = len(Tokens)
 
     for field in fields:
@@ -108,7 +109,7 @@ def cdf(
     observation: dict[str, str | list[int] | list[float | None]],
     fields: list[Field],
     digests: dict[str, TDigest],
-) -> dict[str, list[int] | np.ndarray]:
+) -> dict[str, str | list[int] | np.ndarray]:
     for field in fields:
         if field.type in ["continuous", "temporal"]:
             digest: TDigest = digests[field.name]
@@ -119,7 +120,7 @@ def cdf(
 
 
 def tensorfield(
-    observation: dict[str, list[int] | np.ndarray], params: Hyperparameters, fields: list[Field]
+    observation: dict[str, str | list[int] | np.ndarray], params: Hyperparameters, fields: list[Field]
 ) -> tuple[TensorDict, torch.Tensor, tuple[str, str]]:
     output = {}
 
@@ -218,37 +219,40 @@ def stream(
 def collate(batch: list[SequenceData]) -> SequenceData:
     stacked = torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)
 
+    # the non-tensor data (metadata) during inference needs to be manually collated
     if isinstance(stacked, InferenceData):
         stacked.meta = [observation.meta for observation in batch]
 
     return stacked
 
 
-def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict:
-    data = {}
+def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict[TensorField]:
+    output = {}
 
     N = params.batch_size
     L = params.n_context
 
     is_padded = torch.arange(L).expand(N, L).lt(torch.randint(1, L, [N]).unsqueeze(-1)).bool()
 
+    tensorfield = dict(
+        continuous=ContinuousField,
+        temporal=TemporalField,
+        discrete=DiscreteField,
+        entity=EntityField,
+    )
+
     for field in fields:
-        match field.type:
-            case "continuous" | "temporal":
-                indicators = torch.randint(0, len(Tokens), (N, L))
-                padded = torch.where(is_padded, Tokens.PAD, indicators)
-                is_empty = padded.eq(Tokens.VAL).long()
-                values = torch.rand(N, L).mul(is_empty)
-                data[field.name] = ContinuousField(content=values, lookup=padded, batch_size=[N])
+        if field.type in ["continuous", "temporal"]:
+            indicators = torch.randint(0, len(Tokens), (N, L))
+            padded = torch.where(is_padded, Tokens.PAD, indicators)
+            is_valued = padded.eq(Tokens.VAL).long()
+            values = torch.rand(N, L).mul(is_valued)
+            output[field.name] = tensorfield[field.type](content=values, lookup=padded, batch_size=[N])
 
-            case "discrete":
-                values = torch.randint(0, field.levels + len(Tokens), (N, L))
-                padded = torch.where(is_padded, Tokens.PAD, values)
-                data[field.name] = DiscreteField(lookup=padded, batch_size=[N])
+        if field.type in ["discrete", "entity"]:
+            limit = field.levels + len(Tokens) if field.type == "discrete" else L + len(Tokens)
+            values = torch.randint(0, limit, (N, L))
+            padded = torch.where(is_padded, Tokens.PAD, values)
+            output[field.name] = tensorfield[field.type](lookup=padded, batch_size=[N])
 
-            case "entity":
-                values = torch.randint(0, L + len(Tokens), (N, L))
-                padded = torch.where(is_padded, Tokens.PAD, values)
-                data[field.name] = EntityField(lookup=padded, batch_size=[N])
-
-    return TensorDict(data, batch_size=N)
+    return TensorDict(output, batch_size=N)

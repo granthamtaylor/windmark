@@ -5,11 +5,11 @@ import numpy as np
 import torch
 from funcy import join
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateFinder
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
-from windmark.core.callbacks import ParquetBatchWriter
+from windmark.core.callbacks import ParquetBatchWriter, ThawedFinetuning
 from windmark.core.managers import ClassificationManager
 from windmark.core.structs import Field, Hyperparameters
 
@@ -45,41 +45,44 @@ def fit_sequence_encoder(
         devices="auto",
         strategy="auto",
         precision="bf16-mixed",
-        max_epochs=params.max_epochs,
         gradient_clip_val=params.gradient_clip_val,
     )
 
     trainer = Trainer(
         **config,
         default_root_dir=root / "pretrain",
+        max_epochs=10,
         callbacks=[
-            # LearningRateFinder(),
+            LearningRateFinder(),
             EarlyStopping(monitor="pretrain-validate/loss"),
             pretrain := ModelCheckpoint(),
-            ParquetBatchWriter("outpath"),
         ],
     )
 
     print(pretrain)
 
     trainer.fit(module)
-    # trainer.test(module)
+    trainer.test(module)
 
-    # module.mode = ('finetune')
+    module.mode = "finetune"
 
-    # trainer = Trainer(
-    #     **config,
-    #     default_root_dir=root/'finetune',
-    #     callbacks=[
-    #         LearningRateFinder(),
-    #         EarlyStopping(monitor='finetune-validate/loss'),
-    #         ParquetBatchWriter('outpath'),
-    #         finetune := ModelCheckpoint(),
-    #     ]
-    # )
+    trainer = Trainer(
+        **config,
+        default_root_dir=root / "finetune",
+        min_epochs=16,
+        callbacks=[
+            LearningRateFinder(),
+            EarlyStopping(monitor="finetune-validate/loss"),
+            ThawedFinetuning(transition=16),
+            ParquetBatchWriter("/home/grantham/windmark/data/predictions.parquet"),
+            finetune := ModelCheckpoint(),
+        ],
+    )
 
-    # trainer.fit(module)
-    # trainer.test(module)
+    print(finetune)
+
+    trainer.fit(module)
+    trainer.test(module)
 
     module.mode = "inference"
 

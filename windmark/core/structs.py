@@ -17,10 +17,9 @@ class Tokens(IntEnum):
     """Special token representations"""
 
     VAL = 0
-    NAN = 1
-    UNK = 2
-    PAD = 3
-    MASK = 4
+    UNK = 1
+    PAD = 2
+    MASK = 3
 
 
 class Field:
@@ -75,65 +74,66 @@ class Schema:
 
 
 class Hyperparameters(pydantic.BaseModel):
+    # hidden params
+    # ! will be hidden because can be inferred from balancer
+    n_targets: int = pydantic.Field(2, gt=1, lt=2049)
+    """Number of supervised classification targets"""
+    # ! will be hidden because can be inferred from schema
+    n_fields: int = pydantic.Field(..., gt=1, lt=129)
+    """Number of unique fields"""
+    # ! will be hidden because will be overwritten by learning rate finder
+    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
+    """Learning rate"""
+    # ! will be hidden because default value of 8 is pretty universal
+    precision: int = pydantic.Field(8, gt=1, lt=513)
+    """Precision of fourier feature encoders"""
+    # ! might be able to automatically find
+    pretrain_sample_rate: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
+    """Proportion of events to sample from during pretraining"""
+    # ! this is a pretty confusing param and shouldn't really matter that much
+    head_shape_log_base: int = pydantic.Field(4, gt=0, lt=33)
+    """How quickly to converge sequence representation"""
+    # ! might be able to automatically find
+    finetune_sample_rate: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
+    """Proportion of events to sample from during finetuning"""
+
     # architectural
-    n_fields: int = pydantic.Field(..., gt=1, lt=129, description="Number of unique fields")
-    batch_size: int = pydantic.Field(
-        72, gt=0, lt=2049, description="Batch size for training (how many observations per step"
-    )
-    n_context: int = pydantic.Field(128, gt=0, lt=2049, description="Context size (how many events per observation)")
-    d_field: int = pydantic.Field(64, gt=1, lt=257, description="Hidden dimension per field")
-    precision: int = pydantic.Field(8, gt=1, lt=513, description="Precision of fourier feature encoders")
-    n_heads_field_encoder: int = pydantic.Field(
-        16,
-        gt=0,
-        lt=33,
-        description="Number of heads in field encoder",
-    )
-    n_layers_field_encoder: int = pydantic.Field(2, gt=0, lt=33, description="Number of layers in field encoder")
-    n_heads_event_encoder: int = pydantic.Field(
-        16,
-        gt=0,
-        lt=33,
-        description="Number of heads in event encoder",
-    )
-    n_layers_event_encoder: int = pydantic.Field(8, gt=0, lt=33, description="Number of layers in event encoder")
-    dropout: float = pydantic.Field(0.1, gt=0.0, lt=1.0, description="Dropout rate")
+    batch_size: int = pydantic.Field(72, gt=0, lt=2049)
+    """Batch size for training (how many observations per step)"""
+    n_context: int = pydantic.Field(128, gt=0, lt=2049)
+    """Context size (how many events per observation)"""
+    d_field: int = pydantic.Field(64, gt=1, lt=257)
+    """Hidden dimension per field"""
+    n_heads_field_encoder: int = pydantic.Field(16, gt=0, lt=33)
+    """Number of heads in field encoder"""
+    n_layers_field_encoder: int = pydantic.Field(2, gt=0, lt=33)
+    """Number of layers in field encoder"""
+    n_heads_event_encoder: int = pydantic.Field(16, gt=0, lt=33)
+    """Number of heads in event encoder"""
+    n_layers_event_encoder: int = pydantic.Field(8, gt=0, lt=33)
+    """Number of layers in event encoder"""
+    dropout: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
+    """Dropout rate"""
 
-    # general fitting
-    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0, description="Learning rate (will be overwritten)")
-    weight_decay: float = pydantic.Field(0.001, gt=0.0, lt=1.0, description="Optimizer weight decay")
-    gradient_clip_val: float = pydantic.Field(0.05, gt=0.0, lt=1.0, description="Gradient clipping threshold")
-    max_epochs: int = pydantic.Field(
-        1, gt=0, lt=257, description="Maximum number of epochs for pretraining and finetuning"
-    )
-
-    # pretraining
-    n_quantiles: int = pydantic.Field(
-        16, gt=0, lt=513, description="Number of quantiles for continuous and temporal field"
-    )
-    sigma: float = pydantic.Field(
-        1.0, gt=0.0, lt=33.0, description="Smoothing factor of continuous fields' self-supervised"
-    )
-    p_mask_event: float = pydantic.Field(0.05, gt=0.0, lt=1.0, description="Probability of masking any event")
-    p_mask_field: float = pydantic.Field(0.05, gt=0.0, lt=1.0, description="Probability of masking any field")
-    pretrain_sample_rate: float = pydantic.Field(
-        0.001, gt=0.0, lt=1.0, description="Proportion of events to sample from during pretraining"
-    )
-
-    # finetuning
-    n_targets: int = pydantic.Field(2, gt=1, lt=2049, description="Number of supervised classification targets")
-    freeze_epochs: int = pydantic.Field(
-        1, gt=0, lt=129, description="Number of epochs to freeze encoder while finetuning"
-    )
-    interpolation_rate: float = pydantic.Field(
-        0.125, gt=0.0, lt=1.0, description="Interpolation rate of imbalanced classification labels"
-    )
-    head_shape_log_base: int = pydantic.Field(
-        4, gt=0, lt=33, description="How quickly to converge sequence representation"
-    )
-    finetune_sample_rate: float = pydantic.Field(
-        0.1, gt=0.0, lt=1.0, description="Proportion of events to sample from during finetuning"
-    )
+    # training
+    weight_decay: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
+    """Optimizer weight decay"""
+    gradient_clip_val: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    """Gradient clipping threshold"""
+    max_epochs: int = pydantic.Field(1, gt=0, lt=257)
+    """Maximum number of epochs for pretraining and finetuning"""
+    n_quantiles: int = pydantic.Field(16, gt=0, lt=513)
+    """Number of quantiles for continuous and temporal field"""
+    sigma: float = pydantic.Field(1.0, gt=0.0, lt=33.0)
+    """Smoothing factor of continuous fields' self-supervised"""
+    p_mask_event: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    """Probability of masking any event"""
+    p_mask_field: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    """Probability of masking any field"""
+    freeze_epochs: int = pydantic.Field(1, gt=0, lt=129)
+    """Number of epochs to freeze encoder while finetuning"""
+    interpolation_rate: float = pydantic.Field(0.08, gt=0.0, lt=1.0)
+    """Interpolation rate of imbalanced classification labels"""
 
 
 @jaxtyped(typechecker=beartype)

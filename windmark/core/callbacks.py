@@ -13,7 +13,7 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
     def __init__(self, outpath: str | os.PathLike):
         super().__init__("batch")
 
-        self.outpath = "/home/grantham/windmark/data/predictions.parquet"
+        self.outpath = outpath
         self._destination_file_exists: bool = False
 
     def write_on_batch_end(
@@ -43,10 +43,33 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
             .to_pandas()
         )
 
-        if self._destination_file_exists:
-            fastparquet.write(self.outpath, df, append=True)
+        fastparquet.write(self.outpath, df, append=self._destination_file_exists)
 
-        else:
-            print(df)
-            fastparquet.write(self.outpath, df)
+        if not self._destination_file_exists:
             self._destination_file_exists = True
+
+
+class ThawedFinetuning(lit.callbacks.BaseFinetuning):
+    def __init__(self, transition: int = 10):
+        super().__init__()
+
+        self.transition = transition
+
+    def freeze_before_training(self, module: lit.LightningModule):
+        self.freeze(module.body)
+        self.freeze(module.event_decoder)
+
+    def finetune_function(
+        self,
+        module: lit.LightningModule,
+        epoch: int,
+        optimizer: torch.optim.Optimizer,
+    ):
+        if epoch == self.transition:
+            print(f"sequence encoder body unfrozen at finetuning epoch {epoch}")
+
+            self.unfreeze_and_add_param_group(
+                modules=module.body,
+                optimizer=optimizer,
+                train_bn=True,
+            )
