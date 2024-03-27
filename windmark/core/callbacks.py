@@ -50,14 +50,13 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
 
 
 class ThawedFinetuning(lit.callbacks.BaseFinetuning):
-    def __init__(self, transition: int = 10):
+    def __init__(self, transition: int):
         super().__init__()
 
-        self.transition = transition
+        self._unfreeze_at_epoch = transition
 
     def freeze_before_training(self, module: lit.LightningModule):
         self.freeze(module.body)
-        self.freeze(module.event_decoder)
 
     def finetune_function(
         self,
@@ -65,7 +64,7 @@ class ThawedFinetuning(lit.callbacks.BaseFinetuning):
         epoch: int,
         optimizer: torch.optim.Optimizer,
     ):
-        if epoch == self.transition:
+        if epoch == self._unfreeze_at_epoch:
             print(f"sequence encoder body unfrozen at finetuning epoch {epoch}")
 
             self.unfreeze_and_add_param_group(

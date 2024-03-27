@@ -739,8 +739,10 @@ class SequenceModule(lit.LightningModule):
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         print(f"configuring optimizer for mode {self._mode}")
-        parameters = filter(lambda p: p.requires_grad, self.parameters())
-        return torch.optim.AdamW(parameters, lr=self.lr, weight_decay=self.params.weight_decay)
+
+        return torch.optim.AdamW(
+            filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr, weight_decay=self.params.weight_decay
+        )
 
     training_step = partialmethod(step, strata="train")
     validation_step = partialmethod(step, strata="validate")
@@ -802,6 +804,12 @@ class SequenceModule(lit.LightningModule):
         assert mode in ["pretrain", "finetune", "inference"]
 
         print(f"setting mode to {mode}")
+
+        # for param in self.event_decoder.parameters(recurse=True):
+        #     param.requires_grad = False
+
+        # for param in self.decision_head.parameters(recurse=True):
+        #     param.requires_grad = False
 
         self._mode = mode
 

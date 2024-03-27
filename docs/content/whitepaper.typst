@@ -1,42 +1,73 @@
+#import "@preview/unequivocal-ams:0.1.0": ams-article, theorem, proof
+
+#import "@preview/codly:0.2.0": *
+
+#set raw(lang:"python")
+
+#show: ams-article.with(
+  title: [Natively Modeling Complex Sequential Data with Modular Field Embeddings],
+  authors: (
+    (
+      name: "Grantham Taylor",
+      department: [Research Science],
+      organization: [Windmark Labs],
+      location: [Arlington, VA 22201],
+      email: "granthamtaylor@icloud.com",
+      // url: "www.math.sc.edu/~howard"
+    ),
+  ),
+  abstract: lorem(100),
+  bibliography: bibliography("refs.bib"),
+)
+
 #show link: underline
 
 #set page(margin: (
-  y: 1.5cm,
-  x: 1.5cm,
+  y: 2.0cm,
+  x: 2.0cm,
 ))
 
-Solving Real Business Problems with AI. <title>
+#let icon(codepoint) = {
+  box(
+    height: 0.8em,
+    baseline: 0.05em,
+    image(codepoint)
+  )
+  h(0.1em)
+}
 
-Grantham Taylor <author>
+#show: codly-init.with()
+#codly(languages: (
+  rust: (name: "Rust", color: rgb("#CE412B")),
+  python: (name: "Python", color: rgb("#CE412B")),
+))
 
-#outline(indent: 2em)
 
-== Problem Statement
-Over the last five to ten years, we have observed tremendous leaps in machine learning for universal modalities such as vision, language, audio, and video. With approximately twenty lines of code, anyone can download and fine-tune a foundation model to solve many common problems because of the extraordinarily accessible high-level abstractions built for these modalities. However, these high-level abstractions are limited exclusively to the problems within and in-between these select few universal modalities (text-to-speech, image-to-video, text-to-audio, image-to-text, text summarization, sentence similarity, etc). These high level, generalized abstractions are possible because the modalities are universal.
-
-Tabular machine learning, in practice, has not really changed all that much over the last decade. If you ask anyone how they would approach a tabular machine learning problem they will likely recommend a gradient boosted machine (GBM). GBMs provides excellent results for most tabular machine learning problems. Beyond their spectacular performance, they are intuitive, interpretable, and easy to train. They are able to scale to larger-than-memory datasets with distributed compute and accelerated hardware. GBMs are the long-reigning, undisputed champion for many tabular machine learning problems.
-
-GBMs may be the best solution for actual tabular machine learning. However, I do not think that they are not the correct solution for many of the problems in which they are currently utilized. In other words, I strongly believe that the vast majority of machine learning problems that are currently being modeled with GBMs are not actually tabular.
-
-That is a really bold statement that I would like to contextualize with an example:
-
-Suppose you are to train a model to  of customers. You are currently passing in the following tabular features into a model in order to predict whether a given customer is lying about their identity: `income`, `phone_local`, `phone_confirmed`, `email_confirmed` and `verified_income`.
-
-Consider these two sample training observations:
-
-#figure(
-    align(center)[#table(
-        columns: 6,
-        align: (col, row) => (auto,auto,auto,auto,auto,auto,).at(col),
-        inset: 6pt,
-        [customer], [income], [phone\_confirmed], [phone\_local], [email\_confirmed], [verified\_income],
-        [John],[80,923],[False],[True],[False],[False],
-        [Jane],[90,413],[True],[True],[True],[True],
-    )],
-    caption: [A simple example of tabular data]
+#codly(
+  display-icon: false,
+  zebra-color: white,
 )
 
-At first glance, the use of tabular machine learning is completely reasonable. A GBM will make quick work of such tabular data, likely providing the best results if you have enough labeled training observations and you rigorously optimize your hyperparameters. However, real production data does not actually look like this. This tabular feature representation is one of convenience. It is an abstract "view" that has been created in order to train a tabular model. The data, in its original form, might instead look like so:
+== Problem Statement
+
+From fraud detection to predicting customer's at risk of charging off, many organizations choose to model their business problems with tabular machine learning. Modeling data with tabular machine learning can be surprisingly challenging, however. Some machine learning projects can take _years_ to develop and deploy to production. The long development timelines of tabular machine models may be attributed to the following four reasons:
++ Preparing the production data for tabular machine learning requires manual feature engineering, which results in a loss of the signal available in the raw source data, thus harming model performance.
++ Optimizing tabular models is tedious and time consuming because the model developers must iteratively engineer tabular features from complex non-tabular data and explore their marginal contributions to the model's performance.
++ Deploying tabular models in real-time requires extensive data engineering in order to calculate complex tabular feature definitions within mere milliseconds.
++ Developing subsequent models requires new feature definitions at an ad-hoc basis such each model, limiting an organization's ability to concurrently tackle multiple problems without isolated teams.
+
+All of these problems originate from one key insight: Many common machine learning problems are not tabular. Organizations accrue tech debt in order to restructure their business problems to become ones that may be solved with tabular machine learning.
+
+By unraveling this misconception and developing a tailored solution for business data in its native form, we can address these four deficiencies in order to improve model performance, increase speed-to-market, automate model deployment, and reduce the arbitrary uniqueness of individual machine learning projects.
+
+
+== The Practical Limitations of Tabular Machine Learning
+
+// Over the last five to ten years, we have observed tremendous leaps in machine learning for universal modalities such as vision, language, audio, and video. With approximately twenty lines of code, anyone can download and fine-tune a foundation model to solve many common problems because of the extraordinarily accessible high-level abstractions built for these modalities in mere hours. However, these high-level abstractions are limited exclusively to the problems within and in-between these select few universal modalities (text-to-speech, image-to-video, text-to-audio, image-to-text, text summarization, sentence similarity, etc). These high level, generalized abstractions are possible because the modalities are universal.
+
+Tabular machine learning techniques, specifically GBMs (Gradient Boosted Machines) are powerful when used correctly. However, most "business data" does not conform to the many assumptions that tabular machine learning techniques require. As a consequence, data scientists must spend enormous amounts of resources to restructure their business data to meet these assumptions _in order_ to use tabular machine learning. In other words, data scientists are _changing_ their data in order to make it tabular instead of modeling the data in its native form.
+
+Suppose you work financial institution organization, and you are tasked with training a model to determine if a customer has misrepresented their identity. This is a standard identity verification business problem. Your model is a small piece of the identity verification pipeline, and your task is to flag customers for a manual review by operations. Here is an example of some production data that tells the story of Jane Doe.
 
 #figure(
     align(center)[#table(
@@ -44,75 +75,95 @@ At first glance, the use of tabular machine learning is completely reasonable. A
         align: (col, row) => (auto,auto,left,).at(col),
         inset: 6pt,
         [customer], [timestamp], [event],
-        [John],[`01-01-2024 03:04:50`], [`CreateAccountEvent()`],
-        [John],[`01-01-2024 03:05:43`], [`AddPhoneEvent(phone='1236540987', is_local=True)`],
-        [John],[`01-01-2024 03:07:12`], [`AddEmailEvent(email='john@gmail.com')`],
-        [Jane],[`01-01-2024 15:42:51`], [`CreateAccountEvent()`],
-        [John],[`01-02-2024 07:43:49`], [`AddIncomeEvent(income=80923)`],
-        [Jane],[`01-02-2024 07:44:25`], [`AddEmailEvent(email='jame@hotmail.co')`],
-        [Jane],[`01-02-2024 07:45:41`], [`AddPhoneEvent(phone='4217838914', is_local=True)`],
-        [Jane],[`01-02-2024 07:48:53`], [`ConfirmPhoneEvent(phone='4217838914', is_local=True)`],
-        [Jane],[`01-02-2024 07:51:55`], [`AddIncomeEvent(income=90413)`],
-        [Jane],[`01-02-2024 08:05:03`], [`ConfirmIncomeEvent(income=90413)`],
-        [Jane],[`01-03-2024 11:18:29`], [`FailedEmailAttemptEvent(email='jame@hotmail.co')`],
-        [Jane],[`01-03-2024 16:33:49`], [`AddEmailEvent(email='jane@hotmail.com')`],
-        [Jane],[`01-03-2024 16:35:12`], [`ConfirmEmailEvent(email='jane@hotmail.com')`],
+        [Jane],[01-01-2024 15:42:51], [`CreateAccountEvent()`],
+        [Jane],[01-02-2024 07:44:25], [`AddEmailEvent(email='jame@hotmail.co')`],
+        [Jane],[01-02-2024 07:45:41], [`AddPhoneEvent(phone='4217838914', is_local=True)`],
+        [Jane],[01-02-2024 07:48:53], [`ConfirmPhoneEvent(phone='4217838914', is_local=True)`],
+        [Jane],[01-02-2024 07:51:55], [`AddIncomeEvent(income=90413)`],
+        [Jane],[01-02-2024 08:05:03], [`ConfirmIncomeEvent(income=90413)`],
+        [Jane],[01-03-2024 11:18:29], [`FailedEmailAttemptEvent(email='jame@hotmail.co')`],
+        [Jane],[01-03-2024 16:33:49], [`AddEmailEvent(email='jane@hotmail.com')`],
+        [Jane],[01-03-2024 16:35:12], [`ConfirmEmailEvent(email='jane@hotmail.com')`],
     )],
     caption: [How sequential / transactional data might look like in a production table]
 )
 
-This is the complete history of every event observed of each customer. This construct may fit in a table, but with respect to machine learning is not necessarily tabular. It is actually something more universal: a "ledger" of posted events. Each event streams in asynchronously, perhaps over a data stream such as Kafka, and is immutable such that once a customer does something, it stays on their ledger. Each event can contain any number of complex fields, and each field can have any data type (categorical, textual, numeric, boolean, timestamp, geospatial coordinates, and even file paths to images or audio clips). Additionally, each event may have an associated timestamp for when it was received. This data architecture pattern is called "Event Sourcing". It is extremely powerful for applying business logic and maintaining a record of every customer’s history for the sake of reproducibility. It defines the complete history of everything ever done by every customer.
+This is the complete history of every event observed of Jane Doe. This history may fit in a table, but it is not able to be modeled with tabular machine learning models (each observation is not independent of one another). These data structure is something more universal; a "ledger" of posted events by Jane Doe. Each event streams in asynchronously, perhaps over a data stream such as Kafka, and is immutable such that once a customer does something, it permanently stays on their ledger. Each event can contain any number of complex fields, and each field can be of any data type (categorical, raw text, graph-like entity identifiers, numeric, boolean, timestamp, geospatial coordinates, and even file paths to images or audio clips).
 
-Here are the distinct fields among all of the events in the example above:
-- `event_type`: what the customer did (`CreateAccountEvent`, `AddPhoneEvent`, `AddEmailEvent`, etc)
-- `phone`: The customers reported phone number
-- `is_local`: Whether the phone number is local to the customer’s reported address
-- `email`: The customers reported email address
-- `income`: The customers reported income
-- `timestamp`: The time at which the event occurred
+Additionally, each event may have an associated timestamp for when it was observed. This data architecture pattern is called "Event Sourcing". It is extremely powerful for applying business logic and maintaining a record of every customer's history for the sake of reproducibility. It defines the complete history of everything ever done by every customer. Customers provide enormous amounts of data, almost all of which comes in this format.
 
-*The ledger is the source of truth for everything that has ever happened*, and will always contain a superset of the information available within any tabular view made from it.
+*The ledger is the source of truth for everything that has ever happened.*
 
-You may be thinking that the ledger is going to be more complicated to model than the tabular view we had looked at before. It certainly is more complicated, yes, however it contains significantly more information. For example, we can see that Jane originally misspelled her email address as `jame@hotmail.co`, so she couldn’t verify it until she corrected it to `jane@hotmail.com`. We can see the duration of time that transpired between each event observed of a customer. All of this information _could be_ vital to modeling an identity verification problem. Tabular machine learning is incapable of modeling all of these potential signals without significant manual preprocessing and feature engineering, all of which is subject to human bias and human error.
+Training a machine learning model from this ledger will require some work. Let your manager recommended that you to use a GBM to determine if any customer has misrepresented their identity.
 
-Of course, you _can_ create more tabular features that are able to collectively approach the signal available within the ledger. For example, you could create more tabular features to, say, count the number of times each customer has changed their email over varying time windows (over the last day, week, and month). You would also need to count the number of times the email was verified, however, also for varying time spans (over the last day, week, and month) as well as the number of times the email verification failed. This approach doesn't scale well in practice, however. With more complex examples, you will need to create hundreds, if not thousands of tabular features to account for many different possible intersecting events, over many varying time windows, with multiple possible aggregation functions.
+In order to train a GBM to predict whether any customer has falsified their identity, you need to develop some tabular feature engineering logic, perhaps in SQL or Spark, to transform this "ledger" construct into a set of tabular features. As a very crude first draft, you might engineer the following features:
+- `income`: The customer's most recently reported income
+- `phone_confirmed`: Whether the customer has verified their most phone number
+- `email_confirmed`: Whether the customer has verified their most email address
+- `verified_income`: Whether the customer has verified their most recent reported income
+- `account_tenure`: The number of hours since the customer's account was opened
 
-When you model sequential data with tabular models, these aggregative window functions are required to capture the complex signal. They are extremely computationally expensive to calculate, and it takes a great deal of time and domain expertise to know which kinds of features you should engineer, often leading to a painful, iterative process. Even beyond the absurd computational and domain expertise requirements, however, is the limitations for real-time inference. Calculating hundreds of arbitrarily unique window functions in real time requires entire teams of dedicated on-call engineers. Because of all of these aforementioned costs of modeling sequential data with tabular models, many organizations are simply unable to address many problems that would otherwise provide great value-add.
+#figure(
+    align(center)[#table(
+        columns: 6,
+        align: (col, row) => (auto,auto,auto,auto,auto,auto,).at(col),
+        inset: 6pt,
+        [customer], [income], [phone\_local], [email\_confirmed], [verified\_income], [account\_tenure],
+        [Jane],[90,413],[True],[True],[True],[49]
+    )],
+    caption: [An example of tabular features created from sequential data]
+)
 
-All of these factors result in a painful, manual iterative process of engineering tabular features via SQL or Spark, training models with them, and then pruning the tabular features for the sake of model complexity and real-time inference requirements. Additionally, GBMs are especially prone to overfitting with many tabular features, adding additional constraints to the optimization process.
+A GBM will make quick work of such tabular data, likely providing decent initial model results if you have enough labeled training observations and you optimize your hyperparameters.
 
-By modeling the data exactly how it already exists in its production source table, as opposed to using a manually constructed view of it, we may be able to skip all of the feature engineering! Feature engineering is the bane of tabular modeling. It is time-consuming, tedious, prone to error, and extremely hard to scale for real-time computation. It requires extensive testing, maintenance, and monitoring. However, by using the _raw_ data to model our problem instead of an abstract view of it allows us to instantly unburden the modeling process from all of these significant costs.
+The ledger is much more complicated to model than this tabular view, but the ledger contains significantly more information. The ledger shows three interesting insights that are missing from the tabular view:
++ Jane originally misspelled her email address as "jame\@hotmail.co", so she couldn't verify it until she corrected it to "jane\@hotmail.com".
++ The duration of time that transpired between each event observed Jane's activity.
++ Jane has not changed her income since she joined.
+All of this signal _could be_ vital to modeling an identity verification problem. Tabular machine learning is incapable of modeling all of these potential signals without adding new features.
+
+Of course, you _can_ create more tabular features that are able to collectively approach the signal available within the ledger. For example, you could create more tabular features to, say, count the number of times each customer has changed their email over varying time windows (over the last day, week, and month). You would also need to count the number of times the email was verified, however, also for varying time spans (over the last day, week, and month) as well as the number of times the email verification failed. However, consider how many nuanced signals may be lost during the transformation while operating with more complex data in which customers may post hundreds of unique events, each with dozens of potential fields associated with them With more complex examples. You would need to create hundreds, if not thousands of tabular features to account for many different possible intersecting events, over many varying time windows, with multiple possible aggregation functions. Meanwhile, the ledger already contains this information.
+
+When you model sequential data with tabular models, you will require such aggregative window functions to capture the complex signal. Window functions are extremely computationally expensive to calculate at scale, and it takes a great deal of time and domain expertise to know which features you should prioritize. Even beyond the absurd computational and domain expertise requirements, however, calculating hundreds of arbitrarily unique window functions in real time requires entire teams of dedicated on-call engineers.
+
+Additionally, there is an _infinite_ set of potential tabular features. For example, if you were to use a window function to create a tabular feature that counts the number of times each customer has changed their email in their recent history, which time windows should you use? You could use 1, 7, and 30 day windows. However, this is entirely arbitrary. What if you chose $sqrt(3)$, $2 pi$, and 29.9 days instead? An extremely important component of the tabular model development process is effectively reduced to guesswork.
+
+Lastly, GBMs, being _greedy_ learners, are especially prone to overfitting with many tabular features. You can not simply throw thousands of the infinitely many potential features into the model, else its performance will start to degrade. This adds even more constraints to the optimization process.
+
+All of these factors result in a painful, manual iterative process of engineering tabular features via SQL or Spark, training models with them, and then pruning the tabular features for the sake of model complexity and real-time inference requirements. Because of all of these costs of modeling sequential data with tabular models, many organizations are simply unable to address many problems that would otherwise provide tremendous value-add.
+
+By modeling the data exactly how it already exists in its production source table, as opposed to using a "view" of it, we may be able to skip all of the feature engineering. Feature engineering is the sole reason that tabular machine learning is so expensive to develop and deploy for real-world use cases. It is time-consuming, tedious, prone to error, and extremely hard to scale for real-time computation. It requires extensive testing, maintenance, and monitoring. Tabular machine learning fails to address the requirements of businesses' problems.
+
+However, by using the _raw_ data to model our problem instead of an abstract view of it allows us to instantly unburden the modeling process from all of these significant costs.
 
 #figure(
     image("../diagrams/tabular.drawio.svg"),
     caption: [Cutting out tabular feature engineering dramatically increases speed-to-market],
 )
 
-We should change our model to fit our data instead of changing our data to fit our model. This has many parallels to the history of machine learning for universal modalities. The modality of computer vision comes to mind. Before the birth of CNNs, data scientists were manually defining convolution kernels. This is, in essence, how we are currently modeling business problems: with manually hardcoded tabular features.
+*We should change our model to fit our data instead of changing our data to fit our model.* This has many parallels to the history of machine learning for universal modalities. The modality of computer vision comes to mind. Before the birth of CNNs, data scientists were manually defining convolution kernels. This is, in essence, how we are currently modeling business problems: with hardcoded tabular features.
 
-In summary, instead of manually aggregating the events through miscellaneous window functions in order to represent their current state, with the use of deep learning, we may create a representation of each customer at any point in time given all of the events that they have posted up until that points in time. We assume, from the perspective of our model, an individual may be defined by the sum of their actions. This customer representation may then be used to solve any arbitrary machine learning problem with a single generalized modeling approach that does not require any manual feature engineering. This would allow us to focus exclusively on the construction of an automated modeling pipeline. The remainder of this paper will discuss how this may be done.
+Identity verification is hardly the only problem the suffers from the shortcomings of tabular machine learning. This sequential data structure is relevant to many notable business problems that would all benefit from a generalized modeling approach:
 
-
-== Example Use Cases
-
-Before diving into how this may be done, I want to reflect on the types of problems that this approach is able to solve:
-The above example may seem a little cherry-picked. I would like to provide a few more problem statements to highlight just how prevalent this data structure is:
 + Given every previous ride observed by an Uber customer, what is the probability that they will be late for the next ride?
-+ Given every activity log observed by a customer’s Apple Watch, what is the probability that they will meet their workout goal this week?
++ Given every activity log observed by a customer's Apple Watch, what is the probability that they will meet their workout goal this week?
 + Given every single transaction posted by a credit card holder of Chase, what is their survival curve (either due to attrition or default) over the next five years?
 + Given previous energy usage events observed by a customer of Duke Energy, what is their expected energy usage for the next week?
 + Given the previous purchases observed by a vendor on Ebay, what is the probability that they will be reported as a "scammer" in the next week?
 + Given the previous transactions posted by a user of Venmo, what is the probability that the current transaction is an attempt to defraud another user?
 + Given the previous tweets posted by a user of Twitter, what is the probability that this user is a bot?
 
-There are hundreds of more problem statements associated with dozens of varying industries. This framework that I am describing applies to all of them.
+There are hundreds of businesses problem associated with dozens of different industries. By developing a consolidated modeling framework that unifies all of their machine learning requirements.
+
+In summary, instead of manually aggregating the events through miscellaneous window functions in order to represent their current state, with the use of deep learning, we may instead create a representation of each customer at any point in time given all of the events that they have posted up until that points in time. We assume, from the perspective of our model, an individual may be defined by the sum of their actions. This customer representation may then be used to solve any arbitrary machine learning problem with a single generalized modeling approach that does not require any manual feature engineering, thus accelerating model development timelines, increasing model performance, and decreasing model deployment costs.
 
 == Terminology
+
 It will be helpful to define some terminology before going forward. I will be discussing the architecture of an extensible *_sequence model_*. The sequence model is able to train on *_observations_*, which each are a slice of a *_sequence_*. A sequence is made of multiple *_events_*, in which each event may have any number of *_fields_*, which may have multiple possible data types. I may refer to this data as being "sequential", "transactional". It really is, however, a sequence of multivariate events with nullable, heterogeneous fields.
 
 The population of sequences exists in some data table, in which each event is a record. I refer to this source of raw data as a *_ledger_*. I want to go through the ledger, find all of the unique sequence IDs (IE, customer IDs), and find all of the events that exists within each sequence. Each event includes multiple fields. Every field exists as a column in this table. The values of each field are nullable; any field value can be empty, which the model must be able to distinctly represent and learn.
 
-I want to stream over each sequence, looking at every event available within each sequence. I will then sample random events from the sequences. Each event has an equal probability of being sampled. After sampling each event, I then take that event, and then I collect the $L$ preceding events to calculate the *_context_* for the training sample. If there are not $L$ preceding events before the sampled event, then the context is equal to however many events are available. I then pad and collate the context, collecting every field value within the context, to create an *_observation_*.
+I want to stream over each sequence, looking at every event available within each sequence. I will then sample random events from the sequences. Each event has an equal probability of being sampled. After sampling each event, I then take that event, and then I collect the $L-1$ preceding events to calculate the *_context_* for the training sample. If there are not $L-1$ many preceding events before the sampled event, then the context is equal to however many events are available. I then pad and collate the context, collecting every field value within the context, to create an *_observation_*.
 
 For any supervised modeling task, I am able to take an associated *_target_* value from the sampled event. In other words, using this methodology, I am able to support event-level targets for both classification or regression.
 
@@ -123,13 +174,13 @@ I then create many more observations from other sampled events, some of which ma
     caption: [An observation being sampled and collated from a sequence],
 )
 
-#link(<streaming-operations>)[This section] describes how this process may be optimized for streaming arbitrarily large data from disk.
+The section #link(<streaming-operations>)[_Data Preprocessing for Efficient Streaming Operations_] describes how this process may be optimized for streaming arbitrarily large data from disk.
 
-The model architecture, which I will discuss in detail in the next section, utilizes transformer-encoder blocks in a manner similar to BERT. The sequential model is creating a representation of the events within the context to answer questions about the sequence at a specific point in time. This is in contrast to models like GPT, which utilize transformer-decoder blocks to predict subsequent tokens. The data structure that I have described above may seem similar to how a corpus is sampled to train a models like BERT. That is not entirely inaccurate. However, there is two significant differences:
+The model architecture, which I will discuss in detail in the next section, utilizes transformer-encoder blocks in a manner similar to BERT @bert. The sequential model is creating a representation of the events within the context to answer questions about the sequence at a specific point in time. This is in contrast to models like GPT, which utilize transformer-decoder blocks to predict subsequent tokens. The data structure that I have described above may seem similar to how a corpus is sampled to train a models like BERT. That is not entirely inaccurate. However, there is two significant differences:
 + You may think a list of tokens as being events with a single discrete field, whereas multivariate sequential data may include more than one field. In other words, my model architecture requires one more dimension than BERT.
 + BERT samples observations at a sequence-level, but we need to sample observations from sequences at an event-level. For example, a customer with 10,000 events should result in approximately 10 times more observations than a customer with only 1,000 events. We are creating observations from the context, which are each defined by a randomly sampled event. This enables the model to support fine-tuning with targets uniquely defined for each event.
 
-#link("https://www.youtube.com/watch?v=-9vVhYEXeyQ")[Peltarion] published an excellent walkthrough that better describes how BERT works, which is a prerequisite to understanding the model architecture described below. @peltarion
+Peltarion published #link("https://www.youtube.com/watch?v=-9vVhYEXeyq")[an excellent walkthrough] that better describes how BERT works, which is a prerequisite to understanding the model architecture described below. @peltarion
 
 == Tensor Notation
 Given that we are talking about a rather complicated model structure, here is a reference to the common dimensions used for the tensors:
@@ -152,9 +203,9 @@ Given that we are talking about a rather complicated model structure, here is a 
 == Background
 
 === TabBERT
-In early 2021, developers at IBM published _Tabular Transformers for Modeling Multivariate Time Series_ in which they described a novel model architecture (TabBERT) that could outperform GBMs trained on such handcrafted tabular features for a set of supervised problems with sequential data. @tabformer
+In early 2021, developers at IBM published _Tabular Transformers for Modeling Multivariate Time Series_ (Padhi 2021) in which they described a novel model architecture (TabBERT) that could outperform GBMs trained on such handcrafted tabular features for a set of supervised problems with sequential data. @tabformer
 
-In essence, they are framing the sequence as a two dimensional array. One dimension of the array represents each event in the sequence, and the second dimension represents each field in each event. In their implementation, every single field is limited to being exclusively discrete, such that each value is an integer that needs to be embedded via a standard embeddings table with respect to each field.
+In essence, they are framing each sequence as a two dimensional array. One dimension of the array represents each event in the sequence, and the second dimension represents each field in each event, thus having a dimensionality of `["N L F"]` when collated and batched together to form a training observation. In their implementation, every single field is limited to being exclusively discrete, such that each value is an integer that needs to be embedded via a standard embeddings table with respect to each field.
 
 BERT was embedding a 1D discrete input of tokens (a sentence of words) into 2D space (an array of embeddings):
 ```python
@@ -167,7 +218,7 @@ def embed_2d(tokens: Int[torch.Tensor, "N L F"]) -> Float[torch.Tensor, "N L F C
     ...
 ```
 
-TabBERT then utilizes a hierarchical transformer-encoder architecture with two encoders. The first encoder (in my terminology, the *_field encoder_*) lets every field embedding attend to every field embedding within an event. Those attended field representations are then concatenated to represent the event as a whole (`["N L F*C"]`). The second encoder (in my terminology, the *_event encoder_*) lets every event representation to attend to one another. The event encoder is constructed similarly to BERT, such that there is an appended class token that may be used to represent the sequence as a whole, but one can also use the attended event representations for a MLM-like self-supervised learning task for model pre-training. They defined a custom pre-training task in which a portion of the events and fields are masked, and the event representations outputted from the event encoder needs to be able to reconstruct the masked events and fields. For fine-tuning, the appended class token is passing through a MLP to solve the supervised task at hand.
+TabBERT utilizes a hierarchical transformer-encoder architecture with two encoders. The first encoder (in my terminology, the *_field encoder_*) lets every field embedding (`["N L F C"]`) attend to every field embedding within an event. Those contextualized field embeddings are then concatenated to represent the event as a whole (`["N L F*C"]`). The second encoder (in my terminology, the *_event encoder_*) then lets every event representation to attend to one another. The event encoder is constructed similarly to BERT, such that there is an appended class token (`["N F*C"]`) that may be used to represent the sequence as a whole, but one can also use the attended event representations for a MLM-like self-supervised learning task for model pre-training. They defined a custom pre-training task in which a portion of the events and / or fields are masked, and the event representations outputted from the event encoder needs to be able to reconstruct the masked events and fields. For fine-tuning, the appended class token is passed through a MLP to solve any supervised.
 
 For those unfamiliar with hierarchical transformer architecture, a great analogy comes from the domain of computer vision. If one is building a representation of an image, ideally each pixel should interact with every other pixel. However, if one is building a representation of a video, it would be virtually impossible to allow every pixel of every frame to interact with every pixel of every frame. Instead, it is common to first build a representation of each frame by letting each of its pixels interact with one another, and then build a representation of the video by allowing each representation of each frame interact with every other representation of each frame. Similarly, TabBERT breaks down a very large and complex problem into two smaller problems: representing each unique event and then using those event representations to create a representation of the sequence.
 
@@ -189,19 +240,18 @@ TabBERT, while elegant, did come with some major drawbacks. The largest of which
     caption: [How some example continuous dollar amounts might be discretized to categorical inputs]
 )
 
-Coercing every field to become of a categorical data type comes with model performance costs. Much of GBM’s success comes from their ability to define arbitrary cutoff points for continuous features. For example, in some fraud patterns, fraudsters might prefer gift cards, which commonly come in denominations of exactly \$25, \$50, or \$100. In such a fraud pattern, transactions with dollar amounts equal to exactly those values may be far more likely to associated with known fraud patterns than transactions with dollar amounts with, say, values around \$25.08, \$49.12, or \$99.53. A GBM is free to chase the residuals around these exact cutoff in the continuous distributions. My point being, for some tasks arbitrary precision of continuous fields could be extremely important such that discretizing the continuous fields destroys valuable information.
+Coercing every field to become of a categorical data type comes with model performance costs. Much of GBM's success comes from their ability to define arbitrary cutoff points for continuous features. For example, in some fraud patterns, fraudsters might prefer gift cards, which commonly come in denominations of exactly \$25, \$50, or \$100. In such a fraud pattern, transactions with dollar amounts equal to exactly those values may be far more likely to associated with known fraud patterns than transactions with dollar amounts with, say, values around \$25.08, \$49.12, or \$99.53. A GBM is free to chase the residuals around these exact cutoff in the continuous distributions. My point being, for some tasks arbitrary precision of continuous fields could be extremely important such that discretizing the continuous fields destroys valuable information.
 
-Additionally, the pre-training task suffers from the masked categorical targets if you are working with continuous values that were binned. Neither the model nor the loss function are aware of the ordinal nature of the binned categories. For example, if a masked dollar amount is actually \$9.95 but the model predicts that the value is in the bucket `"$10<x<$20"`, the loss function harshly penalizes the model even though the model was almost correct. By "harshly", I mean that the loss function believes that the models prediction of `"$10<x<$20"` is as "wrong" as a prediction of `"$100<x<$200"`.
+Additionally, the self-supervised pre-training task suffers from the masked categorical targets if you are working with continuous values that were discretized. Neither the model nor the loss function are aware of the ordinal nature of the binned field values. For example, if a masked dollar amount was originally \$9.95 but the model predicts that the value is in the bucket `"$10<x<$20"`, the loss function harshly penalizes the model even though the model was almost correct. By "harshly", I mean that the loss function believes that the models prediction of `"$10<x<$20"` is as "wrong" as a prediction of `"$100<x<$200"`.
 
 === UniTTab
-In 2023, a small Italian consulting firm Prometeia published _One Transformer for All Time Series: Representing and Training with Time-Dependent Heterogeneous Tabular Data_ which introduced the UniTTab architecture. UniTTab made use of some very interesting ideas to represent continuous field values. Their novelties included the use of Fourier feature encodings to "embed" floating point field values without having the bin the values. They referenced the NeRF (Neural Radiance Fields) paper which highlighted how Fourier feature encodings provide neural networks with a better representation of floating point values than passing in raw scalar values. @unittab @nerf @fourier
+In 2023, a small Italian consulting firm Prometeia published _One Transformer for All Time Series: Representing and Training with Time-Dependent Heterogeneous Tabular Data_, in which they introduced the UniTTab architecture. UniTTab made use of some very interesting ideas to represent continuous field values. Their novelties included the use of Fourier feature encodings to "embed" floating point field values without having the bin the values. They referenced the NeRF paper (Neural Radiance Fields) which highlighted how Fourier feature encodings provide neural networks with a better representation of floating point values than passing in raw scalar values. @unittab @nerf @fourier
 
-// FIXME this needs a fact check and a proper citation
 Fourier feature encodings effectively embed the true value of continuous inputs. They are quite similar to the sinusoidal positional embeddings used by early original transformer-based models. The authors of _Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains_ discussed this approach at #link("https://www.youtube.com/watch?v=nVA6K6Sn2S4&t=171s")[a NeurIPS 2020 spotlight] which they describe how this technique works. @fourier
 
-UniTTab also adapted TabBERT’s custom self-supervised learning task to work with continuous fields. Instead of trying to reconstruct the raw scalar values of each field via regression, UniTTab simplified to problem to become one of ordinal classification, in which the model attempts to determine the discretized bin of masked continuous field values. They modified the loss function to "smoothen" the loss if the predicted binned logits are closer to the actual binned target value, a technique that they described as "neighborhood loss smoothing".
+UniTTab also adapted TabBERT's custom self-supervised learning task to work with continuous fields. Instead of trying to reconstruct the raw scalar values of each field via regression, UniTTab simplified to problem to become one of ordinal classification, in which the model attempts to determine the discretized bin of masked continuous field values. They modified the loss function to "smoothen" the loss if the predicted bin is closer to the actual value, a technique that they described as "neighborhood loss smoothing".
 
-UniTTab’s improvements over TabBERT resulted in significantly better performance. UniTTab did not share its source code, however. Additionally, they were quite vague in the implementation. They require that each event be associated with a registered "row type", and that each "row type" has a required, non-nullable schema, which, at least in how I consider their approach, requires an extraordinarily complex implementation in order to be able to trained with accelerated hardware. I designed a modified approximation of UniTTab, and I found that it outperformed my implementation of TabBERT.
+UniTTab's improvements over TabBERT resulted in significantly better performance, however the authors did not share its source code. Additionally, they were quite vague in the implementation. They require that each event be associated with a registered "row type", and that each "row type" has a required, non-nullable schema, which, at least in how I consider their approach, requires an extraordinarily complex implementation in order to be able to trained with accelerated hardware.
 
 === FATA-Trans
 In November of 2023, Visa published _FATA-Trans: Field And Time-Aware Transformer for Sequential Tabular Data_. FATA-Trans was built on top of TabBERT, and did not provide any support for continuous fields. They included two major contributions: the ability to encode timestamps, and the ability to use tabular features alongside sequential data. Theoretically, one could already pass in tabular features by making the values constant among every event in the sequence, but as Visa stated, this is pretty computationally inefficient. They concluded that their architecture had marginal improvements over TabBERT. @fatatrans
@@ -225,7 +275,7 @@ A simple analogy comes from the concept of "dataframes". You might view a datafr
 Instead of creating "row types" in the style of UniTTab, I am creating "field types". Each field type is completely modular in that its contents are defined within a `tensorclass` (basically a dataclass of tensors). Each field type requires several components:
 + A type-specific field embedding module (to create the field embeddings for a specific field type)
 + A type-specific field masking function (to mask the field values during pre-training)
-+ A (optional) type-specific field decoder (to turn an contextualized event representation back into field-level predictions for the self-supervised learning task). If one isn’t specified, the field types will not be used in the self-supervised learning task.
++ A (optional) type-specific field decoder (to turn an contextualized event representation back into field-level predictions for the self-supervised learning task). If one isn't specified, the field types will not be used in the self-supervised learning task.
 + A (optional) custom attention mask generation function to facilitate sparse attention for the field encoder and event encoder.
 
 
@@ -238,14 +288,14 @@ It is extremely important to note that this approach is only valid with the assu
 
 In order to embed each field, we need to ensure that each field is able to be fully represented regardless of its state. There are four unique possibilities for any given field:
 + There is a field value is present (the field is "valued").
-+ There is not a field value present because the field’s event was padded (the field is "padded")
-+ There is not a field value present because there wasn’t a field value available in the data source (the field is "null")
++ There is no field value present because the field's event was padded (the field is "padded")
++ There is no field value present because there wasn't a field value in the data source (the field is "null")
 + There may or may not be a field value present, but the model is not allowed to see it (the field is "masked")
 
 === Discrete Field Embeddings
-For an extremely simple example, let’s start with a simple model architecture that needs to support four discrete fields per event: `is_foreign`, `is_online`, `merchant_category`, and `transaction_type`.
+For an extremely simple example, let's start with a simple model architecture that needs to support four discrete fields per event: `is_foreign`, `is_online`, `merchant_category`, and `transaction_type`.
 
-I use torch’s `TensorDict` and `tensorclass` implementations to bundle the heterogeneous fields. For those unfamiliar with these constructs, they are almost exactly how they sound. A `TensorDict` is a torch dictionary that can contain instances of `torch.Tensor`. A `tensorclass` may be used similarly to `dataclass`. I use it to create a unique, type-checked container for each field type.
+I use torch's `TensorDict` and `tensorclass` implementations to bundle the heterogeneous fields. For those unfamiliar with these constructs, they are almost exactly how they sound. A `TensorDict` is a torch dictionary that can contain instances of `torch.Tensor`. A `tensorclass` may be used similarly to `dataclass`. I use it to create a unique, type-checked container for each field type.
 
 Below is an example of the input to a sequence model with four discrete fields. The input for each discrete field is contained within a `tensorclass` called `DiscreteField`.
 
@@ -253,9 +303,6 @@ Below is an example of the input to a sequence model with four discrete fields. 
 @tensorclass
 class DiscreteField:
     lookup: Int[torch.Tensor, "N L"]
-
-    def mask(self):
-        ...
 
 # example input with a batch size of 2, sequence length of 8, and 4 discrete fields
 TensorDict({
@@ -293,29 +340,33 @@ ModularFieldEmbeddingSystem(
 )
 ```
 
-Upon passing in the above `TensorDict` into the `ModularFieldEmbeddingSystem`, the MFES will iterate over each of the four discrete fields, embedding each of them with their respective `DiscreteFieldEmbedder` to create four tensors of dimensionality `["N L C"]`. After embedding each discrete field, the `ModularFieldEmbeddingSystem` will then concatenate the embeddings into a single tensor of dimensionality `["N L F C"]`, which is then passed into the field encoder.
+Upon passing in the above `TensorDict` into the `ModularFieldEmbeddingSystem`, the MFES will iterate over each of the four discrete fields, embedding each of them with their respective `DiscreteFieldEmbedder` to create four tensors, each of dimensionality `["N L C"]`. After embedding each discrete field, the `ModularFieldEmbeddingSystem` will then concatenate the embeddings into a single tensor of dimensionality `["N L F C"]`, which is then passed into the field encoder.
 
-Representing the non-valued states (padded, null, or masked) is trivial in this case. They are additional tokens available within the `DiscreteFieldEmbedder`’s embedding table. This is almost exactly like language models with three exceptions:
+Representing the non-valued states (padded, null, or masked) is trivial in this case. They are additional tokens available within the `DiscreteFieldEmbedder`'s embedding table. This is almost exactly like language models with three exceptions:
 + In this case each unique field embedding module has its own embeddings for these non-valued states. The special token embeddings are not shared.
 + Positional field embeddings are technically not required to embed each field. Because each field is guaranteed to exist one, and only once, the learned embeddings will learn to collectively learn to become their own positional embeddings for the field encoder. For the event encoder, positional embeddings are still required to help the event encoder understand the ordering of the events.
 + There is no `[CLS]` token present in the field embedding module. The `[CLS]` token will be appended to the event representations right before the event encoder module. The field encoder will not add any value to a `[CLS]` token.
 
 === Continuous Field Embeddings
 
-UniTTab’s approach avoids the complications of having to represent null, padded, or masked continuous field values by enforcing a rigid structure for each "row type". I found this to be extremely challenging to implement. Instead, my approach fully represents continuous fields in their true form as, effectively, `enum` data types:
+UniTTab's approach avoids the complications of having to represent null, padded, or masked continuous field values by enforcing a rigid structure for each "row type". I found this to be extremely challenging to implement. Instead, my approach fully represents continuous fields in their true form as, effectively, `enum` data types:
 
 ```rust
 enum ContinuousFieldValue {
-    Value(float),
-    Null,
+    Valued(f32),
+    Unknown,
     Padded,
     Masked,
 }
 ```
 
-In other words, a continuous field value can either contain a real number, or it could be non-valued, in which case it must be padded, masked, or otherwise null. I represent this `enum`-like structure with continuous fields with two tensors: `values` and `lookup`, both of dimensionality `["N L"]`.
+In other words, a continuous field value can either contain a real number, or it could be non-valued, in which case it must be padded, masked, or otherwise null. I represent this `enum`-like structure with continuous fields with two tensors: `value` and `lookup`, both of dimensionality `["N L"]`.
 
-The `values` tensor contains the cumulative distribution function (CDF) of the original floating point values multiplied by a scalar value slightly less than 1 ($overline(x)="CDF"(x) dot 0.overline(9)$). This guarantees that $overline(x) in [0,1)$ for purposes of optimization. Wherever a field is non-valued (either null, padded, or masked), I impute `values` to be equal to `0.0`. By using the CDF of continuous field values, as opposed to the raw scalar values, I do not require any data standardization / normalization operations in order to represent values of arbitrary distributions. The CDF of the values also provide additional benefits that I will describe later in this section.
+The `value` tensor contains the cumulative distribution function (CDF) of the original floating point values scaled by $0.overline(9)$.
+
+$ overline(x)="CDF"(x) dot 0.overline(9) $
+
+This guarantees that $overline(x) in [0,1)$. Wherever a field is non-valued (either null, padded, or masked), I impute `value` to be equal to `0.0`. By using the CDF of continuous field values, as opposed to the raw scalar values, I do not require any data standardization / normalization operations in order to represent values of arbitrary distributions. The CDF of the `value` tensor also provide additional benefits that I will describe later in this section.
 
 The `lookup` tensor contains one of four integers to explain the state of each field (valued, padded, masked, or otherwise null). In practice, I define the definitions of these four unique integers within a python `IntEnum`:
 
@@ -327,15 +378,15 @@ class SpecialTokens(enum.IntEnum):
     MASK = 3 # the field is "masked" for pre-training
 ```
 
-This token definition is used as the source of truth for every field. It is important to note that the `VAL` token is mapped to 0, which allows for a beautiful mathematical optimization trick described later in this section.
+This token definition is used as the source of truth for every field. It is important to note that the `[VAL]` token is mapped to 0, which allows for a beautiful mathematical optimization trick described later in this section.
 
-Now that we have these two tensors, `values` and `lookup`, we may combine them in a new tensorclass to represent any continuous field:
+Now that we have these two tensors, `value` and `lookup`, we may combine them in a new tensorclass to represent any nullable continuous field:
 
 ```python
 @tensorclass
 class ContinuousField:
     lookup: Int[torch.Tensor, "N L"]
-    values: Float[torch.Tensor, "N L"]
+    value: Float[torch.Tensor, "N L"]
 ```
 
 In order to solidify this concept, let's walkthrough some examples to show how every possible state of our `ContinuousFieldValue` enum can be mapped to an instance of `ContinuousField`:
@@ -345,59 +396,58 @@ In order to solidify this concept, let's walkthrough some examples to show how e
         columns: 2,
         align: (col, row) => (auto,auto).at(col),
         inset: 6pt,
-        [Input Field Value], [Output Tensorclass Representation (assuming $N=1$ and $L=1$)],
-        [`PAD`], [`ContinuousField(lookup=[[2]], values=[[0.00]])`],
-        [`VAL(0.93)`], [`ContinuousField(lookup=[[0]], values=[[0.93]])`],
-        [`VAL(0.65)`], [`ContinuousField(lookup=[[0]], values=[[0.65]])`],
-        [`UNK`], [`ContinuousField(lookup=[[1]], values=[[0.00]])`],
-        [`VAL(0.31)`], [`ContinuousField(lookup=[[0]], values=[[0.31]])`],
-        [`UNK`], [`ContinuousField(lookup=[[1]], values=[[0.00]])`],
-        [`VAL(0.00)`], [`ContinuousField(lookup=[[0]], values=[[0.00]])`],
-        [`MASK`], [`ContinuousField(lookup=[[3]], values=[[0.00]])`],
+        [Input Field Value], [Output Tensorclass Representation],
+        [`Padded`], [`ContinuousField(lookup=[[2]], value=[[0.00]])`],
+        [`Valued(0.93)`], [`ContinuousField(lookup=[[0]], value=[[0.93]])`],
+        [`Valued(0.65)`], [`ContinuousField(lookup=[[0]], value=[[0.65]])`],
+        [`Unknown`], [`ContinuousField(lookup=[[1]], value=[[0.00]])`],
+        [`Valued(0.31)`], [`ContinuousField(lookup=[[0]], value=[[0.31]])`],
+        [`Unknown`], [`ContinuousField(lookup=[1], value=[0.00])`],
+        [`Valued(0.00)`], [`ContinuousField(lookup=[[0]], value=[[0.00]])`],
+        [`Masked`], [`ContinuousField(lookup=[[3]], value=[[0.00]])`],
     )],
-    caption: [How `enum` continuous inputs can be uniquely mapped to a pair of tensors]
-
+    caption: [How continuous inputs can be uniquely mapped to a pair of tensors]
 )
 
-This mapping provides a guarantee that every possible input has a unique tensor representation. Similar to UniTTab and NeRF, I can embed the `values` tensor with Fourier feature encodings. This process looks like the following:
+This mapping provides a guarantee that every possible input has a unique tensor representation. Similar to UniTTab and NeRF, I can embed the `value` tensor with Fourier feature encodings. This process looks like the following:
 
 $ B = 2^[-8..1] $
 $ gamma(overline(x)) = ["cos"(pi B overline(x)) , "sin"(pi B overline(x))] $
 $ "FourierEncoding"(v) = "MLP"(gamma(overline(x))) $
 
-In other words, I am embedding the continuous fields by multiplying the tensor `values` with a sequence of bands, `B`, defined as `2^range(-8, 2)` and then multiplying that again with `pi`. I then compute both `sin(values * B * pi)` and `cos(values * B * pi)`, concatenating these two sequences together to create `gamma`. This tensor is then passed through a simple MLP to represent the tensor `values` to the neural network.
+In other words, I am embedding the continuous fields by multiplying the tensor `value` with a sequence of bands, `B`, defined as $2^[-8..1]$ and then multiplying that again with `pi`. I then compute both `sin(value * B * pi)` and `cos(value * B * pi)`, concatenating these two sequences together to create `gamma`. This tensor is then passed through a simple MLP to represent the tensor `value` to the neural network.
 
-However, there is a small problem. Because I imputed the non-valued fields to `0.0`, how is the model able to differentiate a value that is masked, padded, null, or is actually a value but just happens to be equal to `0.0`? The solution is surprisingly simple. I can simply embed the `lookup` tensor with standard learned embeddings. Because of some mathematical wizardry, I am able to add these two embeddings to fully represent each and every continuous field value, whether they are valued, null, padded, or masked!
+However, there is a small problem. Because I imputed the non-valued fields to `0.0`, how is the model able to differentiate a value that is masked, padded, null, or is actually a value but just happens to be equal to `0.0`? The solution is surprisingly simple. I can simply embed the `lookup` tensor with standard learned embeddings tables and then add the embedded value to $"FourierEncoding"(v)$.
 
 This is due to several wonderful happenstances:
-+ When `values` is equal to zero, $gamma(overline(x))$ will result in alternating ones and zeroes, so that $"MLP"(gamma(overline(x)))$ will result in a very simple $"FourierEncoding"$ for non-valued indicators
-+ The learned embeddings for the three learned non-valued indicator (`UNK`, `PAD`, and `MASK`) will learn around the simple $"FourierEncoding"$ in the same way that the learned embeddings of vocabulary tokens used in BERT are able to learn around the sinusoidal positional embeddings.
-+ The field’s non-valued states are all effectively mutually exclusive (a field value can not be both padded and null at the same time). While a field can be both masked and null or masked and padded, the model should only ever see that it is masked.
++ When `value` is equal to zero, $gamma(overline(x))$ will always result in alternating ones and zeroes and $"MLP"(gamma(overline(x)))$ will always result in the same representation for non-valued indicators.
++ The learned embeddings for the three learned non-valued indicator (`[UNK]`, `[PAD]`, and `[MASK]`) will learn around the non-valued $"FourierEncoding"$ in the same way that the learned embeddings of vocabulary tokens used in BERT are able to learn around the sinusoidal positional embeddings.
++ The field's non-valued states are all effectively mutually exclusive (a field value can not be both padded and null at the same time). While a field can be both masked and null or masked and padded, the model should only ever see that it is masked.
 
-This method also comes with a very beautiful runtime assertion to rigorously validate the two tensors `values` and `lookup` for each continuous field: Given that every non-valued input should be imputed to `0.0`, and that the `VAL` token itself is equal to `0`, we can _guarantee_ that the element-wise product of `lookup` and `values` will always equal zero! This assertion prevents invalid field values from being processed during inference.
+This method also comes with a very beautiful runtime assertion to rigorously validate the two tensors `value` and `lookup` for each continuous field: Given that every non-valued input should be imputed to `0.0`, and that the `[VAL]` token itself is equal to `0`, we can _guarantee_ that the element-wise product of `lookup` and `value` will always equal zero! This assertion ensures that invalid the each field in the `value` tensor cannot be valued in the `indicators` state that the field in non-valued.
 
 ```python
-assert torch.all(values.mul(lookup).eq(0.0)) ,\
-    "all values should be imputed to 0.0 if not null, padded, or masked"
+assert torch.all(value.mul(lookup).eq(0.0)) ,\
+    "Every value should be imputed to 0.0 if not null, padded, or masked"
 
-assert torch.all(values.lt(1.0)) ,\
-    "values should be less than 1.0"
+assert torch.all(value.lt(1.0)) ,\
+    "Every value should be strictly less than 1.0"
 
-assert torch.all(values.ge(0.0)) ,\
-    "values should be greater than or equal to 0.0"
+assert torch.all(value.ge(0.0)) ,\
+    "Every value should be greater than or equal to 0.0"
 ```
 
-One last caveat to this approach is related to the precision of the floating point tensors. Fourier feature encodings have a limited range, which yet another reason I am using the CDFs of the original floating point values.
+There is one last caveat to this approach regarding the precision of the floating point `value` tensor. Fourier feature encodings have a limited range, which yet another reason I am using the CDFs of the original floating point values. As I had mentioned above, UniTTab requires an ordinal classification pre-training task. In other words, we will need to classify which quantile bin a masked value should fall into. If we chose a total of 10 quantile bins than we would need to determine to which decile each of the masked values belong. The choice of quantile bins is a pre-training hyperparameter itself, $q$, so it is much better to calculate the CDF of the original values for the pre-training task, and then when we choose a value for $q$ we can simply calculate the appropriate bucket index by calculating $floor(q * "CDF"(x) * 0.overline(9))$. That means that we can use the CDFs for the inputs of the model, and then modify the CDFs for the targets too!
 
-As I had mentioned above, UniTTab requires an ordinal classification pre-training task. In other words, we will need to classify which quantile bin a masked value should fall into. If we chose a total of 10 quantile bins than we would need to determine to which decile each of the masked values belong. The choice of quantile bins is a pre-training hyperparameter itself (`n_quantiles`), so it is much better to calculate the CDF of the original values for the pre-training task, and then when we choose a value for `n_quantiles` we can simply calculate the appropriate bucket index by calculating $floor("n_quantiles" * "CDF"(x) * 0.overline(9))$. That means that we can use the CDFs for the inputs of the model, and then modify the CDFs for the targets too!
+The scaling by $0.overline(9)$ guarantees that the flooring operation will always round down.
 
-FIXME add TDigest paper citation
+// FIXME add TDigest paper citation
 
-In practice, Ted Dunning’s TDigest algorithm is able to calculate the CDFs of the original values as a _streaming_ operation during both model training and inference, which means we never have to calculate the CDFs as a batch operation. This is extremely valuable, especially at the scale of billions to trillions of data points, because otherwise the calculation of the CDFs would require a great deal of compute. This also saves a great deal of storage as well because we do not have to store the normalized values or the binned value targets. We only have to store the original values.
+In practice, Ted Dunning's TDigest algorithm is able to calculate the CDFs of the original values as a _streaming_ operation during both model training and inference, which means we never have to calculate the CDFs as a batch operation. This is extremely valuable, especially at the scale of billions to trillions of data points, because otherwise the calculation of the CDFs would require a great deal of compute. This also saves a great deal of storage as well because we do not have to store the normalized values or the binned value targets. We only have to store the original values.
 
 In practice, I found that the library `pytdigest`, developed by Tomas Protivinsky, provides a blazingly fast implementation of the TDigest algorithm. @pytdigest All of the other implementations with which I have experimented are far too slow such that the streaming CDF calculations would bottleneck model training and inference.
 
-There are potential alternatives to the aforementioned embedding strategy with which I have not yet experimented. Instead of embedding the `values` tensor with Fourier encodings and then embedding the `lookup` tensor with `torch.nn.Embedding` before adding those two embeddings together, we could instead perform an element-wise addition operation and embed the aggregated tensor once with $"FourierEncoding"$. The model will learn that values exactly equal to `1`, `2`, and `3` are each of a special token representation, and that the floating point inputs in the range of $[0, 1)$ are of actual values. You will need to expand the bands to $B = 2^[-8..1]$ to account for the larger domain.
+There are potential alternatives to the aforementioned embedding strategy with which I have not yet experimented. Instead of embedding the `value` tensor with Fourier encodings and then embedding the `lookup` tensor with `torch.nn.Embedding` before adding those two embeddings together, we could instead perform an element-wise addition operation and embed the aggregated tensor once with $"FourierEncoding"$. The model will learn that values exactly equal to `1`, `2`, and `3` are each of a special token representation, and that the floating point inputs in the range of $[0, 1)$ are of actual values. You will need to expand the bands to $B = 2^[-8..1]$ to account for the larger domain. In this alternative solution, the scaling the CDF by $0.overline(9)$ guarantees a CDF of $1.0$ does not collide the non-value indicator of $1$.
 
 Regardless, we now have a strategy to embed a nullable continuous field of an arbitrarily complex numeric distribution. This is, to my understanding, a novel approach to this very specific problem. Now, let's look at how we may represent multiple, heterogeneous fields within a `TensorDict` input for the MFES.
 
@@ -405,17 +455,17 @@ Regardless, we now have a strategy to embed a nullable continuous field of an ar
 @tensorclass
 class ContinuousField:
     lookup: Int[torch.Tensor, "N L"]
-    values: Float[torch.Tensor, "N L"]
+    value: Float[torch.Tensor, "N L"]
 
 # example input with a batch size of 2, context size of 8, and 2 continuous fields, 1 discrete field
 TensorDict({
     amount: ContinuousField(
         lookup=Tensor(torch.Size([2, 8]), torch.int),
-        values=Tensor(torch.Size([2, 8]), torch.float),
+        value=Tensor(torch.Size([2, 8]), torch.float),
     ),
     balance: ContinuousField(
         lookup=Tensor(torch.Size([2, 8]), torch.int),
-        values=Tensor(torch.Size([2, 8]), torch.float),
+        value=Tensor(torch.Size([2, 8]), torch.float),
     ),
     transaction_type: DiscreteField(lookup=Tensor(torch.Size([2, 8]), torch.int)),
 })
@@ -444,7 +494,7 @@ ModularFieldEmbeddingSystem(
 )
 ```
 
-Similarly to the instance of `ModularFieldEmbeddingSystem` with only discrete fields, this `ModularFieldEmbeddingSystem` with heterogeneous field types will iterate over each of the six fields, embedding them individually and then concatenating their embeddings to create a single embedding for the entire batch of dimensionality `["N L F C"]` where $F=3$.
+As before, this instance of `ModularFieldEmbeddingSystem` with heterogeneous field types will iterate over each of its three fields, embedding them individually and then concatenating their embeddings to create a single embedding for the entire batch of dimensionality `["N L F C"]` where $F=3$.
 
 === Temporal Field Embeddings
 Working with dates and timestamps might seem tricky, but we can actually tackle it similarly to how we handled continuous fields! Temporal fields (dates / timestamps) may be processed as raw numerical data via~UNIX Epoch time, the number of seconds since 1970. That numerical data is then passed through a `TDigest` to retrieve the CDF of the timestamp. The CDF is then passed through an instance of `TimestampFieldEmbedder` to create a timestamp embedding. The usage of CDFs ensures that outlier date / timestamp values are still able to be understood by the model. Even though we are using epoch time, the extraordinarily large numbers (1 to 2 billion seconds since 1970) have no affect on the stability of the model. The TDigest model will learn the distribution of the values available in the training data.
@@ -455,18 +505,18 @@ Regardless, a `TemporalField` operates exactly like a `ContinuousField`, althoug
 @tensorclass
 class TemporalField:
     lookup: Int[torch.Tensor, "N L"]
-    values: Float[torch.Tensor, "N L"]
+    value: Float[torch.Tensor, "N L"]
 
 # example input with a batch size of 2, context size of 8
 # 1 temporal field, 1 continuous field, 1 discrete field
 TensorDict({
     timestamp: TemporalField(
         lookup=Tensor(torch.Size([2, 8]), torch.int),
-        values=Tensor(torch.Size([2, 8]), torch.float),
+        value=Tensor(torch.Size([2, 8]), torch.float),
     ),
     amount: ContinuousField(
         lookup=Tensor(torch.Size([2, 8]), torch.int),
-        values=Tensor(torch.Size([2, 8]), torch.float),
+        value=Tensor(torch.Size([2, 8]), torch.float),
     ),
     transaction_type: DiscreteField(lookup=Tensor(torch.Size([2, 8]), torch.int)),
 })
@@ -496,11 +546,11 @@ TensorDict({
     ),
     timestamp: TemporalField(
         lookup=Tensor(torch.Size([3, 64]), torch.int),
-        values=Tensor(torch.Size([3, 64]), torch.float),
+        value=Tensor(torch.Size([3, 64]), torch.float),
     ),
     amount: ContinuousField(
         lookup=Tensor(torch.Size([3, 64]), torch.int),
-        values=Tensor(torch.Size([3, 64]), torch.float),
+        value=Tensor(torch.Size([3, 64]), torch.float),
     ),
     transaction_type: DiscreteField(lookup=Tensor(torch.Size([3, 64]), torch.int)),
 })
@@ -519,25 +569,25 @@ We might also consider each unique "merchant" as an entity. We might want to be 
 
 Another common example of an entity is the "account" of a customer, or the "customer" of an account. For some businesses, an "account" and a "customer" are not synonymous. If are defining a customer-level model (such that each sequence is defined by all of the events posted by a customer), but customers may have more than one account, you could represent each of the accounts available to a customer with an entity. The opposite is also true; if you are designing an account-level model (such that each sequence is defined by all of the events posted to an account), but each account may be accessed by more than one customer, you could represent each customer ID as an entity.
 
-Lastly, we might consider the devices of each customer to be entities. Device identifiers may be tracked and stored across multiple events observed of each customer (IP address, unique smartphone application tracker, etc). These device identifiers may allow the model to understand which event happened from which of the customer’s devices, providing significant value for protecting customers theft or fraud.
+Lastly, we might consider the devices of each customer to be entities. Device identifiers may be tracked and stored across multiple events observed of each customer (IP address, unique smartphone application tracker, etc). These device identifiers may allow the model to understand which event happened from which of the customer's devices, providing significant value for protecting customers theft or fraud.
 
 Needless to say, effectively tracking the locations, devices and login sessions of customers may be considered a breach of privacy. However, in some cases, such as fraud detection, these data points are absolutely critical for optimal coverage in order to deliver the best customer experience.
 
 The use of entities is very common in recommendation systems, which typically utilizes large lookup tables which are indexed with multiple lookup values created by many different hash functions in order to prevent hash collisions However, there are other ways of accomplishing the same goal.
 
-FIXME add Google unified embeddings paper citation
+// FIXME add Google unified embeddings paper citation
 
-Instead of using these RecSys-style hash embeddings in order to unique represent every possible entity, we could instead elect to simply try to differentiate between the entities available within an observation’s context. In other words, we don’t necessarily need to know which device you are currently using, but we just need to know whether that device is the same that you used for other events within the context. This can actually be done by assigning each unique device in the context a single random number. We can guarantee that there will be, at most, the same number of unique devices equal to the size of the context window. The random lookup value assignment can change between each observation in order to prevent overfitting, but the assignment operation can be fixed to a seed value during inference for reproducibility.
+Instead of using these RecSys-style hash embeddings in order to unique represent every possible entity, we could instead elect to simply try to differentiate between the entities available within an observation's context. In other words, we don't necessarily need to know which device you are currently using, but we just need to know whether that device is the same that you used for other events within the context. This can actually be done by assigning each unique device in the context a single random number. We can guarantee that there will be, at most, the same number of unique devices equal to the size of the context window. The random lookup value assignment can change between each observation in order to prevent overfitting, but the assignment operation can be fixed to a seed value during inference for reproducibility.
 
 ```python
 def hash(values: list[str]) -> list[int]:
-    '''Embeds list of strings into list of random, idempotent embedding lookup values
+    '''Embeds list of strings into list of hashed embedding lookup values
     '''
 
     offset = len(SpecialTokens)
     unique = set(values)
     integers = random.sample(range(offset, params.n_context + offset), len(unique))
-    mapping = dict(zip(unique, integers))
+    mapping: dict[str, int] = dict(zip(unique, integers))
     mapping.update({"[UNK]": Tokens.UNK})
 
     return list(map(lambda value: mapping[value], values))
@@ -565,11 +615,11 @@ TensorDict({
     ),
     timestamp: TemporalField(
         lookup=Tensor(torch.Size([3, 64]), torch.int),
-        values=Tensor(torch.Size([3, 64]), torch.float),
+        value=Tensor(torch.Size([3, 64]), torch.float),
     ),
     amount: ContinuousField(
         lookup=Tensor(torch.Size([3, 64]), torch.int),
-        values=Tensor(torch.Size([3, 64]), torch.float),
+        value=Tensor(torch.Size([3, 64]), torch.float),
     ),
     transaction_type: DiscreteField(lookup=Tensor(torch.Size([3, 64]), torch.int)),
 })
@@ -594,9 +644,7 @@ Additionally, pre-training textual field embedding modules is difficult! Running
 ```python
 @tensorclass
 class TextualField:
-
-    # the T dimension refers to the tokens within the field values
-    lookup: Int[torch.Tensor, "N L T"]
+    document: Int[torch.Tensor, "N L T"]
 ```
 
 ==== Images, Video, and Audio Field Embeddings
@@ -609,16 +657,11 @@ Streaming the operations to read, decode, and collate images will certainly add 
 ```python
 @tensorclass
 class ImageField:
-
-    # the X and Y dimensions refers to pixel coordinates of each image
-    lookup: Int[torch.Tensor, "N L X Y"]
+    image: Int[torch.Tensor, "N L X Y"]
 
 @tensorclass
 class VideoField:
-
-    # the S dimension refers to each frame within the video
-    # the X and Y dimensions refers to pixel coordinates of each image
-    lookup: Int[torch.Tensor, "N L S X Y"]
+    video: Int[torch.Tensor, "N L V X Y"]
 ```
 
 The usage of media is extremely complicated, but really emphasizes the versatility of approaching your data with sequential modeling. In practice, using asynchronous streaming operations (RayData) will be key to scaling these more complex media fields. I do not currently have the expertise to experiment with these ideas.
@@ -633,7 +676,7 @@ Discrete, continuous, temporal, geospatial, entities, media, and external fields
         inset: 6pt,
         [Device ID], [Action], [Amount], [Location], [Timestamp], [Comments], [Merchant Name],
         [`e8e905fbb00f`], [Annual Fee], [395.00], [], [2022-03-19 08:34:02], [Annual Card Fee], [BigBank],
-        [], [Purchase], [171.54], [(-74.204573, -158.007852)], [2022-03-21 11:19:53], [Home improvement supplies], [HomeCraft],
+        [], [Purchase], [171.54], [(-74.20453, -158.0078)], [2022-03-21 11:19:53], [Home improvement supplies], [HomeCraft],
         [], [Purchase], [464.69], [(-76.638826, -36.341502)], [2022-04-30 20:43:02], [Charity donation], [GiveBack],
         [`e8e905fbb00f`], [Online Payment], [463.58], [], [2022-09-13 16:21:23], [Hotel booking], [StayInn],
         [`f2e31f29343b`], [Dispute Transaction], [489.35], [(-34.316692, 170.608224)], [2023-05-01 20:40:15], [Pet supplies], [PetWorld],
@@ -646,10 +689,10 @@ Discrete, continuous, temporal, geospatial, entities, media, and external fields
     caption: [An example sequence of mixed field types]
 )
 
-This approach is extremely versatile. It is able to work with any data type. Additionally, it is able to work with your data exactly how it already is. Similar to language and vision, there is effectively zero batch preprocessing. There are no concerns about nullable fields values.
+This approach is extremely versatile. It is able to work with many different data type. Additionally, it is able to work with your data exactly how it already is. Similar to language and vision, there is effectively zero batch preprocessing. There are no concerns about nullable fields values.
 
 == Model Architecture Summary
-Upon the creation of the field embeddings with the Modular Field Embedding System, TabBERT’s hierarchical transformer-encoder architecture is able to build sequence and event representations as before. I include two transformer-encoder modules, the "field encoder" and the "event encoder". The field encoder allows each field to attend to every other field within each event. The contextualized field representations are then concatenated to form event representations for every event. Each event representation then attends to every other event representation in the event encoder, which produces contextualized event representations, as well as a sequence representation via a special `[CLS]` token, which is appended to the inputted event representations. The event representations are used to pre-train the model, and the sequence representation can be used for arbitrary supervised learning problems.
+Upon the creation of the field embeddings with the Modular Field Embedding System, TabBERT's hierarchical transformer-encoder architecture is able to build sequence and event representations as before. I include two transformer-encoder modules, the "field encoder" and the "event encoder". The field encoder allows each field to attend to every other field within each event. The contextualized field representations are then concatenated to form event representations for every event. Each event representation then attends to every other event representation in the event encoder, which produces contextualized event representations, as well as a sequence representation via a special `[CLS]` token, which is appended to the inputted event representations. The event representations are used to pre-train the model, and the sequence representation can be used for arbitrary supervised learning problems.
 
 #figure(
     image("../diagrams/architecture.drawio.svg"),
@@ -669,7 +712,7 @@ Applying SSL to our data is tricky, however, because every field can be of a dif
         inset: 6pt,
         [Device ID], [Action], [Amount], [Location], [Timestamp], [Comments], [Merchant Name],
         [`e8e905fbb00f`], [`[MASK]`], [395.00], [], [2022-03-19 08:34:02], [Annual Card Fee], [BigBank],
-        [], [Purchase], [171.54], [(-74.204573, -158.007852)], [2022-03-21 11:19:53], [`[MASK]`], [HomeCraft],
+        [], [Purchase], [171.54], [(-74.20457, -158.00785)], [2022-03-21 11:19:53], [`[MASK]`], [HomeCraft],
         [`[MASK]`], [`[MASK]`], [`[MASK]`], [`[MASK]`], [`[MASK]`], [`[MASK]`], [`[MASK]`],
         [`e8e905fbb00f`], [Online Payment], [463.58], [], [2022-09-13 16:21:23], [Hotel booking], [StayInn],
         [`[MASK]`], [Dispute Transaction], [489.35], [(-34.316692, 170.608224)], [2023-05-01 20:40:15], [Pet supplies], [PetWorld],
@@ -682,10 +725,10 @@ Applying SSL to our data is tricky, however, because every field can be of a dif
     caption: [An example masked sequence]
 )
 
-=== Semi-Ordinal Classification of Quantiles
-For the continuous, temporal, and geospatial fields, instead of attempting to reconstruct the original CDFs, we can instead attempt to reconstruct the binned CDFs. This requires that we set a hyperparameter, `n_quantiles`, to define the number of bins for the customer SSL task. Going forward, let’s assume we want to calculate the number of deciles (`n_quantiles = 10`).
+=== Semi-Ordinal Classification of quantiles
+For the continuous, temporal, and geospatial fields, instead of attempting to reconstruct the original CDFs, we can instead attempt to reconstruct the binned CDFs. This requires that we set a hyperparameter, $q$, to define the number of bins for the customer SSL task. Going forward, let's assume we want to calculate the number of deciles ($q=10$).
 
-If one of the masked continuous fields has a CDF of `0.05`, the model should learn to predict that this value belongs in the 1st decile. If another masked continuous field has a CDF of 0.51, the model should learn that this value belongs in the 6th decile. Every masked CDF should be mapped to the bin $floor("CDF"(x) dot "n_quantiles" dot 0.overline(9))$.
+If one of the masked continuous fields has a CDF of `0.05`, the model should learn to predict that this value belongs in the 1st decile. If another masked continuous field has a CDF of 0.51, the model should learn that this value belongs in the 6th decile. Every masked CDF should be mapped to the bin $floor("CDF"(x) dot q dot 0.overline(9))$.
 
 However, this alone is imperfect. We are penalizing the model if it guesses the wrong bin, but we also want encourage the model if it guesses the incorrect bins that are _closer_ to the correct bin. In other words, if the model says that the masked value belongs in the 8th decile, but in reality it belongs in the 10th decile, then it should punished less than if it had said the the masked value belongs in the 1st decile. In other words, we want to run a semi-ordinal classification task. We need to apply the "neighborhood loss smoothing" function from the UniTTab paper, however we need to modify it in order to support the non-valued states of null and padded as well.
 
@@ -702,7 +745,7 @@ However, because it is not of a universal modality like language, vision, video,
 Sequence models are able to support a variety of tasks. In my implementation, I have designed my sequence model to support event-level supervised tasks: classification and regression. In other words, I can have different target labels depending on which event was sampled. This is in contrast to sequence-level tagging, which would restrict the target to be homogeneous for every event in a sequence. Additionally, I have enforced a mechanism that I call "nullable tagging", such that I can include null values in my targets. Events with null targets are able to be used in the historical context of future events, but they can not be sampled as events. I found this mechanism useful for solving the "clipping problem" which I describe in a later section
 
 === Observation Sampling Strategies
-Sampling events from a sequence to create observations is difficult. Sampling too many overlapping observations from a sequence can quickly result in overfitting. By "overlapping observations", I am referring to observations that share events with one another. I have developed an intuition that works well for me. I found success in iterating over each sequence in the population of sequences. Within each sequence, I will sample (`len(sequence) / n_context`) many events on average. In other words, I will sample random events from a sequence at a rate of (`1 / n_context`).
+Sampling events from a sequence to create observations is difficult. Sampling too many overlapping observations from a sequence can quickly result in overfitting. By "overlapping observations", I am referring to observations that share events with one another. I have developed an intuition that works well for me. I found success in iterating over each sequence in the population of sequences. Within each sequence, I will sample (`len(sequence) / n_context`) many events on average. In other words, I will sample random events from a sequence at a rate of $1/L$ (`1 / n_context`). This sampling rate may be increased for better greater confidence in the model's performance metrics during validation and testing.
 
 This event-sampling technique is unique to this problem. In computer vision, you can uniformly sample from the population of images. In language modeling, you can uniformly sample from the population of documents from a corpus. However, for sequence modeling, sampling observations at a sequence-level does not necessarily work because some sequences may have very few events. For example, you may be running a financial institution with 10 million customers, each with a credit card. However, a large portion of your credit card users may be "gamers" that only signed up for the card to collect a sign on bonus. These inactive customers may only tens of events on their records, whereas other customers may have thousands of events in their records.
 
@@ -714,10 +757,10 @@ Sampling uniformly from each customer's sequence will result in sampling the sam
 With the data preprocessing and model architecture, pre-training, and fine-tuning processes all being a function of the data and hyperparameters, there is a way to automate these stages from start to finish without any manual operations.
 
 // FIXME this could be better phrased
-// Unlike GBMs, which are notorious for not having an globally optimal set of hyperparameters for every given problem (thus requiring extensive hyperparameter tuning),
+Unlike GBMs, which are notorious for having varying performance with respect to their many hyperparameters for any given problem (thus requiring extensive hyperparameter tuning),
 
 === Workflow Orchestration
-There are many wonderful workflow orchestration engines out there: Airflow, Kubeflow Pipelines (KFP), and Metaflow are the three most common python-based orchestration engines for data science applications. Airflow gives me nightmares. KFP doesn’t enable local development. Metaflow is the best of the big three orchestrators in my humble opinion, but its class-based SDK bothers me. I elected to instead use Flyte because of its beautiful SDK and pleasant community. Flyte’s SDK (FlyteKit) allows for extraordinarily elegant task definitions that are able to utilize local libraries. Additionally, I am able to seamlessly execute my workflows on my local machine for rapid prototyping and development.
+There are many wonderful workflow orchestration engines out there: Airflow, Kubeflow Pipelines (KFP), and Metaflow are the three most common python-based orchestration engines for data science applications. Airflow gives me nightmares. KFP doesn't enable local development. Metaflow is the best of the big three orchestrators in my humble opinion, but its class-based SDK bothers me. I elected to instead use Flyte because of its beautiful SDK and pleasant community. Flyte's SDK (FlyteKit) allows for extraordinarily elegant task definitions that are able to utilize local libraries. Additionally, I am able to seamlessly execute my workflows on my local machine for rapid prototyping and development.
 
 In my training pipeline, there are seven major steps that are required:
 + *Data Validation*: Parse the inputted ledger and confirm that the requested field types are available and valid
@@ -771,7 +814,7 @@ Because the orchestrated pipeline has been developed to operate automatically, w
 + Run a series of assertions on the ledger to test the quality of the data
 + Generate visualizations for each of the input fields within the
   dataset
-+ Quantize and compile the model for more efficient model inference
++ quantize and compile the model for more efficient model inference
 + Compare model scores between trained torch model and the compiled
   model to validate model compilation
 + Attempt model rollout to production environment (canary deployment
@@ -831,7 +874,7 @@ All three of these solutions prevents the ambiguity between an observation that 
 === The Flushing Problem
 A unique adversarial vulnerability arises when modeling sequential data with a fixed context size depending on the types of events allowed to fill the context window. Theoretically, an ill-intended individual could "flush" the context by spamming innocuous events. In other words, an attacker may simply "login" and "logout" of their account several thousand times in order to attempt to manipulate the model in some way.
 
-A more concrete example: A savvy hacker, having recently hacked into their victim’s account at Big Online Store, could choose to reset the user’s password, email, phone number, and mailing address before attempting to purchase gift card codes. Such risky actions, which may otherwise result in a security alert, may go unnoticed if the fraudster intentionally spams many login events between each nefarious action, such that the model doesn’t see more than one such nefarious action at any point in time. In other words, if you perform a thousand low-risk events between every high-risk event, the model will not see just how risky your recent actions truly are.
+A more concrete example: A savvy hacker, having recently hacked into their victim's account at Big Online Store, could choose to reset the user's password, email, phone number, and mailing address before attempting to purchase gift card codes. Such risky actions, which may otherwise result in a security alert, may go unnoticed if the fraudster intentionally spams many login events between each nefarious action, such that the model doesn't see more than one such nefarious action at any point in time. In other words, if you perform a thousand low-risk events between every high-risk event, the model will not see just how risky your recent actions truly are.
 
 The risk of such an attack may be mitigated by multiple means:
 + Increase the context size.
@@ -845,7 +888,7 @@ The most significant obstacle to implementing multiple sequences of varying even
 
 Regardless, the utilization of multiple sequences and tabular data is yet another solution to the aforementioned "flushing problem" because the signal may be captured from multiple potential sequences of varying event rates.
 
-=== Sub-Quadratic Alternatives to Self-Attention
+=== Sub-quadratic Alternatives to Self-Attention
 An interesting property of sequential data is that events asynchronously, arriving in separate streaming messages. Consequently, there is a potential optimization trick for real-time inference. Using emerging alternatives to transformers, such as RWKV or Mamba, one can actually save an enormous amounts of the compute requirements for inference. The memory complexity with respect to the context size decreases from quadratic to constant!
 
 - Store sequence state representations in a in-memory cache like Redis
@@ -863,4 +906,4 @@ An interesting property of sequential data is that events asynchronously, arrivi
 
 Conclusion: use sequential modeling! Its better. Tabular machine learning sucks and you are wasting hundreds of millions of dollars for no reason.
 
-#bibliography("works.bib")
+#bibliography

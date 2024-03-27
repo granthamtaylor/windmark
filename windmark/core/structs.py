@@ -23,14 +23,14 @@ class Tokens(IntEnum):
 
 
 class Field:
-    def __init__(self, **fieldinfo):
-        assert len(fieldinfo), "enter one field name and type"
+    def __init__(self, **field):
+        assert len(field) == 1, "enter one field name and type"
 
         self.name: str
         self.type: str
         self.n_levels: None | int = None
 
-        self.name, self.type = fieldinfo.popitem()
+        self.name, self.type = field.popitem()
 
         assert self.type in [
             "continuous",
@@ -76,43 +76,43 @@ class Schema:
 class Hyperparameters(pydantic.BaseModel):
     # hidden params
     # ! will be hidden because can be inferred from balancer
-    n_targets: int = pydantic.Field(2, gt=1, lt=2049)
+    n_targets: int = pydantic.Field(2, ge=1, le=2048)
     """Number of supervised classification targets"""
     # ! will be hidden because can be inferred from schema
-    n_fields: int = pydantic.Field(..., gt=1, lt=129)
+    n_fields: int = pydantic.Field(..., gt=1, le=128)
     """Number of unique fields"""
     # ! will be hidden because will be overwritten by learning rate finder
     learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
     """Learning rate"""
     # ! will be hidden because default value of 8 is pretty universal
-    precision: int = pydantic.Field(8, gt=1, lt=513)
+    precision: int = pydantic.Field(8, gt=1, le=512)
     """Precision of fourier feature encoders"""
     # ! might be able to automatically find
     pretrain_sample_rate: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
     """Proportion of events to sample from during pretraining"""
     # ! this is a pretty confusing param and shouldn't really matter that much
-    head_shape_log_base: int = pydantic.Field(4, gt=0, lt=33)
+    head_shape_log_base: int = pydantic.Field(4, gt=1, le=8)
     """How quickly to converge sequence representation"""
     # ! might be able to automatically find
     finetune_sample_rate: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
     """Proportion of events to sample from during finetuning"""
 
     # architectural
-    batch_size: int = pydantic.Field(72, gt=0, lt=2049)
+    batch_size: int = pydantic.Field(72, gt=0, le=2048)
     """Batch size for training (how many observations per step)"""
-    n_context: int = pydantic.Field(128, gt=0, lt=2049)
+    n_context: int = pydantic.Field(128, gt=0, le=2048)
     """Context size (how many events per observation)"""
-    d_field: int = pydantic.Field(64, gt=1, lt=257)
+    d_field: int = pydantic.Field(64, gt=1, le=256)
     """Hidden dimension per field"""
-    n_heads_field_encoder: int = pydantic.Field(16, gt=0, lt=33)
+    n_heads_field_encoder: int = pydantic.Field(16, gt=0, le=32)
     """Number of heads in field encoder"""
-    n_layers_field_encoder: int = pydantic.Field(2, gt=0, lt=33)
+    n_layers_field_encoder: int = pydantic.Field(2, gt=0, le=32)
     """Number of layers in field encoder"""
-    n_heads_event_encoder: int = pydantic.Field(16, gt=0, lt=33)
+    n_heads_event_encoder: int = pydantic.Field(16, gt=0, le=32)
     """Number of heads in event encoder"""
-    n_layers_event_encoder: int = pydantic.Field(8, gt=0, lt=33)
+    n_layers_event_encoder: int = pydantic.Field(8, gt=0, le=32)
     """Number of layers in event encoder"""
-    dropout: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
+    dropout: float = pydantic.Field(0.1, ge=0.0, lt=1.0)
     """Dropout rate"""
 
     # training

@@ -46,12 +46,12 @@ def fit_sequence_encoder(
         strategy="auto",
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
+        max_epochs=params.max_epochs,
     )
 
     trainer = Trainer(
         **config,
         default_root_dir=root / "pretrain",
-        max_epochs=10,
         callbacks=[
             LearningRateFinder(),
             EarlyStopping(monitor="pretrain-validate/loss"),
@@ -69,11 +69,10 @@ def fit_sequence_encoder(
     trainer = Trainer(
         **config,
         default_root_dir=root / "finetune",
-        min_epochs=16,
         callbacks=[
-            LearningRateFinder(),
+            ThawedFinetuning(transition=1),
+            # LearningRateFinder(),
             EarlyStopping(monitor="finetune-validate/loss"),
-            ThawedFinetuning(transition=16),
             ParquetBatchWriter("/home/grantham/windmark/data/predictions.parquet"),
             finetune := ModelCheckpoint(),
         ],
