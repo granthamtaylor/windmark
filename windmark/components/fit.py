@@ -1,37 +1,32 @@
 from pathlib import Path
 
 import flytekit as fk
-import numpy as np
+
 import torch
-from funcy import join
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateFinder
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
 from windmark.core.callbacks import ParquetBatchWriter, ThawedFinetuning
-from windmark.core.managers import ClassificationManager
-from windmark.core.structs import Field, Hyperparameters
+from windmark.core.managers import SequenceManager
+from windmark.core.structs import Hyperparameters
 
 
 @fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
 def fit_sequence_encoder(
-    dataset: fk.types.directory.FlyteDirectory,
+    lifestreams: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
-    fields: list[Field],
-    centroids: list[dict[str, np.ndarray]],
-    balancer: ClassificationManager,
+    manager: SequenceManager,
 ) -> SequenceModule:
     assert torch.cuda.is_available()
 
     torch.set_float32_matmul_precision("medium")
 
     module = SequenceModule(
-        datapath=dataset.path,
-        fields=fields,
+        datapath=lifestreams.path,
         params=params,
-        centroids=join(centroids),
-        balancer=balancer,
+        manager=manager,
     )
 
     root = Path(fk.current_context().working_directory) / "checkpoints"

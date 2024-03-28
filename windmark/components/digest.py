@@ -1,17 +1,16 @@
 import flytekit as fk
-import numpy as np
 import polars as pl
 from pytdigest import TDigest
 
-from windmark.core.structs import Field
+from windmark.core.managers import Field, Centroid
 
 
 @fk.task
-def create_digest_centroids_from_ledger(ledger: str, field: Field, slice_size: int = 10_000) -> dict[str, np.ndarray]:
+def create_digest_centroids_from_ledger(ledger: str, field: Field, slice_size: int = 10_000) -> Centroid:
     digest = TDigest()
 
     if field.type not in ["continuous", "temporal"]:
-        return {}
+        return Centroid()
 
     def format(field: Field) -> pl.Expr:
         if field.type == "continuous":
@@ -30,4 +29,4 @@ def create_digest_centroids_from_ledger(ledger: str, field: Field, slice_size: i
     for shard in shards:
         digest.update(shard.get_column(field.name).to_numpy())
 
-    return {field.name: digest.get_centroids()}
+    return Centroid(field.name, digest)

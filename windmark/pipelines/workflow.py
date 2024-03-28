@@ -2,26 +2,36 @@ from functools import partial
 
 import flytekit as fk
 
-from windmark.core.structs import Field, Hyperparameters
-from windmark.tasks import digest, fit, manager, parse, preprocess, rebalance, sanitize
+from windmark.core.structs import Hyperparameters
+from windmark.core.managers import SchemaManager, SplitManager
+import windmark.components as components
 
 
 @fk.workflow
 def pipeline(
     ledger_path: str,
-    fields: list[Field],
+    schema: SchemaManager,
     params: Hyperparameters,
+    split: SplitManager,
 ):
-    ledger = sanitize(ledger=ledger_path)
+    ledger = components.sanitize(ledger=ledger_path)
 
-    parsed_fields = fk.map_task(partial(parse, ledger=ledger))(field=fields)
+    fields = components.fan.fields(schema=schema)
 
-    centroids = fk.map_task(partial(digest, ledger=ledger, slice_size=10_000))(field=parsed_fields)
+    parsed_fields = fk.map_task(partial(components.parse, ledger=ledger))(field=fields)
 
-    balancer = rebalance(ledger=ledger, params=params)
+    parsed_schema = components.collect.fields(schema=schema, fields=parsed_fields)
 
-    manager(ledger=ledger, shard_size=1, balancer=balancer, params=params)
+    fanned_centroids = fk.map_task(partial(components.digest, ledger=ledger, slice_size=10_000))(field=fields)
 
-    lifestreams = preprocess(ledger=ledger, fields=parsed_fields, balancer=balancer)
+    centroids = components.collect.centroids(centroids=fanned_centroids)
 
-    fit(dataset=lifestreams, fields=parsed_fields, params=params, centroids=centroids, balancer=balancer)
+    task = components.task(ledger=ledger, schema=parsed_schema, params=params)
+
+    sample = components.sample(ledger=ledger, params=params, task=task, split=split)
+
+    manager = components.manager(schema=parsed_schema, task=task, sample=sample, split=split, centroids=centroids)
+
+    lifestreams = components.preprocess(ledger=ledger, manager=manager)
+
+    components.fit(lifestreams=lifestreams, params=params, manager=manager)

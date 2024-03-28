@@ -4,7 +4,6 @@ from collections import OrderedDict
 from functools import partial, partialmethod
 
 import lightning.pytorch as lit
-import numpy as np
 import torch
 import torchmetrics
 from beartype import beartype
@@ -17,7 +16,7 @@ from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
 
-from windmark.core.managers import ClassificationManager
+from windmark.core.managers import SequenceManager, SchemaManager
 from windmark.core.operators import collate, stream, mock
 from windmark.core.structs import (
     ContinuousField,
@@ -37,10 +36,10 @@ def _squarify(tensor: Tensor) -> Tensor:
 
 
 @jaxtyped(typechecker=beartype)
-def create_attention_masks(inputs: TensorDict, fields: list[Field]) -> tuple[Tensor, Tensor]:
+def create_attention_masks(inputs: TensorDict, manager: SequenceManager) -> tuple[Tensor, Tensor]:
     is_non_valued = []
 
-    for field in fields:
+    for field in manager.schema.fields:
         values = inputs[(field.name, "lookup")]
 
         is_padded = values.eq(Tokens.PAD)
@@ -208,12 +207,12 @@ class TemporalFieldEmbedder(ContinuousFieldEmbedder):
     """
 
 
-class ModularAttributeEmbeddingSystem(torch.nn.Module):
+class ModularFieldEmbeddingSystem(torch.nn.Module):
     """
-    ModularAttributeEmbeddingSystem is a PyTorch module for embedding fields.
+    ModularFieldEmbeddingSystem is a PyTorch module for embedding fields.
     """
 
-    def __init__(self, params: Hyperparameters, fields: list[Field]):
+    def __init__(self, params: Hyperparameters, manager: SequenceManager):
         """
         Initialize moduler field embedder.
 
@@ -231,7 +230,7 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
             temporal=TemporalFieldEmbedder,
         )
 
-        for field in fields:
+        for field in manager.schema.fields:
             embedder = embedder_map[field.type]
             embedders[field.name] = embedder(params=params, field=field)
 
@@ -240,7 +239,7 @@ class ModularAttributeEmbeddingSystem(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> Float[Tensor, "N L F C"]:
         """
-        Performs the forward pass of the ModularAttributeEmbeddingSystem.
+        Performs the forward pass of the ModularFieldEmbeddingSystem.
 
         Args:
             inputs (TensorDict[Float[Tensor, "N L"] | Int[Tensor, "N L"]]): The input tensor.
@@ -268,7 +267,7 @@ class FieldEncoder(torch.nn.Module):
     FieldEncoder is a PyTorch module for encoding fields.
     """
 
-    def __init__(self, params: Hyperparameters):
+    def __init__(self, params: Hyperparameters, manager: SequenceManager):
         """
         Initialize field transformer encoder.
 
@@ -278,7 +277,7 @@ class FieldEncoder(torch.nn.Module):
 
         super().__init__()
 
-        identity = torch.eye(params.n_fields).bool().unsqueeze(0)
+        identity = torch.eye(len(manager.schema)).bool().unsqueeze(0)
         self.register_buffer("identity", identity)
 
         self.H = params.n_heads_field_encoder
@@ -292,7 +291,7 @@ class FieldEncoder(torch.nn.Module):
 
         self.encoder = torch.nn.TransformerEncoder(layer, num_layers=params.n_layers_field_encoder)
 
-        self.positional = LearnedTensor(params.n_fields, params.d_field)
+        self.positional = LearnedTensor(len(manager.schema), params.d_field)
 
     @jaxtyped(typechecker=beartype)
     def forward(
@@ -337,7 +336,7 @@ class EventEncoder(torch.nn.Module):
     EventEncoder is a PyTorch module for encoding events.
     """
 
-    def __init__(self, params: Hyperparameters):
+    def __init__(self, params: Hyperparameters, manager: SequenceManager):
         """
         Initialize the event transformer encoder.
 
@@ -350,7 +349,7 @@ class EventEncoder(torch.nn.Module):
         self.H = params.n_heads_event_encoder
 
         layer = torch.nn.TransformerEncoderLayer(
-            d_model=params.n_fields * params.d_field,
+            d_model=len(manager.schema) * params.d_field,
             nhead=params.n_heads_event_encoder,
             batch_first=True,
             dropout=params.dropout,
@@ -358,8 +357,8 @@ class EventEncoder(torch.nn.Module):
 
         self.encoder = torch.nn.TransformerEncoder(layer, num_layers=params.n_layers_event_encoder)
 
-        self.positional = LearnedTensor(params.n_context, params.n_fields * params.d_field)
-        self.class_token = LearnedTensor(1, params.n_fields * params.d_field)
+        self.positional = LearnedTensor(params.n_context, len(manager.schema) * params.d_field)
+        self.class_token = LearnedTensor(1, len(manager.schema) * params.d_field)
 
     @jaxtyped(typechecker=beartype)
     def forward(
@@ -399,7 +398,7 @@ class EventDecoder(torch.nn.Module):
     EventDecoder is a PyTorch module for decoding masked events from their contextualized representations.
     """
 
-    def __init__(self, params: Hyperparameters, fields: list[Field]):
+    def __init__(self, params: Hyperparameters, manager: SchemaManager):
         """
         Initialize the event decoder.
 
@@ -411,7 +410,7 @@ class EventDecoder(torch.nn.Module):
 
         projections = {}
 
-        for field in fields:
+        for field in manager.schema.fields:
             match field.type:
                 case "discrete":
                     d_target = field.levels
@@ -426,7 +425,7 @@ class EventDecoder(torch.nn.Module):
                     d_target = params.n_quantiles
 
             projections[field.name] = torch.nn.Conv1d(
-                in_channels=params.n_fields * params.d_field,
+                in_channels=len(manager.schema) * params.d_field,
                 out_channels=d_target + len(Tokens),
                 kernel_size=1,
             )
@@ -467,7 +466,7 @@ class DecisionHead(torch.nn.Module):
     A PyTorch module representing a classification head. This module is used to map the encoded fields to the target classes.
     """
 
-    def __init__(self, params: Hyperparameters):
+    def __init__(self, params: Hyperparameters, manager: SequenceManager):
         """
         Initialize classification decision head.
 
@@ -480,15 +479,15 @@ class DecisionHead(torch.nn.Module):
             map(
                 lambda x: params.head_shape_log_base**x,
                 range(
-                    math.ceil(math.log(params.n_targets, params.head_shape_log_base)),
-                    math.ceil(math.log(params.n_fields * params.d_field, params.head_shape_log_base)),
+                    math.ceil(math.log(manager.task.n_targets, params.head_shape_log_base)),
+                    math.ceil(math.log(len(manager.schema) * params.d_field, params.head_shape_log_base)),
                 ),
             )
         )
 
         hidden.reverse()
 
-        dims = [params.n_fields * params.d_field, *hidden, params.n_targets]
+        dims = [len(manager.schema) * params.d_field, *hidden, manager.task.n_targets]
 
         layers = []
 
@@ -561,7 +560,7 @@ def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset:
     return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot)
 
 
-def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
+def create_metrics(manager: SequenceManager) -> torch.nn.ModuleDict:
     metrics = dict(
         ap=torchmetrics.AveragePrecision,
         f1=torchmetrics.F1Score,
@@ -577,7 +576,7 @@ def create_metrics(params: Hyperparameters) -> torch.nn.ModuleDict:
         }
     )
 
-    config = dict(task="multiclass", num_classes=params.n_targets)
+    config = dict(task="multiclass", num_classes=manager.task.n_targets)
 
     for strata in stratas.keys():
         for name, Metric in metrics.items():
@@ -605,7 +604,7 @@ def step(
     if self._mode == "pretrain":
         losses = []
 
-        for field in self.fields:
+        for field in self.manager.schema.fields:
             values = reconstruction[field.name]
             targets = batch.targets[field.name]
 
@@ -666,51 +665,40 @@ class SequenceModule(lit.LightningModule):
         self,
         datapath: str | os.PathLike,
         params: Hyperparameters,
-        fields: list[Field],
-        centroids: dict[str, np.ndarray],
-        balancer: ClassificationManager,
+        manager: SequenceManager,
     ):
         super().__init__()
 
         assert os.path.exists(datapath)
-
-        assert isinstance(params, Hyperparameters)
-
-        for field in fields:
-            assert field.is_valid, f"field {field.name} is not valid"
-
         self.datapath: str | os.PathLike = datapath
 
-        self.params: Hyperparameters = params
-        self.fields: list[Field] = fields
-        self.save_hyperparameters(params.dict())
+        for field in manager.schema.fields:
+            assert field.is_valid, f"field {field.name} is not valid"
 
+        assert isinstance(params, Hyperparameters)
+        self.params: Hyperparameters = params
+        self.save_hyperparameters(params.dict())
         self.lr = params.learning_rate
+        self._mode: str = "pretrain"
+        self.manager = manager
 
         self.body = torch.nn.ModuleDict(
             dict(
-                modular_field_embedder=ModularAttributeEmbeddingSystem(params=params, fields=fields),
-                field_encoder=FieldEncoder(params=params),
-                event_encoder=EventEncoder(params=params),
+                modular_field_embedder=ModularFieldEmbeddingSystem(params=params, manager=manager),
+                field_encoder=FieldEncoder(params=params, manager=manager),
+                event_encoder=EventEncoder(params=params, manager=manager),
             )
         )
+        self.event_decoder = EventDecoder(params=params, manager=manager)
+        self.decision_head = DecisionHead(params=params, manager=manager)
 
-        self.event_decoder = EventDecoder(params=params, fields=fields)
-        self.decision_head = DecisionHead(params=params)
-
-        self.metrics = create_metrics(params=params)
-
-        self._mode: str = "pretrain"
-        self.balancer = balancer
-
-        self.register_buffer("weights", torch.tensor(self.balancer.weights))
+        self.metrics = create_metrics(manager=manager)
+        self.register_buffer("weights", torch.tensor(manager.task.balancer.weights))
 
         self.dataloaders: dict[str, DataLoader] = {}
         self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
-        self.centroids: dict[str, np.ndarray] = centroids
 
-        self.example_input_array = sample = mock(params=params, fields=fields)
-
+        self.example_input_array = sample = mock(params=params, manager=manager)
         self.flops_per_batch = measure_flops(self, lambda: self.forward(sample))
 
     @jaxtyped(typechecker=beartype)
@@ -726,7 +714,7 @@ class SequenceModule(lit.LightningModule):
             A tuple containing two tensors. The first tensor represents the supervised classification predictions and the second tensor represents the decoded, reconstructed events.
         """
 
-        field_mask, event_mask = create_attention_masks(inputs, fields=self.fields)
+        field_mask, event_mask = create_attention_masks(inputs, manager=self.manager)
 
         fields = self.body.modular_field_embedder(inputs)
         events = self.body.field_encoder(fields, mask=field_mask)
@@ -750,15 +738,7 @@ class SequenceModule(lit.LightningModule):
     predict_step = partialmethod(step, strata="predict")
 
     def setup(self, stage: StageName):
-        pipe = partial(
-            stream,
-            datapath=self.datapath,
-            mode=self._mode,
-            centroids=self.centroids,
-            params=self.params,
-            balancer=self.balancer,
-            fields=self.fields,
-        )
+        pipe = partial(stream, datapath=self.datapath, mode=self._mode, params=self.params, manager=self.manager)
 
         assert stage in ["fit", "validate", "test", "predict"]
 
@@ -772,8 +752,8 @@ class SequenceModule(lit.LightningModule):
         )
 
         for strata in mapping[stage]:
-            dataset = strata if strata != "predict" else "test"
-            self.pipes[strata] = pipe(masks=f"{dataset}-*.avro")
+            split = strata if strata != "predict" else "test"
+            self.pipes[strata] = pipe(split=split)
 
     def teardown(self, stage: StageName):
         assert stage in ["fit", "validate", "test", "predict"]

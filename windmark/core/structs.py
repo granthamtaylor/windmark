@@ -10,6 +10,7 @@ from jaxtyping import Bool, Float, Int, jaxtyped
 from tensordict import TensorDict
 from tensordict.prototype import tensorclass
 from torch import Tensor
+from pytdigest import TDigest
 
 
 class Tokens(IntEnum):
@@ -23,14 +24,13 @@ class Tokens(IntEnum):
 
 
 class Field:
-    def __init__(self, **field):
-        assert len(field) == 1, "enter one field name and type"
-
+    def __init__(self, field_name: str, field_type: str):
         self.name: str
         self.type: str
         self.n_levels: None | int = None
 
-        self.name, self.type = field.popitem()
+        self.name = field_name
+        self.type = field_type
 
         assert self.type in [
             "continuous",
@@ -60,42 +60,34 @@ class Field:
             return True
 
 
-class Schema:
-    def __init__(self, **fields):
-        assert len(fields) > 1, "must pass in at least two fields"
+class Centroid:
+    def __init__(self, name: str | None = None, digest: TDigest | None = None):
+        self.is_valid: bool
 
-        self.fields: list[Field] = []
+        if name is None:
+            self.is_valid = False
+            return
 
-        for name, dtype in fields.items():
-            self.fields.append(Field(**{name: dtype}))
+        else:
+            assert isinstance(name, str)
+            assert isinstance(digest, TDigest)
+            self.is_valid = True
 
-    def __len__(self) -> int:
-        return len(self.fields)
+        self.name: str = name
+        self.array: np.ndarray = digest.get_centroids()
 
 
 class Hyperparameters(pydantic.BaseModel):
     # hidden params
-    # ! will be hidden because can be inferred from balancer
-    n_targets: int = pydantic.Field(2, ge=1, le=2048)
-    """Number of supervised classification targets"""
-    # ! will be hidden because can be inferred from schema
-    n_fields: int = pydantic.Field(..., gt=1, le=128)
-    """Number of unique fields"""
     # ! will be hidden because will be overwritten by learning rate finder
     learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
     """Learning rate"""
     # ! will be hidden because default value of 8 is pretty universal
     precision: int = pydantic.Field(8, gt=1, le=512)
     """Precision of fourier feature encoders"""
-    # ! might be able to automatically find
-    pretrain_sample_rate: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
-    """Proportion of events to sample from during pretraining"""
     # ! this is a pretty confusing param and shouldn't really matter that much
     head_shape_log_base: int = pydantic.Field(4, gt=1, le=8)
     """How quickly to converge sequence representation"""
-    # ! might be able to automatically find
-    finetune_sample_rate: float = pydantic.Field(0.1, gt=0.0, lt=1.0)
-    """Proportion of events to sample from during finetuning"""
 
     # architectural
     batch_size: int = pydantic.Field(72, gt=0, le=2048)
@@ -116,6 +108,8 @@ class Hyperparameters(pydantic.BaseModel):
     """Dropout rate"""
 
     # training
+    n_steps: int = pydantic.Field(16, gt=0)
+    """Proportion of events to sample from during finetuning"""
     weight_decay: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
     """Optimizer weight decay"""
     gradient_clip_val: float = pydantic.Field(0.05, gt=0.0, lt=1.0)

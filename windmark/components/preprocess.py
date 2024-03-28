@@ -3,17 +3,16 @@ from pathlib import Path
 import flytekit as fk
 import polars as pl
 
-from windmark.core.managers import ClassificationManager, SplitManager
+from windmark.core.managers import SequenceManager, SplitManager
 from windmark.core.structs import Field, Tokens
 
 
 @fk.task
 def preprocess_ledger_to_shards(
     ledger: str,
-    fields: list[Field],
-    balancer: ClassificationManager,
+    manager: SequenceManager,
 ) -> fk.types.directory.FlyteDirectory:
-    assert len(fields) > 0
+    assert len(manager.schema.fields) > 0
 
     lf = pl.scan_parquet(ledger)
 
@@ -62,11 +61,11 @@ def preprocess_ledger_to_shards(
     outpath = Path(fk.current_context().working_directory) / "lifestreams"
     outpath.mkdir(exist_ok=True)
 
-    label_map: dict[str, int] = {label: index for index, label in enumerate(balancer.labels)}
+    label_map: dict[str, int] = {label: index for index, label in enumerate(manager.task.balancer.labels)}
 
     lifestreams = (
         lf.select(
-            *[format(field) for field in fields],
+            *[format(field) for field in manager.schema.fields],
             pl.col("target").replace(label_map).cast(pl.Int32).fill_null(-1),
             "event_id",
             "sequence_id",
@@ -76,19 +75,18 @@ def preprocess_ledger_to_shards(
         .sort("sequence_id", "event_order")
         .group_by("sequence_id", maintain_order=True)
         .agg(
-            *[field.name for field in fields],
+            *[field.name for field in manager.schema.fields],
             size=pl.count().cast(pl.Int32),
             event_ids=pl.col("event_id"),
             target=pl.col("target"),
             split=pl.col("split").last(),
         )
         .collect()
-        .iter_slices(1)
+        .iter_slices(10)
     )
 
     for index, sequence in enumerate(lifestreams):
-        split = sequence.get_column("split").item()
-        sequence.write_avro(outpath / f"{split}-{index}.avro", name="lifestream")
+        sequence.write_avro(outpath / f"{index}.avro", name="lifestream")
 
     print(f"finished preprocessing {index+1} lifestream files")
 

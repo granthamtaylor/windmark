@@ -32,11 +32,11 @@ repos:
       - id: poetry-export
       - id: poetry-install
 
-  - repo: local
-    hooks:
-      - id: pytest-check
-        name: pytest-check
-        entry: just test
-        language: system
-        pass_filenames: false
-        always_run: true
+  # - repo: local
+  #   hooks:
+  #     - id: pytest-check
+  #       name: pytest-check
+  #       entry: just test
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true

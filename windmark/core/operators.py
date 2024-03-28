@@ -9,12 +9,11 @@ from pytdigest import TDigest
 from tensordict import TensorDict
 from torchdata import datapipes
 
-from windmark.core.managers import ClassificationManager
+from windmark.core.managers import SequenceManager
 from windmark.core.structs import (
     ContinuousField,
     DiscreteField,
     EntityField,
-    Field,
     FinetuningData,
     Hyperparameters,
     InferenceData,
@@ -37,15 +36,15 @@ def read(filename):
 def sample(
     sequence: dict,
     params: Hyperparameters,
-    fields: list[Field],
-    balancer: ClassificationManager,
+    manager: SequenceManager,
+    split: str,
     mode: str,
 ) -> list[dict[str, str | list[int] | list[float | None] | list[str]]]:
     observations = []
 
     for event in range(sequence["size"]):
         if mode == "pretrain":
-            if params.pretrain_sample_rate < random.random():
+            if manager.sample.pretraining[split] < random.random():
                 continue
 
             label = -1
@@ -56,10 +55,10 @@ def sample(
             if (label is None) or (label == -1):
                 continue
 
-            if params.finetune_sample_rate < random.random():
+            if manager.sample.finetuning[split] < random.random():
                 continue
 
-            if balancer.thresholds[label] < random.random():
+            if manager.task.balancer.thresholds[label] < random.random():
                 continue
 
         elif mode == "inference":
@@ -73,7 +72,7 @@ def sample(
             label=label,
         )
 
-        for field in fields:
+        for field in manager.schema.fields:
             observation[field.name] = sequence[field.name][window]
 
         observations.append(observation)
@@ -83,12 +82,12 @@ def sample(
 
 def hash(
     observation: dict[str, str | list[int] | list[float | None] | list[str]],
-    fields: list[Field],
+    manager: SequenceManager,
     params: Hyperparameters,
 ) -> dict[str, str | list[int] | list[float | None]]:
     offset = len(Tokens)
 
-    for field in fields:
+    for field in manager.schema.fields:
         if field.type == "entity":
             values: list[str] = observation[field.name]
 
@@ -107,10 +106,10 @@ def hash(
 
 def cdf(
     observation: dict[str, str | list[int] | list[float | None]],
-    fields: list[Field],
+    manager: SequenceManager,
     digests: dict[str, TDigest],
 ) -> dict[str, str | list[int] | np.ndarray]:
-    for field in fields:
+    for field in manager.schema.fields:
         if field.type in ["continuous", "temporal"]:
             digest: TDigest = digests[field.name]
             array = np.array(observation[field.name], dtype=np.float64)
@@ -120,7 +119,9 @@ def cdf(
 
 
 def tensorfield(
-    observation: dict[str, str | list[int] | np.ndarray], params: Hyperparameters, fields: list[Field]
+    observation: dict[str, str | list[int] | np.ndarray],
+    params: Hyperparameters,
+    manager: SequenceManager,
 ) -> tuple[TensorDict, torch.Tensor, tuple[str, str]]:
     output = {}
 
@@ -131,7 +132,7 @@ def tensorfield(
         temporal=TemporalField,
     )
 
-    for field in fields:
+    for field in manager.schema.fields:
         values = observation[field.name]
         tensorclass = tensorclasses[field.type]
         output[field.name] = tensorclass.new(values, params=params)
@@ -146,7 +147,7 @@ def tensorfield(
 def mask(
     observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
     params: Hyperparameters,
-    fields: list[Field],
+    manager: SequenceManager,
 ) -> tuple[TensorDict, TensorDict, tuple[str, str]]:
     inputs, _, meta = observation
 
@@ -156,7 +157,7 @@ def mask(
 
     is_event_masked = torch.rand(N, L).lt(params.p_mask_event)
 
-    for field in fields:
+    for field in manager.schema.fields:
         targets[field.name] = inputs[field.name].mask(is_event_masked, params=params)
 
     targets = TensorDict(targets, batch_size=1)
@@ -167,12 +168,12 @@ def mask(
 def package(
     observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
     params: Hyperparameters,
-    fields: list[Field],
+    manager: SequenceManager,
     mode: str,
 ) -> SequenceData:
     if mode == "pretrain":
         observation: tuple[TensorDict, TensorDict, tuple[str, str]] = mask(
-            observation=observation, params=params, fields=fields
+            observation=observation, params=params, manager=manager
         )
 
     tensorclasses = dict(
@@ -187,32 +188,28 @@ def package(
 def stream(
     datapath: str | os.PathLike,
     mode: str,
-    masks: str,
-    centroids: dict[str, np.ndarray],
-    fields: list[Field],
     params: Hyperparameters,
-    balancer: ClassificationManager,
+    manager: SequenceManager,
+    split: str,
 ) -> datapipes.iter.IterDataPipe:
-    digests = {field: TDigest.of_centroids(centroid) for field, centroid in centroids.items()}
-
     assert mode in ["pretrain", "finetune", "inference"]
+    assert split in ["train", "validate", "test"]
 
     print(f"creating {mode} datapipe")
 
-    sampler = partial(sample, fields=fields, params=params, balancer=balancer, mode=mode)
-
     return (
-        datapipes.iter.FileLister(datapath, masks=masks)
+        datapipes.iter.FileLister(datapath, masks="*.avro")
         .shuffle()
         .sharding_filter()
         .flatmap(read)
+        .filter(lambda sequence: sequence["split"] == split)
         .shuffle()
-        .flatmap(sampler)
-        .map(partial(cdf, fields=fields, digests=digests))
-        .map(partial(hash, fields=fields, params=params))
+        .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))
+        .map(partial(cdf, manager=manager, digests=manager.digests))
+        .map(partial(hash, manager=manager, params=params))
         .shuffle()
-        .map(partial(tensorfield, fields=fields, params=params))
-        .map(partial(package, params=params, fields=fields, mode=mode))
+        .map(partial(tensorfield, manager=manager, params=params))
+        .map(partial(package, params=params, manager=manager, mode=mode))
     )
 
 
@@ -226,7 +223,7 @@ def collate(batch: list[SequenceData]) -> SequenceData:
     return stacked
 
 
-def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict[TensorField]:
+def mock(params: Hyperparameters, manager: SequenceManager) -> TensorDict[TensorField]:
     output = {}
 
     N = params.batch_size
@@ -241,7 +238,7 @@ def mock(params: Hyperparameters, fields: list[Field]) -> TensorDict[TensorField
         entity=EntityField,
     )
 
-    for field in fields:
+    for field in manager.schema.fields:
         if field.type in ["continuous", "temporal"]:
             indicators = torch.randint(0, len(Tokens), (N, L))
             padded = torch.where(is_padded, Tokens.PAD, indicators)
