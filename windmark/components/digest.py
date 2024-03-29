@@ -10,7 +10,7 @@ def create_digest_centroids_from_ledger(ledger: str, field: Field, slice_size: i
     digest = TDigest()
 
     if field.type not in ["continuous", "temporal"]:
-        return Centroid()
+        return Centroid(field.name)
 
     def format(field: Field) -> pl.Expr:
         if field.type == "continuous":

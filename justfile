@@ -1,6 +1,8 @@
 _list:
   @just --list
 
+# @poetry run pyflyte --verbose run windmark/pipelines/workflow.py pipeline
+
 # run pre-commit checks
 check:
   @git add .
@@ -16,7 +18,7 @@ tensorboard:
 
 # compile documentation with pdoc
 doc:
-  @poetry run pdoc windmark/core/architecture.py -o ./docs/site
+  @poetry run sphinx-build -M html "./docs/site" "./docs/site/_build"
 
 # compile whitepaper with typst
 whitepaper:
@@ -24,5 +26,4 @@ whitepaper:
 
 # run training pipeline
 train:
-  # @poetry run pyflyte --verbose run windmark/pipelines/workflow.py pipeline
   @poetry run python windmark/main.py

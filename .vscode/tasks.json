@@ -27,15 +27,6 @@
         "reveal": "always",
         "panel": "new"
       }
-    },
-    {
-      "label": "Test",
-      "type": "shell",
-      "command": "just test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      }
     }
   ]
 }

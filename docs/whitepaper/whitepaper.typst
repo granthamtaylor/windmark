@@ -220,9 +220,9 @@ def embed_2d(tokens: Int[torch.Tensor, "N L F"]) -> Float[torch.Tensor, "N L F C
 
 TabBERT utilizes a hierarchical transformer-encoder architecture with two encoders. The first encoder (in my terminology, the *_field encoder_*) lets every field embedding (`["N L F C"]`) attend to every field embedding within an event. Those contextualized field embeddings are then concatenated to represent the event as a whole (`["N L F*C"]`). The second encoder (in my terminology, the *_event encoder_*) then lets every event representation to attend to one another. The event encoder is constructed similarly to BERT, such that there is an appended class token (`["N F*C"]`) that may be used to represent the sequence as a whole, but one can also use the attended event representations for a MLM-like self-supervised learning task for model pre-training. They defined a custom pre-training task in which a portion of the events and / or fields are masked, and the event representations outputted from the event encoder needs to be able to reconstruct the masked events and fields. For fine-tuning, the appended class token is passed through a MLP to solve any supervised.
 
-For those unfamiliar with hierarchical transformer architecture, a great analogy comes from the domain of computer vision. If one is building a representation of an image, ideally each pixel should interact with every other pixel. However, if one is building a representation of a video, it would be virtually impossible to allow every pixel of every frame to interact with every pixel of every frame. Instead, it is common to first build a representation of each frame by letting each of its pixels interact with one another, and then build a representation of the video by allowing each representation of each frame interact with every other representation of each frame. Similarly, TabBERT breaks down a very large and complex problem into two smaller problems: representing each unique event and then using those event representations to create a representation of the sequence.
+For those unfamiliar with hierarchical transformer architecture, a great analogy comes from the domain of computer vision. If one is building a representation of an image, ideally each pixel should interact with every other pixel. However, if one is building a representation of a video, it would be virtually impossible to allow every pixel of every frame to interact with every pixel of every frame. Instead, it is common to first build a representation of each frame by letting each of its pixels interact with one another, and then build a representation of the video by allowing each of these frame representations to interact with one another. Similarly, TabBERT breaks down a very large and complex problem into two smaller problems: representing each unique event and then using those event representations to create a representation of the sequence.
 
-The hierarchical transformer architecture dramatically reduces the memory complexity of the model. Transformers are notorious for their quadratic memory complexity (both during training and inference) with respect to the context size. By utilizing two transformers to encode the fields and then events separately, we do not require the extensive memory requirements that troubles language models. In effect, we have reduced the memory complexity from a worst case scenerio of $O((L F)^2)$ into a slightly less scary $O(L^2 F + L F^2)$. Within the typical ranges of $L$ (128 to 512) and $F$ (6 to 15), this reduces memory requirements by approximately a factor of 10 to 20.
+The hierarchical transformer architecture dramatically reduces the memory complexity of the model. Transformers are notorious for their quadratic memory complexity (both during training and inference) with respect to the context size. By utilizing two transformers to encode the fields and then events separately, we do not require the extensive memory requirements that troubles language models. In effect, we have reduced the memory complexity from a worst case scenerio of $O((L F)^2)$ into a slightly less scary $O(L^2 F + L F^2)$. Within the typical ranges of $L$ (128 to 512) and $F$ (6 to 15), this reduces memory requirements by a bit over an order of magnitude.
 
 TabBERT, while elegant, did come with some major drawbacks. The largest of which is that their implementation required that every field be coerced into a categorical data type. For example, dollar amounts could not be fully represented, but you can bin them into categorical levels:
 
@@ -443,6 +443,8 @@ The scaling by $0.overline(9)$ guarantees that the flooring operation will alway
 
 // FIXME add TDigest paper citation
 
+// TODO Example continuous features used to represent entities
+
 In practice, Ted Dunning's TDigest algorithm is able to calculate the CDFs of the original values as a _streaming_ operation during both model training and inference, which means we never have to calculate the CDFs as a batch operation. This is extremely valuable, especially at the scale of billions to trillions of data points, because otherwise the calculation of the CDFs would require a great deal of compute. This also saves a great deal of storage as well because we do not have to store the normalized values or the binned value targets. We only have to store the original values.
 
 In practice, I found that the library `pytdigest`, developed by Tomas Protivinsky, provides a blazingly fast implementation of the TDigest algorithm. @pytdigest All of the other implementations with which I have experimented are far too slow such that the streaming CDF calculations would bottleneck model training and inference.
@@ -526,6 +528,8 @@ In addition to passing in the raw timestamp data, you might instead include data
 
 However, timestamps may still be important depending on your data. For example, the "Event Sourcing" pattern is not backwards compatible should the schema for your data change, such that some event types may not have been available in the past. It may be important for your use case to be able to explicitly tell the model about the absolute time an event took place may understand the API schema version at the time of any given event in order to prevent ambiguity. Alternatively, in this specific example you could also elect to pass in the API schema version number as a discrete field itself.
 
+// TODO Example geospatial features used to represent entities
+
 === Geospatial Field Embeddings
 Geospatial data also seems rather tricky. However, we can one again use a technique similar to the continuous field embedding mechanism to accomplish this. Unlike the continuous or temporal fields, geospatial coordinates are defined by two numbers: longitude and latitude. Both longitude and latitude requires their own `TDigest` model.
 
@@ -575,6 +579,7 @@ Needless to say, effectively tracking the locations, devices and login sessions 
 
 The use of entities is very common in recommendation systems, which typically utilizes large lookup tables which are indexed with multiple lookup values created by many different hash functions in order to prevent hash collisions However, there are other ways of accomplishing the same goal.
 
+// TODO Example tabular features used to represent entities
 // FIXME add Google unified embeddings paper citation
 
 Instead of using these RecSys-style hash embeddings in order to unique represent every possible entity, we could instead elect to simply try to differentiate between the entities available within an observation's context. In other words, we don't necessarily need to know which device you are currently using, but we just need to know whether that device is the same that you used for other events within the context. This can actually be done by assigning each unique device in the context a single random number. We can guarantee that there will be, at most, the same number of unique devices equal to the size of the context window. The random lookup value assignment can change between each observation in order to prevent overfitting, but the assignment operation can be fixed to a seed value during inference for reproducibility.
@@ -691,13 +696,17 @@ Discrete, continuous, temporal, geospatial, entities, media, and external fields
 
 This approach is extremely versatile. It is able to work with many different data type. Additionally, it is able to work with your data exactly how it already is. Similar to language and vision, there is effectively zero batch preprocessing. There are no concerns about nullable fields values.
 
-== Model Architecture Summary
+== Model Encoder Architecture
 Upon the creation of the field embeddings with the Modular Field Embedding System, TabBERT's hierarchical transformer-encoder architecture is able to build sequence and event representations as before. I include two transformer-encoder modules, the "field encoder" and the "event encoder". The field encoder allows each field to attend to every other field within each event. The contextualized field representations are then concatenated to form event representations for every event. Each event representation then attends to every other event representation in the event encoder, which produces contextualized event representations, as well as a sequence representation via a special `[CLS]` token, which is appended to the inputted event representations. The event representations are used to pre-train the model, and the sequence representation can be used for arbitrary supervised learning problems.
 
 #figure(
     image("../diagrams/architecture.drawio.svg"),
     caption: [The consolidated model architecture outputting a sequence representation],
 )
+
+=== Sparse Attention
+
+TODO add details for sparse attention
 
 == Self-Supervised Learning Strategy
 One of the many advantages of this network architecture is the opportunity to utilize self-supervised learning (SSL). In many business problems, there is a large amount of unlabeled data that traditional machine learning models are not able to utilize. The modality of language has benefitted enormously by applying masked language modeling (MLM) to pre-train models like BERT. TabBERT, as the name implies, also utilized an adaption of MLM, in which they mask random fields or events.
@@ -833,11 +842,17 @@ Because the orchestrated pipeline has been developed to operate automatically, w
 <streaming-operations>
 I found success in storing the data in a row-major format for custom streaming operations. `ndjson` and `avro` are both good options. I found that `parquet` had issues supporting complex, nested fields. I store my data in many small `avro` files, in which each sequence was stored as an object.
 
-Within each sequence object, I stored the `sequence_id` (`str`), `event_id` (`list[str]`), event fields (`dict[str, list[int] | list[float] | list[str]]`), and event targets (`list[int] | list[float]`). With this format, I may simply sample any event index number, and then slice the context directly from the event fields (`slice(max(0, idx - L), index)`), which can be trivially padded and collated to a tensor, which may then be stored in a `TensorDict` of tensorclasses.
+Within each sequence object, I stored the following items:
+- The sequence's unique ID, such as the customer ID (`str`)
+- The unique event IDs of each event (`list[str]`)
+- event fields (`dict[str, list[int] | list[float] | list[str]]`)
+- event targets for regression or classification tasks (`list[int] | list[float]`).
+
+With this format, I may simply sample any event index number, and then slice the context directly from the event fields (`slice(max(0, idx - L), index)`), which can be trivially padded and collated to a tensor, which may then be stored in a `TensorDict` of tensorclasses.
 
 This data structure ensures that the grouping and filtering operations required to collect all of the events for each sequence will not bottleneck the model training process. It optimizes streaming larger-than-memory sequences from disk to accelerate model training and inference. As a reference to the `pytorch-lifestreams` python library, developed primarily by Dmitri Babaev, I refer to this data structure as a *_lifestream_*.
 
-As mentioned above, this preprocessing pipeline requires the calculation of CDFs as a streaming operation. This operation can be extremely expensive. The TDigest implementation specifically from the `pytdigest` package is extremely optimized. According to their benchmarks, they are 10x to 1000x faster than other such open source implementations.
+As mentioned above, this preprocessing pipeline requires the calculation of CDFs as a streaming operation. This operation can be extremely expensive. The TDigest implementation specifically from the `pytdigest` package is extremely optimized. According to their benchmarks, they are 10x to 1000x faster than other open source implementations.
 
 // TODO add citation to Lifestreams by Babeav
 
@@ -880,6 +895,8 @@ The risk of such an attack may be mitigated by multiple means:
 + Increase the context size.
 + Set up policies to flag high event rates, where needed.
 + Do not include trivial events (login / logout events) in the context, but rather represent them whenever possible, as entity fields (such as a "login session")
+
+== Further Research
 
 === Including Tabular Data and Multiple Sequences of Varying Event Rates
 I have not yet explored integrating static tabular data with my sequential data, although this approach has been explored by Visa Research in their FATA-Trans paper. I am similarly curious about working with multiple sequences of data per account, in which each sequence has different event rates. For example, one sequence of 48 monthly billing statements over the last four years, another sequence for the last 256 customer financial transactions, and a final sequence of the last 2048 online click stream events. This would allow the model to learn from multiple sources without low frequency events being excavated from the context by high frequency events.

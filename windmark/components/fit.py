@@ -4,12 +4,12 @@ import flytekit as fk
 
 import torch
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateFinder
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
 from windmark.core.callbacks import ParquetBatchWriter, ThawedFinetuning
-from windmark.core.managers import SequenceManager
+from windmark.core.managers import SystemManager
 from windmark.core.structs import Hyperparameters
 
 
@@ -17,7 +17,7 @@ from windmark.core.structs import Hyperparameters
 def fit_sequence_encoder(
     lifestreams: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
-    manager: SequenceManager,
+    manager: SystemManager,
 ) -> SequenceModule:
     assert torch.cuda.is_available()
 
@@ -48,7 +48,6 @@ def fit_sequence_encoder(
         **config,
         default_root_dir=root / "pretrain",
         callbacks=[
-            LearningRateFinder(),
             EarlyStopping(monitor="pretrain-validate/loss"),
             pretrain := ModelCheckpoint(),
         ],
@@ -64,9 +63,9 @@ def fit_sequence_encoder(
     trainer = Trainer(
         **config,
         default_root_dir=root / "finetune",
+        min_epochs=(params.freeze_epochs + 1),
         callbacks=[
-            ThawedFinetuning(transition=1),
-            # LearningRateFinder(),
+            ThawedFinetuning(transition=params.freeze_epochs),
             EarlyStopping(monitor="finetune-validate/loss"),
             ParquetBatchWriter("/home/grantham/windmark/data/predictions.parquet"),
             finetune := ModelCheckpoint(),
@@ -80,6 +79,6 @@ def fit_sequence_encoder(
 
     module.mode = "inference"
 
-    trainer.predict(module)
+    # trainer.predict(module)
 
     return module

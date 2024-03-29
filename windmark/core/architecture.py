@@ -16,13 +16,15 @@ from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
 
-from windmark.core.managers import SequenceManager, SchemaManager
+from windmark.core.managers import SystemManager, SchemaManager
 from windmark.core.operators import collate, stream, mock
 from windmark.core.structs import (
     ContinuousField,
     DiscreteField,
     EntityField,
     TemporalField,
+    TargetField,
+    TensorField,
     Field,
     Hyperparameters,
     SequenceData,
@@ -36,7 +38,7 @@ def _squarify(tensor: Tensor) -> Tensor:
 
 
 @jaxtyped(typechecker=beartype)
-def create_attention_masks(inputs: TensorDict, manager: SequenceManager) -> tuple[Tensor, Tensor]:
+def create_attention_masks(inputs: TensorDict, manager: SystemManager) -> tuple[Tensor, Tensor]:
     is_non_valued = []
 
     for field in manager.schema.fields:
@@ -146,10 +148,10 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         super().__init__()
 
         self.field: Field = field
-        self.linear = torch.nn.Linear(2 * params.precision, params.d_field)
+        self.linear = torch.nn.Linear(2 * params.n_bands, params.d_field)
         self.positional = torch.nn.Embedding(len(Tokens), params.d_field)
 
-        weights = torch.logspace(-params.precision, 1, params.precision, base=2).mul(math.pi).unsqueeze(dim=0)
+        weights = torch.logspace(-params.n_bands, 1, params.n_bands, base=2).mul(math.pi).unsqueeze(dim=0)
 
         self.register_buffer("weights", weights)
 
@@ -212,7 +214,7 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
     ModularFieldEmbeddingSystem is a PyTorch module for embedding fields.
     """
 
-    def __init__(self, params: Hyperparameters, manager: SequenceManager):
+    def __init__(self, params: Hyperparameters, manager: SystemManager):
         """
         Initialize moduler field embedder.
 
@@ -267,7 +269,7 @@ class FieldEncoder(torch.nn.Module):
     FieldEncoder is a PyTorch module for encoding fields.
     """
 
-    def __init__(self, params: Hyperparameters, manager: SequenceManager):
+    def __init__(self, params: Hyperparameters, manager: SystemManager):
         """
         Initialize field transformer encoder.
 
@@ -336,7 +338,7 @@ class EventEncoder(torch.nn.Module):
     EventEncoder is a PyTorch module for encoding events.
     """
 
-    def __init__(self, params: Hyperparameters, manager: SequenceManager):
+    def __init__(self, params: Hyperparameters, manager: SystemManager):
         """
         Initialize the event transformer encoder.
 
@@ -466,7 +468,7 @@ class DecisionHead(torch.nn.Module):
     A PyTorch module representing a classification head. This module is used to map the encoded fields to the target classes.
     """
 
-    def __init__(self, params: Hyperparameters, manager: SequenceManager):
+    def __init__(self, params: Hyperparameters, manager: SystemManager):
         """
         Initialize classification decision head.
 
@@ -524,17 +526,18 @@ class DecisionHead(torch.nn.Module):
         return self.mlp(inputs)
 
 
-# FIXME does this belong here on in "operators.py"? It feels out of place
 @jaxtyped(typechecker=beartype)
-def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset: int) -> Float[torch.Tensor, "N L _"]:
+def smoothen(
+    targets: Int[torch.Tensor, "N L"], params: Hyperparameters, n_special_tokens: int
+) -> Float[torch.Tensor, "N L _"]:
     device = targets.device
 
     N, L = targets.size()
 
-    range_tensor = torch.arange(0, params.n_quantiles + offset, device=device).float()
+    range_tensor = torch.arange(0, params.n_quantiles + n_special_tokens, device=device).float()
 
     # expand and reshape to match the batch and sequence dimensions
-    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0).expand(N, L, params.n_quantiles + offset)
+    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0).expand(N, L, params.n_quantiles + n_special_tokens)
     labels_expanded = targets.float().unsqueeze(-1)
 
     # create gaussian distribution for each label in the sequence
@@ -545,10 +548,10 @@ def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset:
     one_hot = torch.zeros_like(gaussian).scatter_(-1, targets.unsqueeze(-1), 1.0)
 
     # determine which labels are above the threshold
-    is_above_threshold = targets > offset
+    is_above_threshold = targets >= n_special_tokens
 
     # prevent gaussian bleeding for labels above the threshold
-    start_bleed = torch.zeros_like(targets, dtype=torch.float32) + offset + 1
+    start_bleed = torch.zeros_like(targets, dtype=torch.float32) + n_special_tokens
     start_positions = torch.where(is_above_threshold, start_bleed, targets.float())
     prevent_bleed_mask = range_tensor >= start_positions.unsqueeze(-1)
 
@@ -560,7 +563,7 @@ def smoothen(targets: Int[torch.Tensor, "N L"], params: Hyperparameters, offset:
     return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot)
 
 
-def create_metrics(manager: SequenceManager) -> torch.nn.ModuleDict:
+def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
     metrics = dict(
         ap=torchmetrics.AveragePrecision,
         f1=torchmetrics.F1Score,
@@ -605,12 +608,12 @@ def step(
         losses = []
 
         for field in self.manager.schema.fields:
-            values = reconstruction[field.name]
-            targets = batch.targets[field.name]
+            values: TensorField = reconstruction[field.name]
+            targets: TargetField = batch.targets[field.name]
 
             # smoothen the targets for continuous fields
             if field.type in ["continuous", "temporal"]:
-                labels = smoothen(targets=targets.lookup, params=self.params, offset=len(Tokens))
+                labels = smoothen(targets=targets.lookup, params=self.params, n_special_tokens=len(Tokens))
             else:
                 labels = targets.lookup
 
@@ -665,7 +668,7 @@ class SequenceModule(lit.LightningModule):
         self,
         datapath: str | os.PathLike,
         params: Hyperparameters,
-        manager: SequenceManager,
+        manager: SystemManager,
     ):
         super().__init__()
 

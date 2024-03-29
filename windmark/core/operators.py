@@ -9,7 +9,7 @@ from pytdigest import TDigest
 from tensordict import TensorDict
 from torchdata import datapipes
 
-from windmark.core.managers import SequenceManager
+from windmark.core.managers import SystemManager
 from windmark.core.structs import (
     ContinuousField,
     DiscreteField,
@@ -36,7 +36,7 @@ def read(filename):
 def sample(
     sequence: dict,
     params: Hyperparameters,
-    manager: SequenceManager,
+    manager: SystemManager,
     split: str,
     mode: str,
 ) -> list[dict[str, str | list[int] | list[float | None] | list[str]]]:
@@ -55,11 +55,13 @@ def sample(
             if (label is None) or (label == -1):
                 continue
 
-            if manager.sample.finetuning[split] < random.random():
-                continue
+            # finetuning test data should not be downsampled
+            if split != "test":
+                if manager.sample.finetuning[split] < random.random():
+                    continue
 
-            if manager.task.balancer.thresholds[label] < random.random():
-                continue
+                if manager.task.balancer.thresholds[label] < random.random():
+                    continue
 
         elif mode == "inference":
             label = -1
@@ -82,7 +84,7 @@ def sample(
 
 def hash(
     observation: dict[str, str | list[int] | list[float | None] | list[str]],
-    manager: SequenceManager,
+    manager: SystemManager,
     params: Hyperparameters,
 ) -> dict[str, str | list[int] | list[float | None]]:
     offset = len(Tokens)
@@ -106,7 +108,7 @@ def hash(
 
 def cdf(
     observation: dict[str, str | list[int] | list[float | None]],
-    manager: SequenceManager,
+    manager: SystemManager,
     digests: dict[str, TDigest],
 ) -> dict[str, str | list[int] | np.ndarray]:
     for field in manager.schema.fields:
@@ -121,7 +123,7 @@ def cdf(
 def tensorfield(
     observation: dict[str, str | list[int] | np.ndarray],
     params: Hyperparameters,
-    manager: SequenceManager,
+    manager: SystemManager,
 ) -> tuple[TensorDict, torch.Tensor, tuple[str, str]]:
     output = {}
 
@@ -147,7 +149,7 @@ def tensorfield(
 def mask(
     observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
     params: Hyperparameters,
-    manager: SequenceManager,
+    manager: SystemManager,
 ) -> tuple[TensorDict, TensorDict, tuple[str, str]]:
     inputs, _, meta = observation
 
@@ -168,7 +170,7 @@ def mask(
 def package(
     observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
     params: Hyperparameters,
-    manager: SequenceManager,
+    manager: SystemManager,
     mode: str,
 ) -> SequenceData:
     if mode == "pretrain":
@@ -189,7 +191,7 @@ def stream(
     datapath: str | os.PathLike,
     mode: str,
     params: Hyperparameters,
-    manager: SequenceManager,
+    manager: SystemManager,
     split: str,
 ) -> datapipes.iter.IterDataPipe:
     assert mode in ["pretrain", "finetune", "inference"]
@@ -223,7 +225,7 @@ def collate(batch: list[SequenceData]) -> SequenceData:
     return stacked
 
 
-def mock(params: Hyperparameters, manager: SequenceManager) -> TensorDict[TensorField]:
+def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict[TensorField]:
     output = {}
 
     N = params.batch_size

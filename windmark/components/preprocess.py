@@ -3,14 +3,13 @@ from pathlib import Path
 import flytekit as fk
 import polars as pl
 
-from windmark.core.managers import SequenceManager, SplitManager
+from windmark.core.managers import SystemManager, SplitManager
 from windmark.core.structs import Field, Tokens
 
 
 @fk.task
 def preprocess_ledger_to_shards(
-    ledger: str,
-    manager: SequenceManager,
+    ledger: str, manager: SystemManager, slice_size: int
 ) -> fk.types.directory.FlyteDirectory:
     assert len(manager.schema.fields) > 0
 
@@ -66,13 +65,13 @@ def preprocess_ledger_to_shards(
     lifestreams = (
         lf.select(
             *[format(field) for field in manager.schema.fields],
-            pl.col("target").replace(label_map).cast(pl.Int32).fill_null(-1),
-            "event_id",
-            "sequence_id",
-            "event_order",
-            split=assign("sequence_id"),
+            target=pl.col(manager.schema.target_id).replace(label_map).cast(pl.Int32).fill_null(-1),
+            event_id=manager.schema.event_id,
+            sequence_id=manager.schema.sequence_id,
+            order_by=manager.schema.order_by,
+            split=assign(manager.schema.sequence_id),
         )
-        .sort("sequence_id", "event_order")
+        .sort("sequence_id", "order_by")
         .group_by("sequence_id", maintain_order=True)
         .agg(
             *[field.name for field in manager.schema.fields],
@@ -82,7 +81,7 @@ def preprocess_ledger_to_shards(
             split=pl.col("split").last(),
         )
         .collect()
-        .iter_slices(10)
+        .iter_slices(slice_size)
     )
 
     for index, sequence in enumerate(lifestreams):

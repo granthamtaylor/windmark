@@ -1,0 +1,22 @@
+import flytekit as fk
+import polars as pl
+
+from windmark.core.managers import Field, LevelSet
+
+
+@fk.task
+def create_unique_levels_from_ledger(ledger: str, field: Field) -> LevelSet:
+    if field.type not in ["discrete"]:
+        return LevelSet(field.name)
+
+    levels: list[str] = (
+        pl.scan_parquet(ledger)
+        .select(field.name)
+        .filter(pl.col(field.name).is_not_null())
+        .unique()
+        .collect(streaming=True)
+        .get_column(field.name)
+        .to_list()
+    )
+
+    return LevelSet(field.name, levels=levels)

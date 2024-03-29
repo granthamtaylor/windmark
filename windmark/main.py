@@ -1,17 +1,15 @@
-from windmark.core.structs import Hyperparameters
-from windmark.pipelines.workflow import pipeline
-from windmark.core.managers import SchemaManager, SplitManager
+import windmark as wm
 
 if __name__ == "__main__":
     ledger = "/home/grantham/windmark/data/quarter_ledger.parquet"
 
-    split = SplitManager(
-        train=0.5,
-        validate=0.25,
-        test=0.25,
+    split = wm.SequenceSplitter(
+        train=0.6,
+        validate=0.2,
+        test=0.2,
     )
 
-    schema = SchemaManager(
+    schema = wm.Schema(
         sequence_id="sequence_id",
         event_id="event_id",
         order_by="event_order",
@@ -26,6 +24,6 @@ if __name__ == "__main__":
         timestamp="temporal",
     )
 
-    params = Hyperparameters(max_epochs=2, n_steps=500, batch_size=8)
+    params = wm.Hyperparameters(n_steps=50, batch_size=64, max_epochs=2, freeze_epochs=1)
 
-    pipeline(schema=schema, ledger_path=ledger, params=params, split=split)
+    wm.pipeline(schema=schema, ledger_path=ledger, params=params, split=split)

@@ -1,11 +1,12 @@
 import math
+import enum
 
 from rich.console import Console
 from rich.table import Table
 from pytdigest import TDigest
 
 
-from windmark.core.structs import Hyperparameters, Field, Centroid
+from windmark.core.structs import Hyperparameters, Field, Centroid, LevelSet
 
 
 class SchemaManager:
@@ -80,7 +81,7 @@ class BalanceManager:
         self.kappa = kappa
 
     def show(self):
-        table = Table(title=f"SupervisedTaskManager(kappa={self.kappa:.2%})")
+        table = Table(title=f"BalanceManager(kappa={self.kappa:.2%})")
 
         table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
 
@@ -202,7 +203,21 @@ class CentroidManager:
         return digests
 
 
-class SequenceManager:
+class LevelManager:
+    def __init__(self, levels: list[LevelSet]):
+        for levelset in levels:
+            assert isinstance(levelset, LevelSet)
+
+        self.levels: dict[str, enum.IntEnum] = {}
+        for levelset in levels:
+            if levelset.is_valid:
+                self.levels[levelset.name] = levelset.enum
+
+    def __get__(self, field) -> enum.IntEnum:
+        return self.levels[field.name]
+
+
+class SystemManager:
     def __init__(
         self,
         schema: SchemaManager,

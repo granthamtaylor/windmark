@@ -7,7 +7,7 @@ from windmark.core.managers import (
     SampleManager,
     SplitManager,
     CentroidManager,
-    SequenceManager,
+    SystemManager,
 )
 
 
@@ -18,5 +18,5 @@ def create_sequence_manager(
     sample: SampleManager,
     split: SplitManager,
     centroids: CentroidManager,
-) -> SequenceManager:
-    return SequenceManager(schema=schema, task=task, sample=sample, split=split, centroids=centroids)
+) -> SystemManager:
+    return SystemManager(schema=schema, task=task, sample=sample, split=split, centroids=centroids)

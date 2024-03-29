@@ -60,63 +60,73 @@ class Field:
             return True
 
 
+class LevelSet:
+    def __init__(self, name: str, levels: list[str] | None = None):
+        self.is_valid: bool
+        self.name: str = name
+
+        if (levels is None) or (len(levels) < 1):
+            self.is_valid = False
+            return
+
+        for level in levels:
+            assert isinstance(level, str)
+
+        mapping = {level: index for index, level in enumerate(levels)}
+        self.levels: IntEnum = IntEnum("LevelEnum", mapping)
+
+
 class Centroid:
-    def __init__(self, name: str | None = None, digest: TDigest | None = None):
+    def __init__(self, name: str, digest: TDigest | None = None):
+        assert isinstance(name, str)
+
+        self.name: str = name
         self.is_valid: bool
 
-        if name is None:
+        if digest is None:
             self.is_valid = False
             return
 
         else:
-            assert isinstance(name, str)
             assert isinstance(digest, TDigest)
             self.is_valid = True
 
-        self.name: str = name
         self.array: np.ndarray = digest.get_centroids()
 
 
 class Hyperparameters(pydantic.BaseModel):
-    # hidden params
-    # ! will be hidden because will be overwritten by learning rate finder
-    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
-    """Learning rate"""
-    # ! will be hidden because default value of 8 is pretty universal
-    precision: int = pydantic.Field(8, gt=1, le=512)
-    """Precision of fourier feature encoders"""
-    # ! this is a pretty confusing param and shouldn't really matter that much
-    head_shape_log_base: int = pydantic.Field(4, gt=1, le=8)
-    """How quickly to converge sequence representation"""
-
     # architectural
-    batch_size: int = pydantic.Field(72, gt=0, le=2048)
+    batch_size: int = pydantic.Field(128, gt=0, le=2048)
     """Batch size for training (how many observations per step)"""
     n_context: int = pydantic.Field(128, gt=0, le=2048)
     """Context size (how many events per observation)"""
     d_field: int = pydantic.Field(64, gt=1, le=256)
     """Hidden dimension per field"""
-    n_heads_field_encoder: int = pydantic.Field(16, gt=0, le=32)
+    n_heads_field_encoder: int = pydantic.Field(8, gt=0, le=32)
     """Number of heads in field encoder"""
     n_layers_field_encoder: int = pydantic.Field(2, gt=0, le=32)
     """Number of layers in field encoder"""
-    n_heads_event_encoder: int = pydantic.Field(16, gt=0, le=32)
+    n_heads_event_encoder: int = pydantic.Field(8, gt=0, le=32)
     """Number of heads in event encoder"""
     n_layers_event_encoder: int = pydantic.Field(8, gt=0, le=32)
     """Number of layers in event encoder"""
     dropout: float = pydantic.Field(0.1, ge=0.0, lt=1.0)
     """Dropout rate"""
+    n_bands: int = pydantic.Field(8, gt=1, le=512)
+    """Precision of fourier feature encoders"""
+    head_shape_log_base: int = pydantic.Field(4, gt=1, le=8)
+    """How quickly to converge sequence representation"""
 
     # training
-    n_steps: int = pydantic.Field(16, gt=0)
+    n_steps: int = pydantic.Field(128, gt=0)
     """Proportion of events to sample from during finetuning"""
-    weight_decay: float = pydantic.Field(0.001, gt=0.0, lt=1.0)
+    weight_decay: float = pydantic.Field(0.001, ge=0.0, lt=1.0)
     """Optimizer weight decay"""
-    gradient_clip_val: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    gradient_clip_val: float = pydantic.Field(0.05, ge=0.0)
     """Gradient clipping threshold"""
-    max_epochs: int = pydantic.Field(1, gt=0, lt=257)
+    max_epochs: int = pydantic.Field(256, gt=0, lt=257)
     """Maximum number of epochs for pretraining and finetuning"""
-    n_quantiles: int = pydantic.Field(16, gt=0, lt=513)
+    n_quantiles: int = pydantic.Field(64, gt=0, lt=513)
     """Number of quantiles for continuous and temporal field"""
     sigma: float = pydantic.Field(1.0, gt=0.0, lt=33.0)
     """Smoothing factor of continuous fields' self-supervised"""
@@ -124,24 +134,38 @@ class Hyperparameters(pydantic.BaseModel):
     """Probability of masking any event"""
     p_mask_field: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
     """Probability of masking any field"""
-    freeze_epochs: int = pydantic.Field(1, gt=0, lt=129)
+    freeze_epochs: int = pydantic.Field(8, gt=0, le=128)
     """Number of epochs to freeze encoder while finetuning"""
-    interpolation_rate: float = pydantic.Field(0.08, gt=0.0, lt=1.0)
+    interpolation_rate: float = pydantic.Field(0.125, gt=0.0, lt=1.0)
     """Interpolation rate of imbalanced classification labels"""
+    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
+    """Learning rate"""
+
+    @pydantic.model_validator(mode="after")
+    def check_head_shape(self) -> "Hyperparameters":
+        assert self.d_field % self.n_heads_field_encoder == 0, "d_field must be divisible by n_heads_field_encoder"
+        assert self.d_field % self.n_heads_event_encoder == 0, "d_field must be divisible by n_heads_event_encoder"
+
+        return self
+
+    @pydantic.model_validator(mode="after")
+    def check_finetuning_unfreeze(self) -> "Hyperparameters":
+        assert self.freeze_epochs < self.max_epochs, "freeze_epochs must be less than max_epochs"
+
+        return self
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class TargetField:
     lookup: Int[Tensor, "N L"]
     is_masked: Bool[Tensor, "N L"]
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class DiscreteField:
     lookup: Int[Tensor, "N L"]
 
+    @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, values: list[int], params: Hyperparameters) -> "DiscreteField":
         padding = (params.n_context - len(values), 0)
@@ -151,6 +175,7 @@ class DiscreteField:
 
         return cls(lookup=lookup, batch_size=[1])
 
+    @jaxtyped(typechecker=beartype)
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
         N, L = (1, params.n_context)
         mask_token = torch.full((N, L), Tokens.MASK)
@@ -169,7 +194,6 @@ class DiscreteField:
         )
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class EntityField:
     lookup: Int[Tensor, "N L"]
@@ -178,12 +202,12 @@ class EntityField:
     mask = DiscreteField.mask
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class ContinuousField:
     lookup: Int[Tensor, "N L"]
     content: Float[Tensor, "N L"]
 
+    @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, values, params: Hyperparameters) -> "ContinuousField":
         padding = (params.n_context - len(values), 0)
@@ -204,6 +228,7 @@ class ContinuousField:
             batch_size=[1],
         )
 
+    @jaxtyped(typechecker=beartype)
     def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
         N, L = (1, params.n_context)
         mask_token = torch.full((N, L), Tokens.MASK)
@@ -225,7 +250,6 @@ class ContinuousField:
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class TemporalField:
     lookup: Int[Tensor, "N L"]
@@ -238,12 +262,12 @@ class TemporalField:
 TensorField: TypeAlias = ContinuousField | DiscreteField | EntityField | TemporalField
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class PretrainingData:
     inputs: TensorDict[TensorField]
-    targets: TensorDict[Tensor]
+    targets: TensorDict[TargetField]
 
+    @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, batch: tuple[TensorDict, TensorDict, tuple[str, str]]):
         inputs, targets, _ = batch
@@ -251,12 +275,12 @@ class PretrainingData:
         return cls(inputs=inputs, targets=targets, batch_size=[1])
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class FinetuningData:
     inputs: TensorDict[TensorField]
-    targets: Tensor
+    targets: Int[Tensor, "N T"]
 
+    @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, batch: tuple[TensorDict, Tensor, tuple[str, str]]):
         inputs, targets, _ = batch
@@ -266,12 +290,12 @@ class FinetuningData:
         return cls(inputs=inputs, targets=targets, batch_size=[1])
 
 
-@jaxtyped(typechecker=beartype)
 @tensorclass
 class InferenceData:
     inputs: TensorDict[TensorField]
     meta: list[tuple[str, str]] | tuple[str, str]
 
+    @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, batch: tuple[TensorDict, Tensor, tuple[str, str]]):
         inputs, _, meta = batch

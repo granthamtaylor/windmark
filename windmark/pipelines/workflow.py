@@ -32,6 +32,6 @@ def pipeline(
 
     manager = components.manager(schema=parsed_schema, task=task, sample=sample, split=split, centroids=centroids)
 
-    lifestreams = components.preprocess(ledger=ledger, manager=manager)
+    lifestreams = components.preprocess(ledger=ledger, manager=manager, slice_size=10)
 
     components.fit(lifestreams=lifestreams, params=params, manager=manager)
