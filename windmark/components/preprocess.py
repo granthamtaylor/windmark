@@ -4,7 +4,7 @@ import flytekit as fk
 import polars as pl
 
 from windmark.core.managers import SystemManager, SplitManager
-from windmark.core.structs import Field, Tokens
+from windmark.core.structs import Field
 
 
 @fk.task
@@ -15,18 +15,6 @@ def preprocess_ledger_to_shards(
 
     lf = pl.scan_parquet(ledger)
 
-    def discretize(column: str) -> pl.Expr:
-        return (
-            pl.col(column)
-            .cast(pl.String)
-            .cast(pl.Categorical)
-            .to_physical()
-            .cast(pl.Int32)
-            .add(len(Tokens))
-            .fill_null(Tokens.UNK)
-            .alias(column)
-        )
-
     def format(field: Field) -> pl.Expr:
         match field.type:
             case "continuous":
@@ -35,10 +23,7 @@ def preprocess_ledger_to_shards(
             case "temporal":
                 return pl.col(field.name).dt.epoch(time_unit="s")
 
-            case "discrete":
-                return discretize(field.name)
-
-            case "entity":
+            case "discrete" | "entity":
                 return pl.col(field.name).fill_null("[UNK]")
 
     split = SplitManager(0.5, 0.25, 0.25)

@@ -94,7 +94,7 @@ class LearnedTensor(torch.nn.Module):
 
 
 class DiscreteFieldEmbedder(torch.nn.Module):
-    def __init__(self, params: Hyperparameters, field: Field):
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: Field):
         """
         Initialize discrete field embedder.
 
@@ -104,14 +104,14 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         super().__init__()
 
         self.field: Field = field
-        self.embeddings = torch.nn.Embedding(field.levels + len(Tokens), params.d_field)
+        self.embeddings = torch.nn.Embedding(manager.levelsets.get_size(field) + len(Tokens), params.d_field)
 
     def forward(self, inputs: DiscreteField) -> Tensor:
         return self.embeddings(inputs.lookup)
 
 
 class EntityFieldEmbedder(torch.nn.Module):
-    def __init__(self, params: Hyperparameters, field: Field):
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: Field):
         super().__init__()
         """
         Initialize entity field embedder.
@@ -137,7 +137,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         weights (Tensor): The weights for the Fourier features.
     """
 
-    def __init__(self, params: Hyperparameters, field: Field):
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: Field):
         """
         Initialize continuous field embedder.
 
@@ -234,7 +234,7 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
 
         for field in manager.schema.fields:
             embedder = embedder_map[field.type]
-            embedders[field.name] = embedder(params=params, field=field)
+            embedders[field.name] = embedder(params=params, manager=manager, field=field)
 
         self.embedders = torch.nn.ModuleDict(embedders)
 
@@ -415,7 +415,7 @@ class EventDecoder(torch.nn.Module):
         for field in manager.schema.fields:
             match field.type:
                 case "discrete":
-                    d_target = field.levels
+                    d_target = manager.levelsets.get_size(field)
 
                 case "entity":
                     d_target = params.n_context
@@ -674,9 +674,6 @@ class SequenceModule(lit.LightningModule):
 
         assert os.path.exists(datapath)
         self.datapath: str | os.PathLike = datapath
-
-        for field in manager.schema.fields:
-            assert field.is_valid, f"field {field.name} is not valid"
 
         assert isinstance(params, Hyperparameters)
         self.params: Hyperparameters = params

@@ -18,19 +18,23 @@ def pipeline(
 
     fields = components.fan.fields(schema=schema)
 
-    parsed_fields = fk.map_task(partial(components.parse, ledger=ledger))(field=fields)
-
-    parsed_schema = components.collect.fields(schema=schema, fields=parsed_fields)
+    fk.map_task(partial(components.parse, ledger=ledger))(field=fields)
 
     fanned_centroids = fk.map_task(partial(components.digest, ledger=ledger, slice_size=10_000))(field=fields)
 
     centroids = components.collect.centroids(centroids=fanned_centroids)
 
-    task = components.task(ledger=ledger, schema=parsed_schema, params=params)
+    fanned_levelsets = fk.map_task(partial(components.levels, ledger=ledger))(field=fields)
+
+    levelsets = components.collect.levelsets(levelsets=fanned_levelsets)
+
+    task = components.task(ledger=ledger, schema=schema, params=params)
 
     sample = components.sample(ledger=ledger, params=params, task=task, split=split)
 
-    manager = components.manager(schema=parsed_schema, task=task, sample=sample, split=split, centroids=centroids)
+    manager = components.manager(
+        schema=schema, task=task, sample=sample, split=split, centroids=centroids, levelsets=levelsets
+    )
 
     lifestreams = components.preprocess(ledger=ledger, manager=manager, slice_size=10)
 

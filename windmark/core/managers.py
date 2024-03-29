@@ -180,10 +180,12 @@ class SampleManager:
             ), f"not enough observations to create {params.n_steps} batches for split {subset} during finetuning"
             self.finetuning[subset] = sample_rate
 
-        self.inference: int = int(split.splits["test"] * n_events / params.batch_size)
+        self.labeled_inference: int = int(split.splits["test"] * sum(balancer.counts) / params.batch_size)
+        self.total_inference: int = int(split.splits["test"] * n_events / params.batch_size)
 
         print(self.pretraining)
         print(self.finetuning)
+        print(f"{self.total_inference} observations in test split ({self.labeled_inference} are labeled)")
 
 
 class CentroidManager:
@@ -204,17 +206,24 @@ class CentroidManager:
 
 
 class LevelManager:
-    def __init__(self, levels: list[LevelSet]):
-        for levelset in levels:
+    def __init__(self, levelsets: list[LevelSet]):
+        for levelset in levelsets:
             assert isinstance(levelset, LevelSet)
 
-        self.levels: dict[str, enum.IntEnum] = {}
-        for levelset in levels:
+        self.levelsets: dict[str, enum.IntEnum] = {}
+        for levelset in levelsets:
             if levelset.is_valid:
-                self.levels[levelset.name] = levelset.enum
+                self.levelsets[levelset.name] = levelset.mapping
 
-    def __get__(self, field) -> enum.IntEnum:
-        return self.levels[field.name]
+    def get_size(self, field: Field) -> int:
+        assert isinstance(field, Field)
+
+        # need to subtract one because "UNK" is hardcoded into enum
+        return len(self.levelsets[field.name]) - 1
+
+    def __getitem__(self, field: Field) -> enum.IntEnum:
+        assert isinstance(field, Field)
+        return self.levelsets[field.name]
 
 
 class SystemManager:
@@ -225,13 +234,22 @@ class SystemManager:
         sample: SampleManager,
         split: SplitManager,
         centroids: CentroidManager,
+        levelsets: LevelManager,
     ):
+        assert isinstance(schema, SchemaManager)
         self.schema: SchemaManager = schema
+
+        assert isinstance(task, SupervisedTaskManager)
         self.task: SupervisedTaskManager = task
+
+        assert isinstance(sample, SampleManager)
         self.sample: SampleManager = sample
+
+        assert isinstance(split, SplitManager)
         self.split: SplitManager = split
+
+        assert isinstance(centroids, CentroidManager)
         self.centroids: CentroidManager = centroids
 
-    @property
-    def digests(self):
-        return self.centroids.digests
+        assert isinstance(levelsets, LevelManager)
+        self.levelsets: LevelManager = levelsets

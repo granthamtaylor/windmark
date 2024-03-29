@@ -11,7 +11,7 @@ def create_unique_levels_from_ledger(ledger: str, field: Field) -> LevelSet:
 
     levels: list[str] = (
         pl.scan_parquet(ledger)
-        .select(field.name)
+        .select(pl.col(field.name).cast(pl.String))
         .filter(pl.col(field.name).is_not_null())
         .unique()
         .collect(streaming=True)

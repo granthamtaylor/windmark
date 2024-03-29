@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import flytekit as fk
 
-from windmark.core.structs import Field, Centroid
-from windmark.core.managers import SchemaManager, CentroidManager
+from windmark.core.structs import Field, Centroid, LevelSet
+from windmark.core.managers import SchemaManager, CentroidManager, LevelManager
 
 
 @fk.task
@@ -12,15 +12,13 @@ def fan_fields(schema: SchemaManager) -> list[Field]:
 
 
 @fk.task
-def collect_fields(schema: SchemaManager, fields: list[Field]) -> SchemaManager:
-    schema.fields = fields
-
-    return schema
+def collect_centroids(centroids: list[Centroid]) -> CentroidManager:
+    return CentroidManager(centroids=centroids)
 
 
 @fk.task
-def collect_centroids(centroids: list[Centroid]) -> CentroidManager:
-    return CentroidManager(centroids=centroids)
+def collect_levelsets(levelsets: list[LevelSet]) -> LevelManager:
+    return LevelManager(levelsets=levelsets)
 
 
 fan = SimpleNamespace(
@@ -28,6 +26,6 @@ fan = SimpleNamespace(
 )
 
 collect = SimpleNamespace(
-    fields=collect_fields,
     centroids=collect_centroids,
+    levelsets=collect_levelsets,
 )

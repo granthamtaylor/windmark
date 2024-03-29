@@ -6,9 +6,10 @@ from windmark.components.sample import create_sample_manager as sample
 from windmark.components.parse import parse_field_from_ledger as parse
 from windmark.components.predict import predict_sequence_encoder as predict
 from windmark.components.export import export_module_to_onnx as export
-from windmark.components.manager import create_sequence_manager as manager
+from windmark.components.manager import create_system_manager as manager
 from windmark.components.task import create_task_manager as task
 from windmark.components.lambdas import fan, collect
+from windmark.components.levels import create_unique_levels_from_ledger as levels
 
 
-__all__ = [sanitize, parse, digest, preprocess, fit, sample, predict, export, manager, task, fan, collect]
+__all__ = [sanitize, levels, parse, digest, preprocess, fit, sample, predict, export, manager, task, fan, collect]

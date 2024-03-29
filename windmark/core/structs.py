@@ -25,13 +25,10 @@ class Tokens(IntEnum):
 
 class Field:
     def __init__(self, field_name: str, field_type: str):
-        self.name: str
-        self.type: str
-        self.n_levels: None | int = None
+        self.name: str = field_name
+        self.type: str = field_type
 
-        self.name = field_name
-        self.type = field_type
-
+        # TODO extract out valid field types to enum
         assert self.type in [
             "continuous",
             "discrete",
@@ -40,24 +37,6 @@ class Field:
         ], 'field type must be "continuous", "discrete", "entity", or "temporal"'
 
         assert re.match(r"^[a-z][a-z0-9_]*$", self.name), f"invalid field name {self.name}"
-
-    @property
-    def levels(self):
-        return self.n_levels
-
-    @levels.setter
-    def levels(self, value: int):
-        assert isinstance(value, int), "value must be of type int"
-        assert self.type == "discrete", "only discrete fields can have this attribute"
-
-        self.n_levels = value
-
-    @property
-    def is_valid(self):
-        if self.type == "discrete":
-            return isinstance(self.n_levels, int)
-        else:
-            return True
 
 
 class LevelSet:
@@ -70,10 +49,13 @@ class LevelSet:
             return
 
         for level in levels:
-            assert isinstance(level, str)
+            assert isinstance(level, str), f"level {level} is of type {type(level)}, not string"
 
-        mapping = {level: index for index, level in enumerate(levels)}
-        self.levels: IntEnum = IntEnum("LevelEnum", mapping)
+        mapping = {level: index + len(Tokens) for index, level in enumerate(levels)}
+        mapping["[UNK]"] = int(Tokens.UNK)
+
+        self.mapping: IntEnum = IntEnum("LevelEnum", mapping)
+        self.is_valid = True
 
 
 class Centroid:
@@ -102,7 +84,7 @@ class Hyperparameters(pydantic.BaseModel):
     """Context size (how many events per observation)"""
     d_field: int = pydantic.Field(64, gt=1, le=256)
     """Hidden dimension per field"""
-    n_heads_field_encoder: int = pydantic.Field(8, gt=0, le=32)
+    n_heads_field_encoder: int = pydantic.Field(4, gt=0, le=32)
     """Number of heads in field encoder"""
     n_layers_field_encoder: int = pydantic.Field(2, gt=0, le=32)
     """Number of layers in field encoder"""

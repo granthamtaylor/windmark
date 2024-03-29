@@ -82,6 +82,21 @@ def sample(
     return observations
 
 
+def tokenize(
+    observation: dict[str, str | list[float | None] | list[str]],
+    manager: SystemManager,
+) -> dict[str, str | list[int] | list[float | None] | list[str]]:
+    for field in manager.schema.fields:
+        if field.type == "discrete":
+            mapping = manager.levelsets[field]
+
+            values: list[str] = observation[field.name]
+
+            observation[field.name]: list[int] = list(map(lambda value: mapping[value], values))
+
+    return observation
+
+
 def hash(
     observation: dict[str, str | list[int] | list[float | None] | list[str]],
     manager: SystemManager,
@@ -207,7 +222,8 @@ def stream(
         .filter(lambda sequence: sequence["split"] == split)
         .shuffle()
         .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))
-        .map(partial(cdf, manager=manager, digests=manager.digests))
+        .map(partial(tokenize, manager=manager))
+        .map(partial(cdf, manager=manager, digests=manager.centroids.digests))
         .map(partial(hash, manager=manager, params=params))
         .shuffle()
         .map(partial(tensorfield, manager=manager, params=params))
@@ -249,7 +265,7 @@ def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict[TensorFi
             output[field.name] = tensorfield[field.type](content=values, lookup=padded, batch_size=[N])
 
         if field.type in ["discrete", "entity"]:
-            limit = field.levels + len(Tokens) if field.type == "discrete" else L + len(Tokens)
+            limit = manager.levelsets.get_size(field) + len(Tokens) if field.type == "discrete" else L + len(Tokens)
             values = torch.randint(0, limit, (N, L))
             padded = torch.where(is_padded, Tokens.PAD, values)
             output[field.name] = tensorfield[field.type](lookup=padded, batch_size=[N])
