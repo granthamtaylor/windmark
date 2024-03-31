@@ -32,7 +32,7 @@ def pipeline(
 
     sample = components.sample(ledger=ledger, params=params, task=task, split=split)
 
-    manager = components.manager(
+    manager = components.system(
         schema=schema, task=task, sample=sample, split=split, centroids=centroids, levelsets=levelsets
     )
 

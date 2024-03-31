@@ -808,10 +808,10 @@ The pipeline executes as a function of the ledger dataset, as well as a large se
         [`gradient_clip_val`], [Gradient clipping threshold],
         [`max_epochs`], [Maximum number of epochs for pre-training and fine-tuning],
         [`n_quantiles`], [Number of quantiles for continuous and temporal field],
-        [`sigma`], [Smoothing factor of continuous fields' self-supervised],
+        [`quantile_smoothing`], [Smoothing factor of continuous fields' self-supervised],
         [`p_mask_event`], [Probability of masking any event],
         [`p_mask_field`], [Probability of masking any field],
-        [`freeze_epochs`], [Number of epochs to freeze encoder while fine-tuning],
+        [`n_epochs_frozen`], [Number of epochs to freeze encoder while fine-tuning],
         [`interpolation_rate`], [Interpolation rate of imbalanced classification labels],
     )],
     caption: [Notable model architecture and training hyperparameter]

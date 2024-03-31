@@ -4,7 +4,7 @@ import flytekit as fk
 
 import torch
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
@@ -32,10 +32,8 @@ def fit_sequence_encoder(
     root = Path(fk.current_context().working_directory) / "checkpoints"
     root.mkdir()
 
-    logger = TensorBoardLogger("logs", name="windmark")
-
     config = dict(
-        logger=logger,
+        logger=TensorBoardLogger("logs", name="windmark"),
         accelerator="auto",
         devices="auto",
         strategy="auto",
@@ -47,13 +45,8 @@ def fit_sequence_encoder(
     trainer = Trainer(
         **config,
         default_root_dir=root / "pretrain",
-        callbacks=[
-            EarlyStopping(monitor="pretrain-validate/loss"),
-            pretrain := ModelCheckpoint(),
-        ],
+        callbacks=[EarlyStopping(monitor="pretrain-validate/loss"), RichProgressBar()],
     )
-
-    print(pretrain)
 
     trainer.fit(module)
     trainer.test(module)
@@ -63,16 +56,15 @@ def fit_sequence_encoder(
     trainer = Trainer(
         **config,
         default_root_dir=root / "finetune",
-        min_epochs=(params.freeze_epochs + 1),
+        min_epochs=(params.n_epochs_frozen + 1),
         callbacks=[
-            ThawedFinetuning(transition=params.freeze_epochs),
+            RichProgressBar(),
+            ThawedFinetuning(transition=params.n_epochs_frozen),
             EarlyStopping(monitor="finetune-validate/loss"),
             ParquetBatchWriter("/home/grantham/windmark/data/predictions.parquet"),
-            finetune := ModelCheckpoint(),
+            ModelCheckpoint(root / "finetune"),
         ],
     )
-
-    print(finetune)
 
     trainer.fit(module)
     trainer.test(module)

@@ -56,7 +56,14 @@ class ThawedFinetuning(lit.callbacks.BaseFinetuning):
         self._unfreeze_at_epoch = transition
 
     def freeze_before_training(self, module: lit.LightningModule):
-        self.freeze(module.body)
+        self.freeze(
+            [
+                module.modular_field_embedder,
+                module.field_encoder,
+                module.event_encoder,
+                module.event_decoder,
+            ]
+        )
 
     def finetune_function(
         self,
@@ -65,10 +72,10 @@ class ThawedFinetuning(lit.callbacks.BaseFinetuning):
         optimizer: torch.optim.Optimizer,
     ):
         if epoch == self._unfreeze_at_epoch:
-            print(f"sequence encoder body unfrozen at finetuning epoch {epoch}")
+            modules = [module.modular_field_embedder, module.field_encoder, module.event_encoder]
 
             self.unfreeze_and_add_param_group(
-                modules=module.body,
+                modules=modules,
                 optimizer=optimizer,
                 train_bn=True,
             )

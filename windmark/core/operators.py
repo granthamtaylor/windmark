@@ -33,6 +33,10 @@ def read(filename):
     return records
 
 
+def subset(sequence: dict, split: str) -> bool:
+    return sequence["split"] == split
+
+
 def sample(
     sequence: dict,
     params: Hyperparameters,
@@ -124,11 +128,10 @@ def hash(
 def cdf(
     observation: dict[str, str | list[int] | list[float | None]],
     manager: SystemManager,
-    digests: dict[str, TDigest],
 ) -> dict[str, str | list[int] | np.ndarray]:
     for field in manager.schema.fields:
         if field.type in ["continuous", "temporal"]:
-            digest: TDigest = digests[field.name]
+            digest: TDigest = manager.centroids.digests[field.name]
             array = np.array(observation[field.name], dtype=np.float64)
             observation[field.name] = digest.cdf(array)
 
@@ -212,18 +215,16 @@ def stream(
     assert mode in ["pretrain", "finetune", "inference"]
     assert split in ["train", "validate", "test"]
 
-    print(f"creating {mode} datapipe")
-
     return (
         datapipes.iter.FileLister(datapath, masks="*.avro")
         .shuffle()
         .sharding_filter()
         .flatmap(read)
-        .filter(lambda sequence: sequence["split"] == split)
+        .filter(partial(subset, split=split))
         .shuffle()
         .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))
         .map(partial(tokenize, manager=manager))
-        .map(partial(cdf, manager=manager, digests=manager.centroids.digests))
+        .map(partial(cdf, manager=manager))
         .map(partial(hash, manager=manager, params=params))
         .shuffle()
         .map(partial(tensorfield, manager=manager, params=params))

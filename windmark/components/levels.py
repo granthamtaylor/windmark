@@ -7,7 +7,7 @@ from windmark.core.managers import Field, LevelSet
 @fk.task
 def create_unique_levels_from_ledger(ledger: str, field: Field) -> LevelSet:
     if field.type not in ["discrete"]:
-        return LevelSet(field.name)
+        return LevelSet.empty(name=field.name)
 
     levels: list[str] = (
         pl.scan_parquet(ledger)
@@ -19,4 +19,4 @@ def create_unique_levels_from_ledger(ledger: str, field: Field) -> LevelSet:
         .to_list()
     )
 
-    return LevelSet(field.name, levels=levels)
+    return LevelSet.from_levels(name=field.name, levels=levels)

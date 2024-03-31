@@ -1,16 +1,19 @@
 import re
+import functools
 from enum import IntEnum
-from typing import TypeAlias
+from typing import TypeAlias, Annotated
+from dataclasses import dataclass
 
 import numpy as np
 import pydantic
 import torch
+from pytdigest import TDigest
 from beartype import beartype
 from jaxtyping import Bool, Float, Int, jaxtyped
 from tensordict import TensorDict
 from tensordict.prototype import tensorclass
 from torch import Tensor
-from pytdigest import TDigest
+from mashumaro.mixins.json import DataClassJSONMixin
 
 
 class Tokens(IntEnum):
@@ -23,116 +26,120 @@ class Tokens(IntEnum):
     MASK = 3
 
 
-class Field:
-    def __init__(self, field_name: str, field_type: str):
-        self.name: str = field_name
-        self.type: str = field_type
+@dataclass
+class Field(DataClassJSONMixin):
+    name: str
+    type: str
 
-        # TODO extract out valid field types to enum
-        assert self.type in [
+    def __post_init__(self):
+        types = [
             "continuous",
             "discrete",
             "entity",
             "temporal",
-        ], 'field type must be "continuous", "discrete", "entity", or "temporal"'
+        ]
+
+        assert self.type in types, f"field type must be one of {types}"
 
         assert re.match(r"^[a-z][a-z0-9_]*$", self.name), f"invalid field name {self.name}"
 
 
-class LevelSet:
-    def __init__(self, name: str, levels: list[str] | None = None):
-        self.is_valid: bool
-        self.name: str = name
+@dataclass
+class LevelSet(DataClassJSONMixin):
+    name: str
+    levels: list[str]
+    is_valid: bool
 
-        if (levels is None) or (len(levels) < 1):
-            self.is_valid = False
-            return
+    @classmethod
+    def empty(cls, name: str) -> "LevelSet":
+        return cls(name=name, levels=[], is_valid=False)
 
-        for level in levels:
-            assert isinstance(level, str), f"level {level} is of type {type(level)}, not string"
+    @classmethod
+    def from_levels(cls, name: str, levels: list[str]) -> "LevelSet":
+        return cls(name=name, levels=levels, is_valid=True)
 
-        mapping = {level: index + len(Tokens) for index, level in enumerate(levels)}
+    @functools.cached_property
+    def mapping(self) -> dict[str, int]:
+        mapping = {level: index + len(Tokens) for index, level in enumerate(self.levels)}
         mapping["[UNK]"] = int(Tokens.UNK)
 
-        self.mapping: IntEnum = IntEnum("LevelEnum", mapping)
-        self.is_valid = True
+        return mapping
 
 
-class Centroid:
-    def __init__(self, name: str, digest: TDigest | None = None):
-        assert isinstance(name, str)
+@dataclass
+class Centroid(DataClassJSONMixin):
+    name: str
+    array: list[list[float]]
+    is_valid: bool
 
-        self.name: str = name
-        self.is_valid: bool
+    @classmethod
+    def empty(cls, name: str) -> "Centroid":
+        return cls(name=name, array=[], is_valid=False)
 
-        if digest is None:
-            self.is_valid = False
-            return
-
-        else:
-            assert isinstance(digest, TDigest)
-            self.is_valid = True
-
-        self.array: np.ndarray = digest.get_centroids()
+    @classmethod
+    def from_digest(cls, name: str, digest: TDigest) -> "Centroid":
+        array = digest.get_centroids().tolist()
+        return cls(name=name, array=array, is_valid=True)
 
 
-class Hyperparameters(pydantic.BaseModel):
+@pydantic.dataclasses.dataclass
+class Hyperparameters(DataClassJSONMixin):
     # architectural
-    batch_size: int = pydantic.Field(128, gt=0, le=2048)
+    batch_size: Annotated[int, pydantic.Field(gt=0, le=2048)] = 128
     """Batch size for training (how many observations per step)"""
-    n_context: int = pydantic.Field(128, gt=0, le=2048)
+    n_context: Annotated[int, pydantic.Field(gt=0, le=2048)] = 128
     """Context size (how many events per observation)"""
-    d_field: int = pydantic.Field(64, gt=1, le=256)
+    d_field: Annotated[int, pydantic.Field(gt=1, le=256)] = 64
     """Hidden dimension per field"""
-    n_heads_field_encoder: int = pydantic.Field(4, gt=0, le=32)
+    n_heads_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 4
     """Number of heads in field encoder"""
-    n_layers_field_encoder: int = pydantic.Field(2, gt=0, le=32)
+    n_layers_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 2
     """Number of layers in field encoder"""
-    n_heads_event_encoder: int = pydantic.Field(8, gt=0, le=32)
+    n_heads_event_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 8
     """Number of heads in event encoder"""
-    n_layers_event_encoder: int = pydantic.Field(8, gt=0, le=32)
+    n_layers_event_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 8
     """Number of layers in event encoder"""
-    dropout: float = pydantic.Field(0.1, ge=0.0, lt=1.0)
+    dropout: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.1
     """Dropout rate"""
-    n_bands: int = pydantic.Field(8, gt=1, le=512)
+    n_bands: Annotated[int, pydantic.Field(gt=1, le=512)] = 8
     """Precision of fourier feature encoders"""
-    head_shape_log_base: int = pydantic.Field(4, gt=1, le=8)
+    head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
     """How quickly to converge sequence representation"""
+    n_quantiles: Annotated[int, pydantic.Field(gt=0, lt=513)] = 64
+    """Number of quantiles for continuous and temporal field"""
 
     # training
-    n_steps: int = pydantic.Field(128, gt=0)
+    n_steps: Annotated[int, pydantic.Field(gt=0)] = 128
     """Proportion of events to sample from during finetuning"""
-    weight_decay: float = pydantic.Field(0.001, ge=0.0, lt=1.0)
+    weight_decay: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.001
     """Optimizer weight decay"""
-    gradient_clip_val: float = pydantic.Field(0.05, ge=0.0)
+    gradient_clip_val: Annotated[float, pydantic.Field(ge=0.0)] = 0.05
     """Gradient clipping threshold"""
-    max_epochs: int = pydantic.Field(256, gt=0, lt=257)
+    max_epochs: Annotated[int, pydantic.Field(gt=0, lt=257)] = 256
     """Maximum number of epochs for pretraining and finetuning"""
-    n_quantiles: int = pydantic.Field(64, gt=0, lt=513)
-    """Number of quantiles for continuous and temporal field"""
-    sigma: float = pydantic.Field(1.0, gt=0.0, lt=33.0)
+    quantile_smoothing: Annotated[float, pydantic.Field(gt=0.0, lt=33.0)] = 1.0
     """Smoothing factor of continuous fields' self-supervised"""
-    p_mask_event: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    p_mask_event: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.05
     """Probability of masking any event"""
-    p_mask_field: float = pydantic.Field(0.05, gt=0.0, lt=1.0)
+    p_mask_field: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.05
     """Probability of masking any field"""
-    freeze_epochs: int = pydantic.Field(8, gt=0, le=128)
+    n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)] = 8
     """Number of epochs to freeze encoder while finetuning"""
-    interpolation_rate: float = pydantic.Field(0.125, gt=0.0, lt=1.0)
+    interpolation_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.125
     """Interpolation rate of imbalanced classification labels"""
-    learning_rate: float = pydantic.Field(0.0001, gt=0.0, lt=1.0)
+    learning_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.0001
     """Learning rate"""
 
     @pydantic.model_validator(mode="after")
-    def check_head_shape(self) -> "Hyperparameters":
+    def check_head_shape(self):
         assert self.d_field % self.n_heads_field_encoder == 0, "d_field must be divisible by n_heads_field_encoder"
         assert self.d_field % self.n_heads_event_encoder == 0, "d_field must be divisible by n_heads_event_encoder"
 
         return self
 
     @pydantic.model_validator(mode="after")
-    def check_finetuning_unfreeze(self) -> "Hyperparameters":
-        assert self.freeze_epochs < self.max_epochs, "freeze_epochs must be less than max_epochs"
+    def check_finetuning_unfreeze(self):
+        assert self.n_epochs_frozen < self.max_epochs, "n_epochs_frozen must be less than max_epochs"
 
         return self
 
@@ -169,11 +176,7 @@ class DiscreteField:
 
         self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
 
-        return TargetField(
-            lookup=targets,
-            is_masked=is_masked,
-            batch_size=self.batch_size,
-        )
+        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)
 
 
 @tensorclass
