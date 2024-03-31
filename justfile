@@ -27,3 +27,6 @@ whitepaper:
 # run training pipeline
 train:
   @poetry run python windmark/main.py
+
+plot:
+  @poetry run python windmark/plot.py

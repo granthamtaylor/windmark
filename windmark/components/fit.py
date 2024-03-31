@@ -8,7 +8,7 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProg
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
-from windmark.core.callbacks import ParquetBatchWriter, ThawedFinetuning
+from windmark.core.callbacks import ThawedFinetuning
 from windmark.core.managers import SystemManager
 from windmark.core.structs import Hyperparameters
 
@@ -18,7 +18,7 @@ def fit_sequence_encoder(
     lifestreams: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
     manager: SystemManager,
-) -> SequenceModule:
+) -> fk.types.file.FlyteFile:
     assert torch.cuda.is_available()
 
     torch.set_float32_matmul_precision("medium")
@@ -42,14 +42,14 @@ def fit_sequence_encoder(
         max_epochs=params.max_epochs,
     )
 
-    trainer = Trainer(
-        **config,
-        default_root_dir=root / "pretrain",
-        callbacks=[EarlyStopping(monitor="pretrain-validate/loss"), RichProgressBar()],
-    )
+    # trainer = Trainer(
+    #     **config,
+    #     default_root_dir=root / "pretrain",
+    #     callbacks=[EarlyStopping(monitor="pretrain-validate/loss"), RichProgressBar()],
+    # )
 
-    trainer.fit(module)
-    trainer.test(module)
+    # trainer.fit(module)
+    # trainer.test(module)
 
     module.mode = "finetune"
 
@@ -61,16 +61,15 @@ def fit_sequence_encoder(
             RichProgressBar(),
             ThawedFinetuning(transition=params.n_epochs_frozen),
             EarlyStopping(monitor="finetune-validate/loss"),
-            ParquetBatchWriter("/home/grantham/windmark/data/predictions.parquet"),
-            ModelCheckpoint(root / "finetune"),
+            checkpoint := ModelCheckpoint(root / "finetune"),
         ],
     )
 
     trainer.fit(module)
-    trainer.test(module)
+    # trainer.test(module)
 
     module.mode = "inference"
 
     # trainer.predict(module)
 
-    return module
+    return fk.types.file.FlyteFile(checkpoint.best_model_path)

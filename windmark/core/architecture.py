@@ -704,7 +704,7 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]
 
     pipe = self.pipes[strata]
-    loader = DataLoader(
+    self.dataloaders[strata] = loader = DataLoader(
         pipe,
         batch_size=self.params.batch_size,
         num_workers=28,
@@ -712,7 +712,6 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
         pin_memory=True,
         drop_last=True,
     )
-    self.dataloaders[strata] = loader
 
     return loader
 
@@ -732,9 +731,9 @@ class SequenceModule(lit.LightningModule):
         assert isinstance(params, Hyperparameters)
         self.params: Hyperparameters = params
         self.save_hyperparameters(params.to_dict())
-        self.lr = params.learning_rate
+        self.lr: float = params.learning_rate
         self._mode: str = "pretrain"
-        self.manager = manager
+        self.manager: SystemManager = manager
 
         self.modular_field_embedder = ModularFieldEmbeddingSystem(params=params, manager=manager)
         self.field_encoder = FieldEncoder(params=params, manager=manager)

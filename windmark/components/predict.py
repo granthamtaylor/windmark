@@ -2,19 +2,42 @@ from pathlib import Path
 
 import flytekit as fk
 from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import RichProgressBar
 
 from windmark.core.architecture import SequenceModule
 from windmark.core.callbacks import ParquetBatchWriter
+from windmark.core.managers import SystemManager
+from windmark.core.structs import Hyperparameters
 
 
 @fk.task
-def predict_sequence_encoder(module: SequenceModule) -> fk.types.file.FlyteFile:
+def predict_sequence_encoder(
+    checkpoint: fk.types.file.FlyteFile,
+    lifestreams: fk.types.directory.FlyteDirectory,
+    params: Hyperparameters,
+    manager: SystemManager,
+):
+    module = SequenceModule.load_from_checkpoint(
+        checkpoint_path=checkpoint.path,
+        datapath=lifestreams.path,
+        params=params,
+        manager=manager,
+    )
+
+    module.mode = "inference"
+
     outpath = Path(fk.current_context().working_directory) / "lifestreams"
+    outpath.mkdir()
 
-    callbacks = [ParquetBatchWriter(outpath)]
+    trainer = Trainer(
+        accelerator="auto",
+        devices="auto",
+        strategy="auto",
+        precision="bf16-mixed",
+        callbacks=[
+            RichProgressBar(),
+            ParquetBatchWriter("/home/grantham/windmark/data/predictions.parquet"),
+        ],
+    )
 
-    trainer = Trainer(accelerator="cpu", fast_dev_run=True, callbacks=callbacks)
-
-    trainer.predict(module)
-
-    return fk.types.file.FlyteFile(outpath)
+    trainer.predict(module, return_predictions=False)

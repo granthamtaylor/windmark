@@ -38,4 +38,6 @@ def pipeline(
 
     lifestreams = components.preprocess(ledger=ledger, manager=manager, slice_size=10)
 
-    components.fit(lifestreams=lifestreams, params=params, manager=manager)
+    checkpoint = components.fit(lifestreams=lifestreams, params=params, manager=manager)
+
+    components.predict(checkpoint=checkpoint, params=params, manager=manager, lifestreams=lifestreams)

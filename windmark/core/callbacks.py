@@ -1,6 +1,7 @@
 import os
 
-import fastparquet
+import pyarrow.parquet as pq
+
 import lightning.pytorch as lit
 import msgspec
 import polars as pl
@@ -14,7 +15,8 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
         super().__init__("batch")
 
         self.outpath = outpath
-        self._destination_file_exists: bool = False
+        self.schema = None
+        self.writer = None
 
     def write_on_batch_end(
         self,
@@ -26,9 +28,13 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
         batch_index: int,
         dataloader_index: int,
     ) -> None:
+        """
+        Called when the predict epoch ends.
+        """
+
         array = prediction.float().cpu().detach().numpy()
 
-        df = (
+        table = (
             pl.DataFrame(
                 {
                     "meta": batch.meta,
@@ -36,17 +42,26 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
                 }
             )
             .select(
-                pl.col("predictions").map_elements(lambda x: msgspec.json.encode(x.to_list())),
+                pl.col("predictions").map_elements(lambda x: msgspec.json.encode(x.to_list()), return_dtype=pl.String),
                 sequence_id=pl.col("meta").list.first(),
                 event_id=pl.col("meta").list.last(),
             )
-            .to_pandas()
+            .to_arrow()
         )
 
-        fastparquet.write(self.outpath, df, append=self._destination_file_exists)
+        if self.writer is None:
+            self.schema = table.schema
+            self.writer = pq.ParquetWriter(self.outpath, self.schema)
 
-        if not self._destination_file_exists:
-            self._destination_file_exists = True
+        self.writer.write_table(table)
+
+    def on_predict_end(self, trainer: lit.Trainer, module: lit.LightningModule):
+        """
+        Called at the end of the prediction loop to close the Parquet writer.
+        """
+        if self.writer:
+            self.writer.close()
+            self.writer = None
 
 
 class ThawedFinetuning(lit.callbacks.BaseFinetuning):
@@ -72,7 +87,11 @@ class ThawedFinetuning(lit.callbacks.BaseFinetuning):
         optimizer: torch.optim.Optimizer,
     ):
         if epoch == self._unfreeze_at_epoch:
-            modules = [module.modular_field_embedder, module.field_encoder, module.event_encoder]
+            modules = [
+                module.modular_field_embedder,
+                module.field_encoder,
+                module.event_encoder,
+            ]
 
             self.unfreeze_and_add_param_group(
                 modules=modules,
