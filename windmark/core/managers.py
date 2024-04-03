@@ -131,7 +131,7 @@ class BalanceManager(DataClassJSONMixin):
 
         table.add_row("Label Counts", *format_integers(self.counts))
         table.add_row("Population Distribution", *format_percent(self.values))
-        table.add_row("Observation Distribution", *format_percent(self.interpolation))
+        table.add_row("Modified Distribution", *format_percent(self.interpolation))
         table.add_row("Marginal Sample Rate", *format_percent(self.thresholds))
         table.add_row("Loss Weights", *format_numbers(self.weights))
 

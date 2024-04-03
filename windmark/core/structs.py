@@ -101,7 +101,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Number of layers in event encoder"""
     dropout: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.1
     """Dropout rate"""
-    n_bands: Annotated[int, pydantic.Field(gt=1, le=512)] = 8
+    n_bands: Annotated[int, pydantic.Field(gt=1, le=16)] = 8
     """Precision of fourier feature encoders"""
     head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
     """How quickly to converge sequence representation"""
@@ -111,21 +111,21 @@ class Hyperparameters(DataClassJSONMixin):
     # training
     n_steps: Annotated[int, pydantic.Field(gt=0)] = 128
     """Proportion of events to sample from during finetuning"""
-    weight_decay: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.001
+    weight_decay: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.00001
     """Optimizer weight decay"""
-    gradient_clip_val: Annotated[float, pydantic.Field(ge=0.0)] = 0.05
+    gradient_clip_val: Annotated[float, pydantic.Field(ge=0.0)] = 0.5
     """Gradient clipping threshold"""
     max_epochs: Annotated[int, pydantic.Field(gt=0, lt=257)] = 256
     """Maximum number of epochs for pretraining and finetuning"""
     quantile_smoothing: Annotated[float, pydantic.Field(gt=0.0, lt=33.0)] = 1.0
-    """Smoothing factor of continuous fields' self-supervised"""
-    p_mask_event: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.05
+    """Smoothing factor of continuous fields' quantile labels"""
+    p_mask_event: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
     """Probability of masking any event"""
-    p_mask_field: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.05
+    p_mask_field: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
     """Probability of masking any field"""
-    n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)] = 8
+    n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)] = 12
     """Number of epochs to freeze encoder while finetuning"""
-    interpolation_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.125
+    interpolation_rate: Annotated[float, pydantic.Field(ge=0.0, le=1.0)] = 0.125
     """Interpolation rate of imbalanced classification labels"""
     learning_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.0001
     """Learning rate"""
@@ -140,6 +140,12 @@ class Hyperparameters(DataClassJSONMixin):
     @pydantic.model_validator(mode="after")
     def check_finetuning_unfreeze(self):
         assert self.n_epochs_frozen < self.max_epochs, "n_epochs_frozen must be less than max_epochs"
+
+        return self
+
+    @pydantic.model_validator(mode="after")
+    def check_weight_decay(self):
+        assert self.weight_decay < self.learning_rate, "weight decay must be less than learning rate"
 
         return self
 

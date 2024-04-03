@@ -14,8 +14,9 @@ from windmark.core.structs import Hyperparameters
 
 
 @fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
-def fit_sequence_encoder(
+def finetune_sequence_encoder(
     lifestreams: fk.types.directory.FlyteDirectory,
+    checkpoint: fk.types.file.FlyteFile,
     params: Hyperparameters,
     manager: SystemManager,
 ) -> fk.types.file.FlyteFile:
@@ -23,16 +24,17 @@ def fit_sequence_encoder(
 
     torch.set_float32_matmul_precision("medium")
 
-    module = SequenceModule(
+    module = SequenceModule.load_from_checkpoint(
+        checkpoint_path=checkpoint.path,
         datapath=lifestreams.path,
         params=params,
         manager=manager,
+        mode="finetune",
     )
 
     root = Path(fk.current_context().working_directory) / "checkpoints"
-    root.mkdir()
 
-    config = dict(
+    trainer = Trainer(
         logger=TensorBoardLogger("logs", name="windmark"),
         accelerator="auto",
         devices="auto",
@@ -40,36 +42,17 @@ def fit_sequence_encoder(
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
         max_epochs=params.max_epochs,
-    )
-
-    # trainer = Trainer(
-    #     **config,
-    #     default_root_dir=root / "pretrain",
-    #     callbacks=[EarlyStopping(monitor="pretrain-validate/loss"), RichProgressBar()],
-    # )
-
-    # trainer.fit(module)
-    # trainer.test(module)
-
-    module.mode = "finetune"
-
-    trainer = Trainer(
-        **config,
         default_root_dir=root / "finetune",
         min_epochs=(params.n_epochs_frozen + 1),
         callbacks=[
             RichProgressBar(),
             ThawedFinetuning(transition=params.n_epochs_frozen),
-            EarlyStopping(monitor="finetune-validate/loss"),
+            EarlyStopping(monitor="finetune-validate/loss", patience=12),
             checkpoint := ModelCheckpoint(root / "finetune"),
         ],
     )
 
     trainer.fit(module)
-    # trainer.test(module)
-
-    module.mode = "inference"
-
-    # trainer.predict(module)
+    trainer.test(module)
 
     return fk.types.file.FlyteFile(checkpoint.best_model_path)

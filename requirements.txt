@@ -4,9 +4,9 @@ absl-py==2.1.0 ; python_full_version == "3.11.8" \
 adlfs==2024.2.0 ; python_full_version == "3.11.8" \
     --hash=sha256:6514fb147032eea843e4b773c557df90cf6a929185edc7c97f7a12b91bfc1fa1 \
     --hash=sha256:860f5ddbd7f3c2553d84a101717dc5736e823305e0d51e8c0058bc85a7fa304d
-aiobotocore==2.12.1 ; python_full_version == "3.11.8" \
-    --hash=sha256:6a9a3d646cf422f45fdc1e4256e78563ebffba64733bc9b8ca9123614e8ba9af \
-    --hash=sha256:8706b28f16f93c541f6ed50352115a79d8f3499539f8d0bb70aa0f7a5379c1fe
+aiobotocore==2.12.2 ; python_full_version == "3.11.8" \
+    --hash=sha256:41160f33cdada96815be7d180d1a2405fbf03f0364bac88c03d6ff1ad2cd83d7 \
+    --hash=sha256:eb595362cfa6cd70e2940766e3945b114e2522168b67096b0dbc3067f7fd60ad
 aiohttp==3.9.3 ; python_full_version == "3.11.8" \
     --hash=sha256:017a21b0df49039c8f46ca0971b3a7fdc1f56741ab1240cb90ca408049766168 \
     --hash=sha256:039df344b45ae0b34ac885ab5b53940b174530d4dd8a14ed8b0e2155b9dddccb \
@@ -437,6 +437,9 @@ docker==6.1.3 ; python_full_version == "3.11.8" \
 docstring-parser==0.16 ; python_full_version == "3.11.8" \
     --hash=sha256:538beabd0af1e2db0146b6bd3caa526c35a34d61af9fd2887f3a8a27a739aa6e \
     --hash=sha256:bf0a1387354d3691d102edef7ec124f219ef639982d096e26e3b60aeffa90637
+faker==24.4.0 ; python_full_version == "3.11.8" \
+    --hash=sha256:998c29ee7d64429bd59204abffa9ba11f784fb26c7b9df4def78d1a70feb36a7 \
+    --hash=sha256:a5ddccbe97ab691fad6bd8036c31f5697cfaa550e62e000078d1935fa8a7ec2e
 fastavro==1.9.4 ; python_full_version == "3.11.8" \
     --hash=sha256:02bf1276b7326397314adf41b34a4890f6ffa59cf7e0eb20b9e4ab0a143a1598 \
     --hash=sha256:063d01d197fc929c20adc09ca9f0ca86d33ac25ee0963ce0b438244eee8315ae \
@@ -792,9 +795,9 @@ joblib==1.3.2 ; python_full_version == "3.11.8" \
 jsonpickle==3.0.3 ; python_full_version == "3.11.8" \
     --hash=sha256:5691f44495327858ab3a95b9c440a79b41e35421be1a6e09a47b6c9b9421fd06 \
     --hash=sha256:e8d6dcc58f6722bea0321cd328fbda81c582461185688a535df02be0f699afb4
-keyring==25.0.0 ; python_full_version == "3.11.8" \
-    --hash=sha256:9a15cd280338920388e8c1787cb8792b9755dabb3e7c61af5ac1f8cd437cefde \
-    --hash=sha256:fc024ed53c7ea090e30723e6bd82f58a39dc25d9a6797d866203ecd0ee6306cb
+keyring==25.1.0 ; python_full_version == "3.11.8" \
+    --hash=sha256:26fc12e6a329d61d24aa47b22a7c5c3f35753df7d8f2860973cf94f4e1fb3427 \
+    --hash=sha256:7230ea690525133f6ad536a9b5def74a4bd52642abe594761028fc044d7c7893
 lightning-utilities==0.11.2 ; python_full_version == "3.11.8" \
     --hash=sha256:541f471ed94e18a28d72879338c8c52e873bb46f4c47644d89228faeb6751159 \
     --hash=sha256:adf4cf9c5d912fe505db4729e51d1369c6927f3a8ac55a9dff895ce5c0da08d9
@@ -1172,13 +1175,13 @@ pandas==2.2.1 ; python_full_version == "3.11.8" \
 plotly==5.20.0 ; python_full_version == "3.11.8" \
     --hash=sha256:837a9c8aa90f2c0a2f0d747b82544d014dc2a2bdde967b5bb1da25b53932d1a9 \
     --hash=sha256:bf901c805d22032cfa534b2ff7c5aa6b0659e037f19ec1e0cca7f585918b5c89
-polars==0.20.17 ; python_full_version == "3.11.8" \
-    --hash=sha256:097101954dc4a02401cb323379816c37641908f7e15c01682c0477ff87de3b52 \
-    --hash=sha256:22d21d57b235d6a2dc117776e50a9decaac93f01785e767ccbce49141bf889b8 \
-    --hash=sha256:7034594f05c29504410eb4f3da004668813911824217d4ddea8f95798b66f31b \
-    --hash=sha256:931e22000806209466568c9aadd011087507a841e36543ee593e0eb6aead1198 \
-    --hash=sha256:a9dd52800b1379393ad179ffd9407b02d418bac3f26727ba59c9f20977a3726a \
-    --hash=sha256:ad9050c4dd594e66312f4e240479c6fa2893ea970ce09eb9d47043d48330138f
+polars==0.20.18 ; python_full_version == "3.11.8" \
+    --hash=sha256:26716f074301f583da9af93108d57da631622d6496cbcbb8c08476180953f408 \
+    --hash=sha256:4b775e9677d0050775243400def1f5de4dd02b5ee220873406abc4028228525e \
+    --hash=sha256:5b3843f69228df68cb82e39647c212fde58671c064c25a0c4d544f9446160a7e \
+    --hash=sha256:73b81b9582c48f0ca4ae08c0adc56917b0c55682044bedf0eccd3f94e4e39169 \
+    --hash=sha256:8a321cbdbb459e3c0cc1af2ce6ac930d0d3b5ccbeb2dd3e4237ad07d487fd290 \
+    --hash=sha256:e305f5e6c0b8dc37fe0ff3bb1143a8bf0341134e0b23dec7c50a148f426acceb
 portalocker==2.8.2 ; python_full_version == "3.11.8" \
     --hash=sha256:2b035aa7828e46c58e9b31390ee1f169b98e1066ab10b9a6a861fe7e25ee4f33 \
     --hash=sha256:cfb86acc09b9aa7c3b43594e19be1345b9d16af3feb08bf92f23d4dce513a28e
@@ -1570,9 +1573,9 @@ urllib3==1.26.18 ; python_full_version == "3.11.8" \
 websocket-client==1.7.0 ; python_full_version == "3.11.8" \
     --hash=sha256:10e511ea3a8c744631d3bd77e61eb17ed09304c413ad42cf6ddfa4c7787e8fe6 \
     --hash=sha256:f4c3d22fec12a2461427a29957ff07d35098ee2d976d3ba244e688b8b4057588
-werkzeug==3.0.1 ; python_full_version == "3.11.8" \
-    --hash=sha256:507e811ecea72b18a404947aded4b3390e1db8f826b494d76550ef45bb3b1dcc \
-    --hash=sha256:90a285dc0e42ad56b34e696398b8122ee4c681833fb35b8334a095d82c56da10
+werkzeug==3.0.2 ; python_full_version == "3.11.8" \
+    --hash=sha256:3aac3f5da756f93030740bc235d3e09449efcf65f2f55e3602e1d851b8f48795 \
+    --hash=sha256:e39b645a6ac92822588e7b39a692e7828724ceae0b0d702ef96701f90e70128d
 wrapt==1.16.0 ; python_full_version == "3.11.8" \
     --hash=sha256:0d2691979e93d06a95a26257adb7bfd0c93818e89b1406f5a28f36e0d8c1e1fc \
     --hash=sha256:14d7dc606219cdd7405133c713f2c218d4252f2a469003f8c46bb92d5d095d81 \

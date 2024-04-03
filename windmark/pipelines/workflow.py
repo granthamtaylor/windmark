@@ -4,40 +4,40 @@ import flytekit as fk
 
 from windmark.core.structs import Hyperparameters
 from windmark.core.managers import SchemaManager, SplitManager
-import windmark.components as components
+import windmark.components as comp
 
 
 @fk.workflow
-def pipeline(
-    ledger_path: str,
+def train(
+    datapath: str,
     schema: SchemaManager,
     params: Hyperparameters,
     split: SplitManager,
 ):
-    ledger = components.sanitize(ledger=ledger_path)
+    ledger = comp.sanitize(ledger=datapath)
 
-    fields = components.fan.fields(schema=schema)
+    fields = comp.fan.fields(schema=schema)
 
-    fk.map_task(partial(components.parse, ledger=ledger))(field=fields)
+    fk.map_task(partial(comp.parse, ledger=ledger))(field=fields)
 
-    fanned_centroids = fk.map_task(partial(components.digest, ledger=ledger, slice_size=10_000))(field=fields)
+    fanned_centroids = fk.map_task(partial(comp.digest, ledger=ledger, slice_size=10_000))(field=fields)
 
-    centroids = components.collect.centroids(centroids=fanned_centroids)
+    centroids = comp.collect.centroids(centroids=fanned_centroids)
 
-    fanned_levelsets = fk.map_task(partial(components.levels, ledger=ledger))(field=fields)
+    fanned_levelsets = fk.map_task(partial(comp.levels, ledger=ledger))(field=fields)
 
-    levelsets = components.collect.levelsets(levelsets=fanned_levelsets)
+    levelsets = comp.collect.levelsets(levelsets=fanned_levelsets)
 
-    task = components.task(ledger=ledger, schema=schema, params=params)
+    task = comp.task(ledger=ledger, schema=schema, params=params)
 
-    sample = components.sample(ledger=ledger, params=params, task=task, split=split)
+    sample = comp.sample(ledger=ledger, params=params, task=task, split=split)
 
-    manager = components.system(
-        schema=schema, task=task, sample=sample, split=split, centroids=centroids, levelsets=levelsets
-    )
+    system = comp.system(schema=schema, task=task, sample=sample, split=split, centroids=centroids, levelsets=levelsets)
 
-    lifestreams = components.preprocess(ledger=ledger, manager=manager, slice_size=10)
+    lifestreams = comp.preprocess(ledger=ledger, manager=system, slice_size=10)
 
-    checkpoint = components.fit(lifestreams=lifestreams, params=params, manager=manager)
+    pretrained = comp.pretrain(lifestreams=lifestreams, params=params, manager=system)
 
-    components.predict(checkpoint=checkpoint, params=params, manager=manager, lifestreams=lifestreams)
+    comp.finetune(checkpoint=pretrained, lifestreams=lifestreams, params=params, manager=system)
+
+    # comp.predict(checkpoint=finetuned, params=params, manager=system, lifestreams=lifestreams)

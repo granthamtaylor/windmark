@@ -3,6 +3,7 @@ from pathlib import Path
 import flytekit as fk
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import RichProgressBar
+from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
 from windmark.core.callbacks import ParquetBatchWriter
@@ -22,14 +23,14 @@ def predict_sequence_encoder(
         datapath=lifestreams.path,
         params=params,
         manager=manager,
+        mode="inference",
     )
-
-    module.mode = "inference"
 
     outpath = Path(fk.current_context().working_directory) / "lifestreams"
     outpath.mkdir()
 
     trainer = Trainer(
+        logger=TensorBoardLogger("logs", name="windmark"),
         accelerator="auto",
         devices="auto",
         strategy="auto",

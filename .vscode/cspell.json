@@ -1,0 +1,17 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "arange",
+    "AUROC",
+    "dtype",
+    "embedders",
+    "jaxtyped",
+    "jaxtyping",
+    "nhead",
+    "optim",
+    "quantile",
+    "squarify",
+    "unsqueeze"
+  ]
+}

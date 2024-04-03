@@ -22,11 +22,10 @@ def create_task_manager(
         .to_dict(as_series=False)
     )
 
-    balancer = BalanceManager(
-        labels=records["labels"],
-        counts=records["counts"],
-        kappa=params.interpolation_rate,
-    )
+    labels: list[str] = records["labels"]
+    counts: list[int] = records["counts"]
+
+    balancer = BalanceManager(labels=labels, counts=counts, kappa=params.interpolation_rate)
 
     balancer.show()
 

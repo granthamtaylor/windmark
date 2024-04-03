@@ -2,6 +2,7 @@ import math
 import os
 from collections import OrderedDict
 from functools import partial, partialmethod
+from typing import Annotated
 
 import lightning.pytorch as lit
 import torch
@@ -9,14 +10,13 @@ import torchmetrics
 from beartype import beartype
 from jaxtyping import Bool, Float, Int, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
-from lightning.pytorch.trainer.states import TrainerFn as StageName
 from tensordict import TensorDict
 from torch import Tensor
 from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
 
-from windmark.core.managers import SystemManager, SchemaManager
+from windmark.core.managers import SystemManager
 from windmark.core.operators import collate, stream, mock
 from windmark.core.structs import (
     ContinuousField,
@@ -156,12 +156,13 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         super().__init__()
 
         self.field: Field = field
-        self.linear = torch.nn.Linear(2 * params.n_bands, params.d_field)
-        self.positional = torch.nn.Embedding(len(Tokens), params.d_field)
 
-        weights = torch.logspace(-params.n_bands, 1, params.n_bands, base=2).mul(math.pi).unsqueeze(dim=0)
+        offset = 3
 
-        self.register_buffer("weights", weights)
+        weights = torch.logspace(start=-params.n_bands, end=offset, steps=params.n_bands + offset + 1, base=2)
+
+        self.linear = torch.nn.Linear(2 * len(weights), params.d_field)
+        self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
 
     @jaxtyped(typechecker=beartype)
     def forward(
@@ -192,7 +193,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         N, L = values.shape
 
         # weight inputs with buffers of precision bands
-        weighted = values.view(N * L).unsqueeze(dim=1).mul(self.weights)
+        weighted = values.sub(indicators).view(N * L).unsqueeze(dim=1).mul(self.weights)
 
         # apply sine and cosine functions to weighted inputs
         fourier = torch.sin(weighted), torch.cos(weighted)
@@ -200,10 +201,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         # project sinusoidal representations with MLP
         projections = self.linear(torch.cat(fourier, dim=1)).view(N, L, -1)
 
-        # embed null indicators
-        positional = self.positional(indicators)
-
-        return projections + positional
+        return projections
 
 
 class TemporalFieldEmbedder(ContinuousFieldEmbedder):
@@ -224,7 +222,7 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
         """
-        Initialize moduler field embedder.
+        Initialize modular field embedder.
 
         Args:
             params (Hyperparameters): The hyperparameters for the architecture.
@@ -261,10 +259,9 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
 
         embeddings = []
 
-        for field in inputs.keys():
-            if field in self.embedders.keys():
-                embedding = self.embedders[field](inputs[field])
-                embeddings.append(embedding)
+        for field in self.embedders.keys():
+            embedding = self.embedders[field](inputs[field])
+            embeddings.append(embedding)
 
         # N L C F
         stacked = torch.stack(embeddings, dim=-1)
@@ -411,7 +408,7 @@ class EventDecoder(torch.nn.Module):
     EventDecoder is a PyTorch module for decoding masked events from their contextualized representations.
     """
 
-    def __init__(self, params: Hyperparameters, manager: SchemaManager):
+    def __init__(self, params: Hyperparameters, manager: SystemManager):
         """
         Initialize the event decoder.
 
@@ -438,6 +435,9 @@ class EventDecoder(torch.nn.Module):
                 case "temporal":
                     d_target = params.n_quantiles
 
+                case _:
+                    raise NotImplementedError
+
             projections[field.name] = torch.nn.Conv1d(
                 in_channels=len(manager.schema) * params.d_field,
                 out_channels=d_target + len(Tokens),
@@ -450,7 +450,7 @@ class EventDecoder(torch.nn.Module):
     def forward(
         self,
         inputs: Float[Tensor, "N L FC"],
-    ) -> TensorDict[Float[Tensor, "N L ?"]]:
+    ) -> Annotated[TensorDict, Float[Tensor, "N L _"]]:
         """
         Performs the forward pass of the EventDecoder.
 
@@ -469,7 +469,7 @@ class EventDecoder(torch.nn.Module):
         events = {}
 
         for field, projection in self.projections.items():
-            events[field] = projection(permuted)
+            events[field] = projection(permuted).permute(0, 2, 1)
 
         # N, L, ?
         return TensorDict(events, batch_size=N)
@@ -539,11 +539,43 @@ class DecisionHead(torch.nn.Module):
         return self.mlp(inputs)
 
 
+def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
+    """Create supervised module metrics
+
+    Args:
+        manager (SystemManager): The pipeline system manager.
+
+    Returns:
+        torch.nn.ModuleDict: Nested dictionaries of metrics (strata > metrics > instances)
+    """
+
+    metrics = dict(
+        ap=torchmetrics.AveragePrecision,
+        f1=torchmetrics.F1Score,
+        auc=torchmetrics.AUROC,
+        acc=torchmetrics.Accuracy,
+    )
+
+    stratas = torch.nn.ModuleDict(
+        {
+            "train_metrics": torch.nn.ModuleDict(),
+            "validate_metrics": torch.nn.ModuleDict(),
+            "test_metrics": torch.nn.ModuleDict(),
+        }
+    )
+
+    for strata in stratas.keys():
+        for name, Metric in metrics.items():
+            stratas[strata][name] = Metric(task="multiclass", num_classes=manager.task.n_targets)
+
+    return stratas
+
+
 @jaxtyped(typechecker=beartype)
 def smoothen(
     targets: Int[torch.Tensor, "N L"],
     params: Hyperparameters,
-) -> Float[torch.Tensor, "N L _"]:
+) -> Float[torch.Tensor, "NL _"]:
     """Apply gaussian smoothing to continuous targets with fixed offset for special tokens
 
     Arguments:
@@ -583,41 +615,7 @@ def smoothen(
     gaussian_masked /= gaussian_masked.sum(dim=-1, keepdim=True)
 
     # combine using the condition
-    return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot)
-
-
-def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
-    """Create supervised module metrics
-
-    Args:
-        manager (SystemManager): The pipeline system manager.
-
-    Returns:
-        torch.nn.ModuleDict: Nested dictionaries of metrics (strata > metrics > instances)
-    """
-
-    metrics = dict(
-        ap=torchmetrics.AveragePrecision,
-        f1=torchmetrics.F1Score,
-        auc=torchmetrics.AUROC,
-        acc=torchmetrics.Accuracy,
-    )
-
-    stratas = torch.nn.ModuleDict(
-        {
-            "train_metrics": torch.nn.ModuleDict(),
-            "validate_metrics": torch.nn.ModuleDict(),
-            "test_metrics": torch.nn.ModuleDict(),
-        }
-    )
-
-    config = dict(task="multiclass", num_classes=manager.task.n_targets)
-
-    for strata in stratas.keys():
-        for name, Metric in metrics.items():
-            stratas[strata][name] = Metric(**config)
-
-    return stratas
+    return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot).reshape(N * L, -1)
 
 
 def pretrain(
@@ -632,23 +630,25 @@ def pretrain(
         values: Tensor = reconstruction[field.name]
         targets: TargetField = batch.targets[field.name]
 
+        N, L, T = values.shape
+
         # smoothen the targets for continuous fields
         if field.type in ["continuous", "temporal"]:
             labels = smoothen(targets=targets.lookup, params=module.params)
 
         else:
-            labels = targets.lookup
+            assert field.type in ["discrete", "entity"]
+            labels = torch.nn.functional.one_hot(targets.lookup.reshape(N * L), num_classes=T).float()
 
-        labels = labels.reshape(module.params.batch_size * module.params.n_context, -1).squeeze()
-        is_masked = targets.is_masked.reshape(module.params.batch_size * module.params.n_context, -1)
-        values = values.reshape(module.params.batch_size * module.params.n_context, -1)
+        mask = targets.is_masked.reshape(N * L)
+        values = values.reshape(N * L, T)
 
-        loss = cross_entropy(values, labels, reduction="none").mul(is_masked).mean()
+        loss = cross_entropy(values, labels, reduction="none").mul(mask).mean()
         losses.append(loss)
-        module.info(f"{module.mode}-{strata}/{field.name}-loss", loss)
+        module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
     total_loss = torch.stack(losses).sum()
-    module.info(f"{module.mode}-{strata}/loss", total_loss, prog_bar=(strata == "validate"))
+    module.info(f"pretrain-{strata}/loss", total_loss, prog_bar=(strata == "validate"))
     return total_loss
 
 
@@ -659,12 +659,12 @@ def finetune(
     strata: str,
 ) -> Tensor:
     loss = cross_entropy(predictions, batch.targets, weight=module.weights)
-    module.info(name=f"{module.mode}-{strata}/loss", value=loss, prog_bar=(strata == "validate"))
+    module.info(name=f"finetune-{strata}/loss", value=loss, prog_bar=(strata == "validate"))
 
     probabilities = torch.nn.functional.softmax(predictions, dim=1)
     for title, metric in module.metrics[f"{strata}_metrics"].items():
         metric.update(probabilities, batch.targets)
-        module.info(name=f"{module.mode}-{strata}/{title}", value=metric)
+        module.info(name=f"finetune-{strata}/{title}", value=metric)
 
     return loss
 
@@ -717,13 +717,10 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
 
 
 class SequenceModule(lit.LightningModule):
-    def __init__(
-        self,
-        datapath: str | os.PathLike,
-        params: Hyperparameters,
-        manager: SystemManager,
-    ):
+    def __init__(self, datapath: str | os.PathLike, params: Hyperparameters, manager: SystemManager, mode: str):
         super().__init__()
+
+        assert mode in ["pretrain", "finetune", "inference"]
 
         assert os.path.exists(datapath)
         self.datapath: str | os.PathLike = datapath
@@ -732,7 +729,7 @@ class SequenceModule(lit.LightningModule):
         self.params: Hyperparameters = params
         self.save_hyperparameters(params.to_dict())
         self.lr: float = params.learning_rate
-        self._mode: str = "pretrain"
+        self.mode: str = mode
         self.manager: SystemManager = manager
 
         self.modular_field_embedder = ModularFieldEmbeddingSystem(params=params, manager=manager)
@@ -750,11 +747,11 @@ class SequenceModule(lit.LightningModule):
 
         self.info = partial(self.log, on_step=False, on_epoch=True, batch_size=self.params.batch_size)
 
-        self.example_input_array = sample = mock(params=params, manager=manager)
-        self.flops_per_batch = measure_flops(self, lambda: self.forward(sample))
+        self.example_input_array = sample = mock(params=params, manager=manager)  # type: ignore
+        self.flops_per_batch = measure_flops(self, lambda: self(sample))
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N T"], TensorDict]:
+    def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N T"], TensorDict]:  # type: ignore
         """
         Performs the forward pass of the encoder.
 
@@ -782,12 +779,12 @@ class SequenceModule(lit.LightningModule):
             filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr, weight_decay=self.params.weight_decay
         )
 
-    training_step = partialmethod(step, strata="train")
-    validation_step = partialmethod(step, strata="validate")
-    test_step = partialmethod(step, strata="test")
-    predict_step = partialmethod(step, strata="predict")
+    training_step = partialmethod(step, strata="train")  # type: ignore
+    validation_step = partialmethod(step, strata="validate")  # type: ignore
+    test_step = partialmethod(step, strata="test")  # type: ignore
+    predict_step = partialmethod(step, strata="predict")  # type: ignore
 
-    def setup(self, stage: StageName):
+    def setup(self, stage: str):
         pipe = partial(stream, datapath=self.datapath, mode=self.mode, params=self.params, manager=self.manager)
 
         assert stage in ["fit", "validate", "test", "predict"]
@@ -803,7 +800,7 @@ class SequenceModule(lit.LightningModule):
             split = strata if strata != "predict" else "test"
             self.pipes[strata] = pipe(split=split)
 
-    def teardown(self, stage: StageName):
+    def teardown(self, stage: str):
         assert stage in ["fit", "validate", "test", "predict"]
 
         mapping = dict(
@@ -817,26 +814,10 @@ class SequenceModule(lit.LightningModule):
             del self.pipes[strata]
             del self.dataloaders[strata]
 
-    train_dataloader = partialmethod(dataloader, strata="train")
-    val_dataloader = partialmethod(dataloader, strata="validate")
-    test_dataloader = partialmethod(dataloader, strata="test")
-    predict_dataloader = partialmethod(dataloader, strata="predict")
-
-    @property
-    def mode(self):
-        return self._mode
-
-    @mode.setter
-    def mode(self, mode: str):
-        assert mode in ["pretrain", "finetune", "inference"]
-
-        # for param in self.event_decoder.parameters(recurse=True):
-        #     param.requires_grad = (mode != "finetune")
-
-        # for param in self.decision_head.parameters(recurse=True):
-        #     param.requires_grad = (mode != "pretrain")
-
-        self._mode = mode
+    train_dataloader = partialmethod(dataloader, strata="train")  # type: ignore
+    val_dataloader = partialmethod(dataloader, strata="validate")  # type: ignore
+    test_dataloader = partialmethod(dataloader, strata="test")  # type: ignore
+    predict_dataloader = partialmethod(dataloader, strata="predict")  # type: ignore
 
     # def show(self):
     #     memory = humanize.naturalsize(complexity(self.params))

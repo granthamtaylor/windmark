@@ -10,14 +10,22 @@ if __name__ == "__main__":
     )
 
     schema = wm.Schema.create(
-        sequence_id="sequence_id",
-        event_id="event_id",
-        order_by="event_order",
+        sequence_id="customer_id",
+        event_id="transaction_id",
+        order_by="order_id",
         target_id="target",
         use_chip="discrete",
         merchant_state="discrete",
         merchant_city="discrete",
         merchant_name="entity",
+        has_bad_pin="discrete",
+        has_bad_zipcode="discrete",
+        has_bad_card_number="discrete",
+        has_insufficient_balance="discrete",
+        has_bad_expiration="discrete",
+        has_technical_glitch="discrete",
+        has_bad_cvv="discrete",
+        card="entity",
         mcc="discrete",
         amount="continuous",
         timedelta="continuous",
@@ -25,10 +33,10 @@ if __name__ == "__main__":
     )
 
     params = wm.Hyperparameters(
-        n_steps=160,
-        batch_size=16,
-        max_epochs=2,
-        n_epochs_frozen=1,
+        n_steps=20,
+        batch_size=128,
+        max_epochs=256,
+        d_field=48,
     )
 
-    wm.pipeline(schema=schema, ledger_path=ledger, params=params, split=split)
+    wm.train(schema=schema, ledger_path=ledger, params=params, split=split)
