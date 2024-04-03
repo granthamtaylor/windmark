@@ -549,6 +549,8 @@ def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
         torch.nn.ModuleDict: Nested dictionaries of metrics (strata > metrics > instances)
     """
 
+    n_targets = manager.task.n_targets
+
     metrics = dict(
         ap=torchmetrics.AveragePrecision,
         f1=torchmetrics.F1Score,
@@ -556,19 +558,17 @@ def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
         acc=torchmetrics.Accuracy,
     )
 
-    stratas = torch.nn.ModuleDict(
-        {
-            "train_metrics": torch.nn.ModuleDict(),
-            "validate_metrics": torch.nn.ModuleDict(),
-            "test_metrics": torch.nn.ModuleDict(),
-        }
+    collection = torchmetrics.MetricCollection(
+        {name: metric(task="multiclass", num_classes=n_targets) for name, metric in metrics.items()}
     )
 
-    for strata in stratas.keys():
-        for name, Metric in metrics.items():
-            stratas[strata][name] = Metric(task="multiclass", num_classes=manager.task.n_targets)
-
-    return stratas
+    return torch.nn.ModuleDict(
+        {
+            "train_collection": collection.clone(),
+            "validate_collection": collection.clone(),
+            "test_collection": collection.clone(),
+        }
+    )
 
 
 @jaxtyped(typechecker=beartype)
@@ -643,7 +643,7 @@ def pretrain(
         mask = targets.is_masked.reshape(N * L)
         values = values.reshape(N * L, T)
 
-        loss = cross_entropy(values, labels, reduction="none").mul(mask).mean()
+        loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean()
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
@@ -662,9 +662,12 @@ def finetune(
     module.info(name=f"finetune-{strata}/loss", value=loss, prog_bar=(strata == "validate"))
 
     probabilities = torch.nn.functional.softmax(predictions, dim=1)
-    for title, metric in module.metrics[f"{strata}_metrics"].items():
+
+    collection = module.metrics[f"{strata}_collection"]
+
+    for name, metric in collection.items():
         metric.update(probabilities, batch.targets)
-        module.info(name=f"finetune-{strata}/{title}", value=metric)
+        module.info(name=f"finetune-{strata}/{name}", value=metric)
 
     return loss
 

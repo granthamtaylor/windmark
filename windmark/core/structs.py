@@ -17,7 +17,6 @@ from mashumaro.mixins.json import DataClassJSONMixin
 
 
 class Tokens(IntEnum):
-
     """Special token representations"""
 
     VAL = 0
@@ -105,7 +104,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Precision of fourier feature encoders"""
     head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
     """How quickly to converge sequence representation"""
-    n_quantiles: Annotated[int, pydantic.Field(gt=0, lt=513)] = 64
+    n_quantiles: Annotated[int, pydantic.Field(gt=1, lt=513)] = 64
     """Number of quantiles for continuous and temporal field"""
 
     # training
@@ -146,6 +145,13 @@ class Hyperparameters(DataClassJSONMixin):
     @pydantic.model_validator(mode="after")
     def check_weight_decay(self):
         assert self.weight_decay < self.learning_rate, "weight decay must be less than learning rate"
+
+        return self
+
+    @pydantic.model_validator(mode="after")
+    def check_mask_rates(self):
+        rates = [self.p_mask_event, self.p_mask_field, self.p_mask_field + self.p_mask_event]
+        assert max(rates) >= 0.01, "the masking rates are too low for any meaningful pretraining"
 
         return self
 

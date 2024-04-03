@@ -32,11 +32,6 @@ if __name__ == "__main__":
         timestamp="temporal",
     )
 
-    params = wm.Hyperparameters(
-        n_steps=20,
-        batch_size=128,
-        max_epochs=256,
-        d_field=48,
-    )
+    params = wm.Hyperparameters(n_steps=20, batch_size=128, max_epochs=2, d_field=48, n_epochs_frozen=1)
 
-    wm.train(schema=schema, ledger_path=ledger, params=params, split=split)
+    wm.train(datapath=ledger, schema=schema, params=params, split=split)
