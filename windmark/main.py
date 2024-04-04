@@ -1,19 +1,19 @@
 import windmark as wm
 
 if __name__ == "__main__":
-    ledger = "/home/grantham/windmark/data/quarter_ledger.parquet"
+    ledger = "/home/grantham/windmark/data/ledger.parquet"
 
     split = wm.SequenceSplitter(
-        train=0.70,
-        validate=0.15,
-        test=0.15,
+        train=0.60,
+        validate=0.20,
+        test=0.20,
     )
 
     schema = wm.Schema.create(
         sequence_id="customer_id",
         event_id="transaction_id",
         order_by="order_id",
-        target_id="target",
+        target_id="is_fraud",
         use_chip="discrete",
         merchant_state="discrete",
         merchant_city="discrete",
@@ -28,10 +28,13 @@ if __name__ == "__main__":
         card="entity",
         mcc="discrete",
         amount="continuous",
-        timedelta="continuous",
         timestamp="temporal",
     )
 
-    params = wm.Hyperparameters(n_steps=20, batch_size=128, max_epochs=2, d_field=48, n_epochs_frozen=1)
+    params = wm.Hyperparameters(
+        n_steps=300,
+        batch_size=196,
+        d_field=48,
+    )
 
     wm.train(datapath=ledger, schema=schema, params=params, split=split)

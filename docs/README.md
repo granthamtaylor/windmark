@@ -24,7 +24,7 @@ Below is a simple example to get you started with Windmark. This example demonst
 ```python
 import windmark as wm
 
-ledger = "/home/grantham/windmark/data/quarter_ledger.parquet"
+ledger = "data/mini-ledger.parquet"
 
 split = wm.SequenceSplitter(
     train=0.70,
@@ -32,7 +32,7 @@ split = wm.SequenceSplitter(
     test=0.15,
 )
 
-schema = wm.Schema(
+schema = wm.Schema.create(
 
     # required columns
     sequence_id="sequence_id",
@@ -59,14 +59,31 @@ params = wm.Hyperparameters(
     n_epochs_frozen=1
 )
 
-wm.pipeline(
-    ledger_path=ledger,
+wm.train(
+    datapath=ledger,
     schema=schema,
     params=params,
     split=split
 )
 
 ```
+
+## Backlog
+
+### Features
+
+- [ ] Data quality checks and data exploration visualizations
+- [ ] Larger-than-memory data preprocessing (Spark)
+- [ ] Support for alternative supervised learning tasks (Regression, Survival)
+- [ ] Automatically generated report of model performance
+- [ ] Model deployment pipeline
+
+### Experiments
+
+- [ ] Confirm that attention masks are not harming performance
+- [ ] Confirm that attention masks are improving compute
+- [ ] Explore preprocessing bottlenecks
+- [ ] Explore streaming compute bottlenecks
 
 ## Documentation
 

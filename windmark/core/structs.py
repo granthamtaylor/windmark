@@ -104,7 +104,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Precision of fourier feature encoders"""
     head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
     """How quickly to converge sequence representation"""
-    n_quantiles: Annotated[int, pydantic.Field(gt=1, lt=513)] = 64
+    n_quantiles: Annotated[int, pydantic.Field(gt=1, le=512)] = 64
     """Number of quantiles for continuous and temporal field"""
 
     # training
@@ -114,7 +114,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Optimizer weight decay"""
     gradient_clip_val: Annotated[float, pydantic.Field(ge=0.0)] = 0.5
     """Gradient clipping threshold"""
-    max_epochs: Annotated[int, pydantic.Field(gt=0, lt=257)] = 256
+    max_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)] = 256
     """Maximum number of epochs for pretraining and finetuning"""
     quantile_smoothing: Annotated[float, pydantic.Field(gt=0.0, lt=33.0)] = 1.0
     """Smoothing factor of continuous fields' quantile labels"""
@@ -128,6 +128,8 @@ class Hyperparameters(DataClassJSONMixin):
     """Interpolation rate of imbalanced classification labels"""
     learning_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.0001
     """Learning rate"""
+    patience: Annotated[int, pydantic.Field(ge=1, le=256)] = 16
+    """early_stopping_patience"""
 
     @pydantic.model_validator(mode="after")
     def check_head_shape(self):
@@ -261,8 +263,8 @@ TensorField: TypeAlias = ContinuousField | DiscreteField | EntityField | Tempora
 
 @tensorclass
 class PretrainingData:
-    inputs: TensorDict[TensorField]
-    targets: TensorDict[TargetField]
+    inputs: Annotated[TensorDict, TensorField]
+    targets: Annotated[TensorDict, TargetField]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -274,7 +276,7 @@ class PretrainingData:
 
 @tensorclass
 class FinetuningData:
-    inputs: TensorDict[TensorField]
+    inputs: Annotated[TensorDict, TensorField]
     targets: Int[Tensor, "N T"]
 
     @jaxtyped(typechecker=beartype)
@@ -289,7 +291,7 @@ class FinetuningData:
 
 @tensorclass
 class InferenceData:
-    inputs: TensorDict[TensorField]
+    inputs: Annotated[TensorDict, TensorField]
     meta: list[tuple[str, str]] | tuple[str, str]
 
     @jaxtyped(typechecker=beartype)

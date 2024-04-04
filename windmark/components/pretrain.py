@@ -44,7 +44,7 @@ def pretrain_sequence_encoder(
         default_root_dir=root / "pretrain",
         callbacks=[
             RichProgressBar(),
-            EarlyStopping(monitor="pretrain-validate/loss", patience=12),
+            EarlyStopping(monitor="pretrain-validate/loss", patience=params.patience),
             checkpoint := ModelCheckpoint(root / "finetune"),
         ],
     )

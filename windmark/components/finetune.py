@@ -47,7 +47,7 @@ def finetune_sequence_encoder(
         callbacks=[
             RichProgressBar(),
             ThawedFinetuning(transition=params.n_epochs_frozen),
-            EarlyStopping(monitor="finetune-validate/loss", patience=12),
+            EarlyStopping(monitor="finetune-validate/loss", patience=params.patience),
             checkpoint := ModelCheckpoint(root / "finetune"),
         ],
     )

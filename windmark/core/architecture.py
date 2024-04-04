@@ -260,7 +260,8 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
         embeddings = []
 
         for field in self.embedders.keys():
-            embedding = self.embedders[field](inputs[field])
+            embedder = self.embedders[field]
+            embedding = embedder(inputs[field])
             embeddings.append(embedding)
 
         # N L C F

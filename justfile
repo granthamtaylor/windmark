@@ -22,7 +22,7 @@ doc:
 
 # compile whitepaper with typst
 whitepaper:
-  @typst watch docs/content/whitepaper.typst --root=docs
+  @typst watch docs/whitepaper/whitepaper.typst --root=docs
 
 # run training pipeline
 train:
