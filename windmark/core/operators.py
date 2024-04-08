@@ -1,4 +1,3 @@
-import os
 import random
 from functools import partial
 
@@ -14,14 +13,12 @@ from windmark.core.structs import (
     ContinuousField,
     DiscreteField,
     EntityField,
-    FinetuningData,
     Hyperparameters,
-    InferenceData,
+    SupervisedData,
     PretrainingData,
     SequenceData,
     Tokens,
     TemporalField,
-    TensorField,
 )
 
 
@@ -46,6 +43,8 @@ def sample(
 ) -> list[dict[str, str | list[int] | list[float | None] | list[str]]]:
     observations = []
 
+    assert split == sequence["split"]
+
     for event in range(sequence["size"]):
         if mode == "pretrain":
             if manager.sample.pretraining[split] < random.random():
@@ -54,7 +53,7 @@ def sample(
             label = -1
 
         elif mode == "finetune":
-            label = sequence["target"][event]
+            label: int = sequence["target"][event]
 
             if (label is None) or (label == -1):
                 continue
@@ -69,6 +68,9 @@ def sample(
 
         elif mode == "inference":
             label = -1
+
+        else:
+            raise ValueError
 
         window = slice(max(0, event - params.n_context), event)
 
@@ -96,7 +98,7 @@ def tokenize(
 
             values: list[str] = observation[field.name]
 
-            observation[field.name]: list[int] = list(map(lambda value: mapping[value], values))
+            observation[field.name] = list(map(lambda value: mapping[value], values))
 
     return observation
 
@@ -131,6 +133,7 @@ def cdf(
 ) -> dict[str, str | list[int] | np.ndarray]:
     for field in manager.schema.fields:
         if field.type in ["continuous", "temporal"]:
+            # TODO verify that this is caching properly
             digest: TDigest = manager.centroids.digests[field.name]
             array = np.array(observation[field.name], dtype=np.float64)
             observation[field.name] = digest.cdf(array)
@@ -191,22 +194,16 @@ def package(
     manager: SystemManager,
     mode: str,
 ) -> SequenceData:
-    if mode == "pretrain":
-        observation: tuple[TensorDict, TensorDict, tuple[str, str]] = mask(
-            observation=observation, params=params, manager=manager
-        )
+    assert mode in ("pretrain", "finetune", "inference")
 
-    tensorclasses = dict(
-        pretrain=PretrainingData,
-        finetune=FinetuningData,
-        inference=InferenceData,
-    )
+    if mode in ["finetune", "inference"]:
+        return SupervisedData.new(observation)
 
-    return tensorclasses[mode].new(observation)
+    return PretrainingData.new(mask(observation=observation, params=params, manager=manager))
 
 
 def stream(
-    datapath: str | os.PathLike,
+    datapath: str,
     mode: str,
     params: Hyperparameters,
     manager: SystemManager,
@@ -235,14 +232,13 @@ def stream(
 def collate(batch: list[SequenceData]) -> SequenceData:
     stacked = torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)
 
-    # the non-tensor data (metadata) during inference needs to be manually collated
-    if isinstance(stacked, InferenceData):
+    if isinstance(batch[0], SupervisedData):
         stacked.meta = [observation.meta for observation in batch]
 
     return stacked
 
 
-def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict[TensorField]:
+def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
     output = {}
 
     N = params.batch_size

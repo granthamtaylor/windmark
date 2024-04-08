@@ -11,7 +11,7 @@ from windmark.core.managers import SystemManager
 from windmark.core.structs import Hyperparameters
 
 
-@fk.task
+@fk.task(requests=fk.Resources(cpu="32", mem="64Gi"))
 def predict_sequence_encoder(
     checkpoint: fk.types.file.FlyteFile,
     lifestreams: fk.types.directory.FlyteDirectory,
@@ -30,14 +30,14 @@ def predict_sequence_encoder(
     outpath.mkdir()
 
     trainer = Trainer(
-        logger=TensorBoardLogger("logs", name="windmark"),
+        logger=TensorBoardLogger("logs", name="windmark", version=manager.version),
         accelerator="auto",
         devices="auto",
         strategy="auto",
         precision="bf16-mixed",
         callbacks=[
             RichProgressBar(),
-            ParquetBatchWriter("/home/grantham/windmark/data/predictions.parquet"),
+            ParquetBatchWriter(f"data/predictions/{manager.version}.parquet"),
         ],
     )
 

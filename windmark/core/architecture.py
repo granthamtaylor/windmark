@@ -25,18 +25,13 @@ from windmark.core.structs import (
     TemporalField,
     TargetField,
     PretrainingData,
-    FinetuningData,
-    InferenceData,
+    SupervisedData,
+    OutputData,
     Field,
     Hyperparameters,
     SequenceData,
     Tokens,
 )
-
-
-@jaxtyped(typechecker=beartype)
-def _squarify(tensor: Tensor) -> Tensor:
-    return ~(tensor.unsqueeze(-1) & tensor.unsqueeze(-2))
 
 
 @jaxtyped(typechecker=beartype)
@@ -57,7 +52,11 @@ def create_attention_masks(inputs: TensorDict, manager: SystemManager) -> tuple[
     field_mask = ~is_non_valued.view(N * L, F)
     event_mask = ~is_non_valued.amin(-1)
 
-    return (_squarify(field_mask), _squarify(event_mask))
+    # FIXME this could be better
+    return (
+        ~(field_mask.unsqueeze(-1) & field_mask.unsqueeze(-2)),
+        ~(event_mask.unsqueeze(-1) & event_mask.unsqueeze(-2)),
+    )
 
 
 class LearnedTensor(torch.nn.Module):
@@ -320,7 +319,7 @@ class FieldEncoder(torch.nn.Module):
         """
 
         N, L, F, C = fields.shape
-        H = self.H
+        # H = self.H
 
         # NL F C
         batched = fields.view(N * L, F, C)
@@ -329,13 +328,14 @@ class FieldEncoder(torch.nn.Module):
         batched += self.positional().unsqueeze(dim=0).expand(N * L, F, C)
 
         # NLH F F
-        identity = self.identity.expand((N * L * H, F, F))
+        # identity = self.identity.expand((N * L * H, F, F))
 
         # NLH F F
-        masks = torch.repeat_interleave(mask, H, dim=0) & ~identity
+        # masks = torch.repeat_interleave(mask, H, dim=0) & ~identity
 
         # NL F C
-        events = self.encoder(batched, mask=masks).view(N, L, F * C)
+        # events = self.encoder(batched, mask=masks).view(N, L, F * C)
+        events = self.encoder(batched).view(N, L, F * C)
 
         # N L FC
         return events
@@ -381,7 +381,7 @@ class EventEncoder(torch.nn.Module):
         Float[Tensor, "N L FC"],
     ]:
         N, L, FC = events.shape
-        H = self.H
+        # H = self.H
 
         # N L FC
         events += self.positional().unsqueeze(0).expand(N, L, FC)
@@ -393,10 +393,11 @@ class EventEncoder(torch.nn.Module):
         concatenated = torch.cat((class_token, events), dim=1)
 
         # NH L+1 L+1
-        masks = torch.nn.functional.pad(mask, (1, 0, 1, 0), value=0).repeat_interleave(H, dim=0)
+        # masks = torch.nn.functional.pad(mask, (1, 0, 1, 0), value=0).repeat_interleave(H, dim=0)
 
         # N L+1 FC
-        encoded = self.encoder(concatenated, mask=masks)
+        # encoded = self.encoder(concatenated, mask=masks)
+        encoded = self.encoder(concatenated)
 
         # (N 1 FC), (N L FC)
         sequence, events = encoded.split((1, L), dim=1)
@@ -459,7 +460,7 @@ class EventDecoder(torch.nn.Module):
             inputs (Float[Tensor, "N L FC"]): The input tensor.
 
         Returns:
-            TensorDict[Float[Tensor, "N L ?"]]: A dictionary of output tensors for each field.
+            TensorDict[Float[Tensor, "N L _"]]: A dictionary of output tensors for each field.
         """
 
         N = inputs.shape[0]
@@ -622,13 +623,13 @@ def smoothen(
 def pretrain(
     module: "SequenceModule",
     batch: PretrainingData,
-    reconstruction: TensorDict,
+    output: OutputData,
     strata: str,
 ) -> Tensor:
     losses = []
 
     for field in module.manager.schema.fields:
-        values: Tensor = reconstruction[field.name]
+        values: Tensor = output.reconstructions[field.name]
         targets: TargetField = batch.targets[field.name]
 
         N, L, T = values.shape
@@ -655,20 +656,26 @@ def pretrain(
 
 def finetune(
     module: "SequenceModule",
-    batch: FinetuningData,
-    predictions: Tensor,
+    batch: SupervisedData,
+    output: OutputData,
     strata: str,
 ) -> Tensor:
-    loss = cross_entropy(predictions, batch.targets, weight=module.weights)
+    loss = cross_entropy(output.predictions, batch.targets, weight=module.weights)
     module.info(name=f"finetune-{strata}/loss", value=loss, prog_bar=(strata == "validate"))
 
-    probabilities = torch.nn.functional.softmax(predictions, dim=1)
+    probabilities = torch.nn.functional.softmax(output.predictions, dim=1)
 
     collection = module.metrics[f"{strata}_collection"]
 
     for name, metric in collection.items():
         metric.update(probabilities, batch.targets)
         module.info(name=f"finetune-{strata}/{name}", value=metric)
+
+    if module.global_step % 10 == 0:
+        for index, values in enumerate(probabilities.unbind(dim=1)):
+            label = module.manager.task.balancer.labels[index]
+            tag = f'finetune-distribution/{module.manager.schema.target_id}="{label}"'
+            module.logger.experiment.add_histogram(tag=tag, values=values, global_step=module.global_step)
 
     return loss
 
@@ -691,17 +698,18 @@ def step(
 
     assert strata in ["train", "validate", "test", "predict"]
 
-    predictions, reconstruction = self.forward(batch.inputs)
+    output: OutputData = self.forward(batch.inputs)
 
-    match batch:
-        case PretrainingData():
-            return pretrain(module=self, batch=batch, reconstruction=reconstruction, strata=strata)
+    if isinstance(batch, PretrainingData):
+        return pretrain(module=self, batch=batch, output=output, strata=strata)
 
-        case FinetuningData():
-            return finetune(module=self, batch=batch, predictions=predictions, strata=strata)
+    assert isinstance(batch, SupervisedData)
 
-        case InferenceData():
-            return torch.nn.functional.softmax(predictions, dim=1)
+    if strata == "predict":
+        return torch.nn.functional.softmax(output.predictions, dim=1)
+
+    else:
+        return finetune(module=self, batch=batch, output=output, strata=strata)
 
 
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
@@ -755,18 +763,7 @@ class SequenceModule(lit.LightningModule):
         self.flops_per_batch = measure_flops(self, lambda: self(sample))
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N T"], TensorDict]:  # type: ignore
-        """
-        Performs the forward pass of the encoder.
-
-        Args:
-            events (Float[Tensor, "N L FC"]): The input tensor.
-
-        Returns:
-            tuple[Tensor, TensorDict]:
-            A tuple containing two tensors. The first tensor represents the supervised classification predictions and the second tensor represents the decoded, reconstructed events.
-        """
-
+    def forward(self, inputs: TensorDict) -> OutputData:
         field_mask, event_mask = create_attention_masks(inputs, manager=self.manager)
 
         fields = self.modular_field_embedder(inputs)
@@ -776,7 +773,7 @@ class SequenceModule(lit.LightningModule):
         predictions = self.decision_head(sequence)
         reconstructions = self.event_decoder(representations)
 
-        return predictions, reconstructions
+        return OutputData.new(sequence=sequence, reconstructions=reconstructions, predictions=predictions)
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         return torch.optim.AdamW(

@@ -14,10 +14,14 @@ if __name__ == "__main__":
         event_id="transaction_id",
         order_by="order_id",
         target_id="is_fraud",
-        use_chip="discrete",
         merchant_state="discrete",
         merchant_city="discrete",
+        use_chip="discrete",
+        amount="continuous",
         merchant_name="entity",
+        card="entity",
+        timestamp="temporal",
+        mcc="discrete",
         has_bad_pin="discrete",
         has_bad_zipcode="discrete",
         has_bad_card_number="discrete",
@@ -25,16 +29,16 @@ if __name__ == "__main__":
         has_bad_expiration="discrete",
         has_technical_glitch="discrete",
         has_bad_cvv="discrete",
-        card="entity",
-        mcc="discrete",
-        amount="continuous",
-        timestamp="temporal",
     )
 
     params = wm.Hyperparameters(
-        n_steps=300,
-        batch_size=196,
+        n_pretrain_steps=2000,
+        n_finetune_steps=200,
+        batch_size=192,
         d_field=48,
+        max_epochs=256,
+        n_epochs_frozen=16,
+        learning_rate=0.00005,
     )
 
     wm.train(datapath=ledger, schema=schema, params=params, split=split)

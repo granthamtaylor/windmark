@@ -102,15 +102,17 @@ class Hyperparameters(DataClassJSONMixin):
     """Dropout rate"""
     n_bands: Annotated[int, pydantic.Field(gt=1, le=16)] = 8
     """Precision of fourier feature encoders"""
-    head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
+    head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 2
     """How quickly to converge sequence representation"""
     n_quantiles: Annotated[int, pydantic.Field(gt=1, le=512)] = 64
     """Number of quantiles for continuous and temporal field"""
 
     # training
-    n_steps: Annotated[int, pydantic.Field(gt=0)] = 128
-    """Proportion of events to sample from during finetuning"""
-    weight_decay: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.00001
+    n_pretrain_steps: Annotated[int, pydantic.Field(gt=0)] = 128
+    """Number of steps to take per epoch during pretraining"""
+    n_finetune_steps: Annotated[int, pydantic.Field(gt=0)] = 128
+    """Number of steps to take per epoch during finetuning"""
+    weight_decay: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.000001
     """Optimizer weight decay"""
     gradient_clip_val: Annotated[float, pydantic.Field(ge=0.0)] = 0.5
     """Gradient clipping threshold"""
@@ -275,31 +277,40 @@ class PretrainingData:
 
 
 @tensorclass
-class FinetuningData:
+class SupervisedData:
     inputs: Annotated[TensorDict, TensorField]
     targets: Int[Tensor, "N T"]
-
-    @jaxtyped(typechecker=beartype)
-    @classmethod
-    def new(cls, batch: tuple[TensorDict, Tensor, tuple[str, str]]):
-        inputs, targets, _ = batch
-
-        targets = targets.unsqueeze(0)
-
-        return cls(inputs=inputs, targets=targets, batch_size=[1])
-
-
-@tensorclass
-class InferenceData:
-    inputs: Annotated[TensorDict, TensorField]
     meta: list[tuple[str, str]] | tuple[str, str]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, batch: tuple[TensorDict, Tensor, tuple[str, str]]):
-        inputs, _, meta = batch
+        inputs, targets, meta = batch
 
-        return cls(inputs=inputs, meta=meta, batch_size=[1])
+        targets = targets.unsqueeze(0)
+
+        return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])
 
 
-SequenceData: TypeAlias = PretrainingData | FinetuningData | InferenceData
+SequenceData: TypeAlias = PretrainingData | SupervisedData
+
+
+@tensorclass
+class OutputData:
+    sequence: Float[Tensor, "N FC"]
+    reconstructions: TensorDict
+    predictions: Float[Tensor, "N T"]
+
+    @jaxtyped(typechecker=beartype)
+    @classmethod
+    def new(
+        cls,
+        sequence: Float[Tensor, "N FC"],
+        reconstructions: TensorDict,
+        predictions: Float[Tensor, "N T"],
+    ):
+        assert sequence.shape[0] == reconstructions.shape[0] == predictions.shape[0]
+
+        L = sequence.shape[0]
+
+        return cls(sequence=sequence, reconstructions=reconstructions, predictions=predictions, batch_size=[L])

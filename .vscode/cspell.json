@@ -6,16 +6,18 @@
     "AUROC",
     "dtype",
     "embedders",
+    "fastavro",
     "finfo",
     "jaxtyped",
     "jaxtyping",
     "mashumaro",
+    "ndarray",
     "nhead",
     "optim",
+    "pyarrow",
     "pydantic",
     "pytdigest",
     "quantile",
-    "squarify",
     "unsqueeze"
   ]
 }

@@ -38,6 +38,6 @@ def train(
 
     pretrained = comp.pretrain(lifestreams=lifestreams, params=params, manager=system)
 
-    comp.finetune(checkpoint=pretrained, lifestreams=lifestreams, params=params, manager=system)
+    finetuned = comp.finetune(checkpoint=pretrained, lifestreams=lifestreams, params=params, manager=system)
 
-    # comp.predict(checkpoint=finetuned, params=params, manager=system, lifestreams=lifestreams)
+    comp.predict(checkpoint=finetuned, params=params, manager=system, lifestreams=lifestreams)

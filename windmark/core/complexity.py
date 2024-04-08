@@ -1,6 +1,7 @@
 from functools import partial
 
 from windmark.core.structs import Hyperparameters
+from windmark.core.managers import SystemManager
 
 
 def _calculate_bert_memory_complexity(
@@ -37,12 +38,12 @@ def _calculate_bert_memory_complexity(
     memory += batch_size * n_heads * max_seq_len * max_seq_len
 
     # the "3" comes from forward prop, backward prop, and general model overhead
-    memory *= 2.5 * n_blocks * precision
+    memory *= 3 * n_blocks * precision
 
     return memory
 
 
-def complexity(params: Hyperparameters) -> int:
+def complexity(params: Hyperparameters, manager: SystemManager) -> int:
     # as per https://pytorch.org/docs/stable/generated/torch.nn.TransformerEncoderLayer.html
     D_FFN = 2048
 
@@ -57,7 +58,7 @@ def complexity(params: Hyperparameters) -> int:
 
     field = encoder(
         batch_size=params.batch_size * params.n_context,
-        max_seq_len=params.n_fields,
+        max_seq_len=len(manager.schema),
         d_hidden=params.d_field,
         n_blocks=params.n_layers_field_encoder,
         n_heads=params.n_heads_field_encoder,
@@ -66,7 +67,7 @@ def complexity(params: Hyperparameters) -> int:
     event = encoder(
         batch_size=params.batch_size,
         max_seq_len=params.n_context,
-        d_hidden=params.n_fields * params.d_field,
+        d_hidden=len(manager.schema) * params.d_field,
         n_blocks=params.n_layers_event_encoder,
         n_heads=params.n_heads_event_encoder,
     )

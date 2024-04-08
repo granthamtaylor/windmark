@@ -12,7 +12,7 @@ from windmark.core.managers import SystemManager
 from windmark.core.structs import Hyperparameters
 
 
-@fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
+@fk.task(requests=fk.Resources(cpu="32", mem="64Gi"))
 def pretrain_sequence_encoder(
     lifestreams: fk.types.directory.FlyteDirectory,
     params: Hyperparameters,
@@ -33,19 +33,18 @@ def pretrain_sequence_encoder(
     root.mkdir()
 
     trainer = Trainer(
-        logger=TensorBoardLogger("logs", name="windmark"),
+        logger=TensorBoardLogger("logs", name="windmark", version=manager.version),
         accelerator="auto",
         devices="auto",
         strategy="auto",
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
         max_epochs=params.max_epochs,
-        min_epochs=255,
         default_root_dir=root / "pretrain",
         callbacks=[
             RichProgressBar(),
             EarlyStopping(monitor="pretrain-validate/loss", patience=params.patience),
-            checkpoint := ModelCheckpoint(root / "finetune"),
+            checkpoint := ModelCheckpoint(root / "pretrain"),
         ],
     )
 

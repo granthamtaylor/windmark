@@ -13,7 +13,7 @@ from windmark.core.managers import SystemManager
 from windmark.core.structs import Hyperparameters
 
 
-@fk.task(requests=fk.Resources(cpu="24", mem="8Gi"))
+@fk.task(requests=fk.Resources(cpu="32", mem="64Gi"))
 def finetune_sequence_encoder(
     lifestreams: fk.types.directory.FlyteDirectory,
     checkpoint: fk.types.file.FlyteFile,
@@ -35,7 +35,7 @@ def finetune_sequence_encoder(
     root = Path(fk.current_context().working_directory) / "checkpoints"
 
     trainer = Trainer(
-        logger=TensorBoardLogger("logs", name="windmark"),
+        logger=TensorBoardLogger("logs", name="windmark", version=manager.version),
         accelerator="auto",
         devices="auto",
         strategy="auto",
@@ -53,6 +53,6 @@ def finetune_sequence_encoder(
     )
 
     trainer.fit(module)
-    trainer.test(module)
+    # trainer.test(module)
 
     return fk.types.file.FlyteFile(checkpoint.best_model_path)

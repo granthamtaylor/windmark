@@ -27,6 +27,15 @@
         "reveal": "always",
         "panel": "new"
       }
+    },
+    {
+      "label": "Tensorboard",
+      "type": "shell",
+      "command": "just tensorboard",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
     }
   ]
 }

@@ -120,19 +120,19 @@ class BalanceManager(DataClassJSONMixin):
         for label in self.labels:
             table.add_column(f'"{label}"', style="magenta")
 
-        def format_percent(values: list[float]) -> list[str]:
+        def format_percents(values: list[float]) -> list[str]:
             return list(map(lambda x: f"{x:.4%}", values))
 
         def format_numbers(values: list[float]) -> list[str]:
             return list(map(lambda x: f"{x:.4}", values))
 
-        def format_integers(values: list[float]) -> list[str]:
+        def format_integers(values: list[int]) -> list[str]:
             return list(map(lambda x: f"{x:,}", values))
 
         table.add_row("Label Counts", *format_integers(self.counts))
-        table.add_row("Population Distribution", *format_percent(self.values))
-        table.add_row("Modified Distribution", *format_percent(self.interpolation))
-        table.add_row("Marginal Sample Rate", *format_percent(self.thresholds))
+        table.add_row("Population Distribution", *format_percents(self.values))
+        table.add_row("Modified Distribution", *format_percents(self.interpolation))
+        table.add_row("Marginal Sample Rate", *format_percents(self.thresholds))
         table.add_row("Loss Weights", *format_numbers(self.weights))
 
         console.print(table)
@@ -199,12 +199,12 @@ class SampleManager(DataClassJSONMixin):
         # expected finetuning steps per epoch
         self.pretraining: dict[str, float] = {}
         for subset in ["train", "validate", "test"]:
-            # n_steps = sample_rate * n_events * split_rate / batch_size
-            # n_steps * batch_size = sample_rate * n_events * split_rate
-            # (n_steps * batch_size) / (n_events * split_rate) = sample_rate
+            # n_pretrain_steps = sample_rate * n_events * split_rate / batch_size
+            # n_pretrain_steps * batch_size = sample_rate * n_events * split_rate
+            # (n_pretrain_steps * batch_size) / (n_events * split_rate) = sample_rate
 
-            sample_rate = (self.params.n_steps * self.params.batch_size) / (self.split[subset] * self.n_events)
-            assert sample_rate < 1.0, message(mode="pretraining", n_steps=self.params.n_steps, split=subset)
+            sample_rate = (self.params.n_pretrain_steps * self.params.batch_size) / (self.split[subset] * self.n_events)
+            assert sample_rate < 1.0, message(mode="pretraining", n_steps=self.params.n_pretrain_steps, split=subset)
             self.pretraining[subset] = sample_rate
 
         n_targets = 0
@@ -214,8 +214,8 @@ class SampleManager(DataClassJSONMixin):
         # expected finetuning steps per epoch
         self.finetuning: dict[str, float] = {}
         for subset in ["train", "validate", "test"]:
-            sample_rate = (self.params.n_steps * self.params.batch_size) / (self.split[subset] * n_targets)
-            assert sample_rate < 1.0, message(mode="finetuning", n_steps=self.params.n_steps, split=subset)
+            sample_rate = (self.params.n_finetune_steps * self.params.batch_size) / (self.split[subset] * n_targets)
+            assert sample_rate < 1.0, message(mode="finetuning", n_steps=self.params.n_finetune_steps, split=subset)
             self.finetuning[subset] = sample_rate
 
     def show(self) -> None:
@@ -264,6 +264,7 @@ class LevelManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class SystemManager(DataClassJSONMixin):
+    version: str
     schema: SchemaManager
     task: SupervisedTaskManager
     sample: SampleManager

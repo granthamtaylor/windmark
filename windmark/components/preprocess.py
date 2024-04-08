@@ -87,6 +87,8 @@ def preprocess_ledger_to_shards(
         sequence.write_avro(outpath / f"{index}.avro", name="lifestream")
         index += 1
 
-    console.print(f"[red]INFO:[/] finished preprocessing [bold]{index+1}[/] lifestream shards")
+    console.print(f"[red]INFO:[/] finished preprocessing [bold]{index}[/] lifestream shards")
+
+    print(outpath)
 
     return fk.types.directory.FlyteDirectory(outpath)

@@ -756,7 +756,7 @@ However, this alone is imperfect. We are penalizing the model if it guesses the 
 
 If the a masked field is really "padded", but the model guessed that the value is in any decile (or is null), we want to fully penalize the model. Additionally, if a masked field is of any decile, but the model predicted that masked field is either null or padded, then we should fully penalize the model. The "neighborhood loss smoothing" only applies if the masked field is valued, and even then it only applies among valued quantile bins.
 
-//   FIXME
+// FIXME
 Geospatial fields are a little more complicated, however, because lines of longitude wrap around at the prime meridian. This requires an adaption such that the 1st decile is as close to the 10th decile as the 9th decile. This is only relevant to the longitude tensor of geospatial fields.
 
 == Fine-tuning Sequence Models

@@ -1,16 +1,17 @@
 import os
+from typing import Sequence, Optional
 
 import pyarrow.parquet as pq
 
 import lightning.pytorch as lit
-import msgspec
+from lightning.pytorch import callbacks
 import polars as pl
 import torch
 
-from windmark.core.structs import InferenceData
+from windmark.core.structs import SupervisedData
 
 
-class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
+class ParquetBatchWriter(callbacks.BasePredictionWriter):
     def __init__(self, outpath: str | os.PathLike):
         super().__init__("batch")
 
@@ -21,28 +22,28 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
     def write_on_batch_end(
         self,
         trainer: lit.Trainer,
-        module: lit.LightningModule,
+        pl_module: lit.LightningModule,
         prediction: torch.Tensor,
-        batch_indices: list[int] | None,
-        batch: InferenceData,
-        batch_index: int,
-        dataloader_index: int,
+        batch_indices: Optional[Sequence[int]],
+        batch: SupervisedData,
+        batch_idx: int,
+        dataloader_idx: int,
     ) -> None:
         """
         Called when the predict epoch ends.
         """
 
-        array = prediction.float().cpu().detach().numpy()
-
         table = (
             pl.DataFrame(
                 {
                     "meta": batch.meta,
-                    "predictions": array,
+                    "targets": batch.targets.cpu().detach().numpy(),
+                    "predictions": prediction.float().cpu().detach().numpy(),
                 }
             )
             .select(
-                pl.col("predictions").map_elements(lambda x: msgspec.json.encode(x.to_list()), return_dtype=pl.String),
+                pl.col("predictions"),
+                pl.col("targets"),
                 sequence_id=pl.col("meta").list.first(),
                 event_id=pl.col("meta").list.last(),
             )
@@ -55,7 +56,7 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
 
         self.writer.write_table(table)
 
-    def on_predict_end(self, trainer: lit.Trainer, module: lit.LightningModule):
+    def on_predict_end(self, trainer: lit.Trainer, pl_module: lit.LightningModule):
         """
         Called at the end of the prediction loop to close the Parquet writer.
         """
@@ -64,33 +65,33 @@ class ParquetBatchWriter(lit.callbacks.BasePredictionWriter):
             self.writer = None
 
 
-class ThawedFinetuning(lit.callbacks.BaseFinetuning):
+class ThawedFinetuning(callbacks.BaseFinetuning):
     def __init__(self, transition: int):
         super().__init__()
 
         self._unfreeze_at_epoch = transition
 
-    def freeze_before_training(self, module: lit.LightningModule):
+    def freeze_before_training(self, pl_module: lit.LightningModule):
         self.freeze(
             [
-                module.modular_field_embedder,
-                module.field_encoder,
-                module.event_encoder,
-                module.event_decoder,
+                pl_module.modular_field_embedder,
+                pl_module.field_encoder,
+                pl_module.event_encoder,
+                pl_module.event_decoder,
             ]
         )
 
     def finetune_function(
         self,
-        module: lit.LightningModule,
+        pl_module: lit.LightningModule,
         epoch: int,
         optimizer: torch.optim.Optimizer,
     ):
         if epoch == self._unfreeze_at_epoch:
             modules = [
-                module.modular_field_embedder,
-                module.field_encoder,
-                module.event_encoder,
+                pl_module.modular_field_embedder,
+                pl_module.field_encoder,
+                pl_module.event_encoder,
             ]
 
             self.unfreeze_and_add_param_group(
