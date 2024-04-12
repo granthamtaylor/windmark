@@ -1,14 +1,17 @@
 import math
+import datetime
 import dataclasses
 import functools
 
 import numpy as np
-from rich.console import Console
+from rich.console import Console, Group
 from rich.table import Table
+from rich import print
+from rich.panel import Panel
 from pytdigest import TDigest
 from mashumaro.mixins.json import DataClassJSONMixin
 
-from windmark.core.structs import Hyperparameters, Field, Centroid, LevelSet
+from windmark.core.constructs import Hyperparameters, Field, Centroid, LevelSet
 
 console = Console()
 
@@ -53,14 +56,12 @@ class SchemaManager(DataClassJSONMixin):
     def __post_init__(self):
         assert len(self.fields) > 1, "must pass in at least two fields"
 
-        reserved_names = set(
-            [
-                self.sequence_id,
-                self.event_id,
-                self.order_by,
-                self.target_id,
-            ]
-        )
+        reserved_names: set[str] = {
+            self.sequence_id,
+            self.event_id,
+            self.order_by,
+            self.target_id,
+        }
 
         assert len(reserved_names) == 4
 
@@ -113,27 +114,24 @@ class BalanceManager(DataClassJSONMixin):
         self.kappa = self.kappa
 
     def show(self):
-        table = Table(title=f"BalanceManager(kappa={self.kappa:.2%})")
+        table = Table(title=f"Balance Manager (kappa={self.kappa:.2%})")
 
         table.add_column("Class Labels", justify="right", style="cyan", no_wrap=True)
+        table.add_column("Label Counts", style="cyan", no_wrap=True)
+        table.add_column("Population Distribution", style="cyan", no_wrap=True)
+        table.add_column("Sample Rate", style="cyan", no_wrap=True)
+        table.add_column("Modified Distribution", style="cyan", no_wrap=True)
+        table.add_column("Loss Weight", style="cyan", no_wrap=True)
 
-        for label in self.labels:
-            table.add_column(f'"{label}"', style="magenta")
-
-        def format_percents(values: list[float]) -> list[str]:
-            return list(map(lambda x: f"{x:.4%}", values))
-
-        def format_numbers(values: list[float]) -> list[str]:
-            return list(map(lambda x: f"{x:.4}", values))
-
-        def format_integers(values: list[int]) -> list[str]:
-            return list(map(lambda x: f"{x:,}", values))
-
-        table.add_row("Label Counts", *format_integers(self.counts))
-        table.add_row("Population Distribution", *format_percents(self.values))
-        table.add_row("Modified Distribution", *format_percents(self.interpolation))
-        table.add_row("Marginal Sample Rate", *format_percents(self.thresholds))
-        table.add_row("Loss Weights", *format_numbers(self.weights))
+        for index in range(len(self.labels)):
+            table.add_row(
+                self.labels[index],
+                f"{self.counts[index]:,}",
+                f"{self.values[index]:.4%}",
+                f"{self.interpolation[index]:.4%}",
+                f"{self.thresholds[index]:.4%}",
+                f"{self.weights[index]:.4}",
+            )
 
         console.print(table)
 
@@ -149,7 +147,6 @@ class SupervisedTaskManager(DataClassJSONMixin):
         assert self.n_targets > 1
 
 
-# TODO is this getting recalculated anywhere that is performance critical?
 @dataclasses.dataclass
 class SplitManager(DataClassJSONMixin):
     train: float
@@ -191,20 +188,14 @@ class SampleManager(DataClassJSONMixin):
     split: SplitManager
 
     def __post_init__(self):
-        def message(mode: str, n_steps: int, split: str):
-            return (
-                f"There not enough observations" f" to create {n_steps} batches for" f" split '{split}' during {mode}."
-            )
+        def warn(mode: str, n_steps: int, split: str):
+            return f"There not enough observations to create {n_steps} batches for split '{split}' during {mode}."
 
         # expected finetuning steps per epoch
         self.pretraining: dict[str, float] = {}
         for subset in ["train", "validate", "test"]:
-            # n_pretrain_steps = sample_rate * n_events * split_rate / batch_size
-            # n_pretrain_steps * batch_size = sample_rate * n_events * split_rate
-            # (n_pretrain_steps * batch_size) / (n_events * split_rate) = sample_rate
-
             sample_rate = (self.params.n_pretrain_steps * self.params.batch_size) / (self.split[subset] * self.n_events)
-            assert sample_rate < 1.0, message(mode="pretraining", n_steps=self.params.n_pretrain_steps, split=subset)
+            assert sample_rate < 1.0, warn(mode="pretraining", n_steps=self.params.n_pretrain_steps, split=subset)
             self.pretraining[subset] = sample_rate
 
         n_targets = 0
@@ -215,16 +206,39 @@ class SampleManager(DataClassJSONMixin):
         self.finetuning: dict[str, float] = {}
         for subset in ["train", "validate", "test"]:
             sample_rate = (self.params.n_finetune_steps * self.params.batch_size) / (self.split[subset] * n_targets)
-            assert sample_rate < 1.0, message(mode="finetuning", n_steps=self.params.n_finetune_steps, split=subset)
+            assert sample_rate < 1.0, warn(mode="finetuning", n_steps=self.params.n_finetune_steps, split=subset)
             self.finetuning[subset] = sample_rate
 
     def show(self) -> None:
-        labeled_inference: int = int(self.split["test"] * sum(self.task.balancer.counts) / self.params.batch_size)
-        total_inference: int = int(self.split["test"] * self.n_events / self.params.batch_size)
+        def render(mode: str) -> Table:
+            assert mode in ["finetune", "pretrain"]
 
-        print(self.pretraining)
-        print(self.finetuning)
-        print(f"{total_inference} observations in test split ({labeled_inference} are labeled)")
+            if mode == "pretrain":
+                title = "Pretraining Sample Manager"
+                rates = self.pretraining
+            else:
+                title = "Finetuning Sample Manager"
+                rates = self.finetuning
+
+            table = Table(title=title)
+
+            table.add_column("Strata", justify="right", style="cyan", no_wrap=True)
+            table.add_column("Sample Rate", justify="right", style="cyan", no_wrap=True)
+
+            for strata, sample_rate in rates.items():
+                table.add_row(strata, f"{sample_rate:.4%}")
+
+            return table
+
+        n_inference_batches: int = int(self.split["test"] * self.n_events / self.params.batch_size)
+
+        renderables = Group(
+            render("pretrain"),
+            render("finetune"),
+            f"inference batches: {n_inference_batches:,}",
+        )
+
+        console.print(Panel.fit(renderables, title="Sample Managers"))
 
 
 @dataclasses.dataclass
@@ -243,23 +257,77 @@ class CentroidManager(DataClassJSONMixin):
 
         return digests
 
+    def show(self, schema: SchemaManager):
+        percentiles = [0.0, 0.05, 0.25, 0.50, 0.75, 0.95, 1.0]
+
+        types: dict[str, str] = {field.name: field.type for field in schema.fields}
+
+        table = Table(title="Centroid Manager")
+
+        table.add_column("Field Names", justify="right", style="cyan", no_wrap=True)
+
+        for percentile in percentiles:
+            table.add_column(f"Q({percentile:.2})", style="cyan", no_wrap=True)
+
+        for field, digest in self.digests.items():
+            values = []
+
+            for percentile in percentiles:
+                value = digest.inverse_cdf(percentile)  # type: ignore
+
+                if types[field] == "continuous":
+                    values.append(f"{value:.3f}")
+                elif types[field] == "temporal":
+                    values.append(datetime.datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M"))  # type: ignore
+                else:
+                    raise NotImplementedError
+
+            table.add_row(field, *values)
+
+        console.print(table)
+
 
 @dataclasses.dataclass
 class LevelManager(DataClassJSONMixin):
     levelsets: list[LevelSet]
-    mapping: dict[str, dict[str, int]] = dataclasses.field(init=False)
+    mappings: dict[str, dict[str, int]] = dataclasses.field(init=False)
 
     def __post_init__(self):
-        self.mapping = {levelset.name: levelset.mapping for levelset in self.levelsets if levelset.is_valid}
+        self.mappings = {levelset.name: levelset.mapping for levelset in self.levelsets if levelset.is_valid}
 
     def get_size(self, field: Field) -> int:
         assert isinstance(field, Field)
-        # ! need to subtract one because "UNK" is hardcoded into enum
-        return len(self.mapping[field.name]) - 1
+
+        # ! need to subtract one because "[UNK]" is hardcoded into enum
+        return len(self.mappings[field.name]) - 1
 
     def __getitem__(self, field: Field) -> dict[str, int]:
         assert isinstance(field, Field)
-        return self.mapping[field.name]
+        return self.mappings[field.name]
+
+    def show(self):
+        table = Table(title="Level Manager")
+
+        table.add_column("Field Names", justify="right", style="cyan", no_wrap=True)
+
+        table.add_column("Depth", style="cyan", no_wrap=True)
+        table.add_column("Levels", style="cyan", no_wrap=False)
+
+        for field, mapping in self.mappings.items():
+            size: int = len(mapping) - 1
+
+            levels: list[str] = [level for level in list(mapping.keys()) if level != "[UNK]"]
+
+            max_levels = 50
+
+            formatted_levels = (", ").join(levels[: min(max_levels, size)])
+
+            if size >= max_levels:
+                formatted_levels += "..."
+
+            table.add_row(field, f"{size:,}", formatted_levels)
+
+        console.print(table)
 
 
 @dataclasses.dataclass
@@ -271,3 +339,11 @@ class SystemManager(DataClassJSONMixin):
     split: SplitManager
     centroids: CentroidManager
     levelsets: LevelManager
+
+    def show(self):
+        print(Panel.fit(self.version, title="Training Model"))
+
+        self.task.balancer.show()
+        self.sample.show()
+        self.centroids.show(schema=self.schema)
+        self.levelsets.show()

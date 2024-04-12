@@ -2,7 +2,7 @@ import flytekit as fk
 import polars as pl
 
 from windmark.core.managers import SupervisedTaskManager, SplitManager, SampleManager
-from windmark.core.structs import Hyperparameters
+from windmark.core.constructs import Hyperparameters
 
 
 @fk.task

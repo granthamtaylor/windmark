@@ -10,10 +10,12 @@ if __name__ == "__main__":
     )
 
     schema = wm.Schema.create(
+        # structural
         sequence_id="customer_id",
         event_id="transaction_id",
         order_by="order_id",
         target_id="is_fraud",
+        # fields
         merchant_state="discrete",
         merchant_city="discrete",
         use_chip="discrete",
@@ -32,13 +34,15 @@ if __name__ == "__main__":
     )
 
     params = wm.Hyperparameters(
-        n_pretrain_steps=2000,
-        n_finetune_steps=200,
+        n_pretrain_steps=800,
+        n_finetune_steps=300,
         batch_size=192,
         d_field=48,
-        max_epochs=256,
-        n_epochs_frozen=16,
-        learning_rate=0.00005,
+        max_pretrain_epochs=128,
+        max_finetune_epochs=256,
+        n_layers_event_encoder=8,
+        n_layers_field_encoder=1,
+        learning_rate=0.0005,
     )
 
     wm.train(datapath=ledger, schema=schema, params=params, split=split)

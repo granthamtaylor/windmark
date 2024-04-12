@@ -1,5 +1,6 @@
 import random
 from functools import partial
+from typing import TypeAlias, Any
 
 import fastavro
 import numpy as np
@@ -9,7 +10,7 @@ from tensordict import TensorDict
 from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
-from windmark.core.structs import (
+from windmark.core.constructs import (
     ContinuousField,
     DiscreteField,
     EntityField,
@@ -34,13 +35,17 @@ def subset(sequence: dict, split: str) -> bool:
     return sequence["split"] == split
 
 
+AnnotationType: TypeAlias = tuple[str, str, int]
+FieldType: TypeAlias = dict[str, Any]
+
+
 def sample(
     sequence: dict,
     params: Hyperparameters,
     manager: SystemManager,
     split: str,
     mode: str,
-) -> list[dict[str, str | list[int] | list[float | None] | list[str]]]:
+) -> list[tuple[AnnotationType, FieldType]]:
     observations = []
 
     assert split == sequence["split"]
@@ -74,47 +79,52 @@ def sample(
 
         window = slice(max(0, event - params.n_context), event)
 
-        observation = dict(
-            sequence_id=str(sequence["sequence_id"]),
-            event_id=str(sequence["event_ids"][event]),
-            label=label,
+        annotations: AnnotationType = (
+            str(sequence["sequence_id"]),
+            str(sequence["event_ids"][event]),
+            label,
         )
 
-        for field in manager.schema.fields:
-            observation[field.name] = sequence[field.name][window]
+        fields = {}
 
-        observations.append(observation)
+        for field in manager.schema.fields:
+            fields[field.name] = sequence[field.name][window]
+
+        observations.append((annotations, fields))
 
     return observations
 
 
 def tokenize(
-    observation: dict[str, str | list[float | None] | list[str]],
+    observation: tuple[AnnotationType, FieldType],
     manager: SystemManager,
-) -> dict[str, str | list[int] | list[float | None] | list[str]]:
+) -> tuple[AnnotationType, FieldType]:
+    annotations, fields = observation
+
     for field in manager.schema.fields:
         if field.type == "discrete":
             mapping = manager.levelsets[field]
 
-            values: list[str] = observation[field.name]
+            values: list[str] = fields[field.name]
 
-            observation[field.name] = list(map(lambda value: mapping[value], values))
+            fields[field.name] = list(map(lambda value: mapping[value], values))
 
-    return observation
+    return annotations, fields
 
 
 def hash(
-    observation: dict[str, str | list[int] | list[float | None] | list[str]],
+    observation: tuple[AnnotationType, FieldType],
     manager: SystemManager,
     params: Hyperparameters,
-) -> dict[str, str | list[int] | list[float | None]]:
+) -> tuple[AnnotationType, FieldType]:
+    meta, fields = observation
     offset = len(Tokens)
 
     for field in manager.schema.fields:
         if field.type == "entity":
-            values: list[str] = observation[field.name]
+            values: list[str] = fields[field.name]
 
-            unique = set(values)
+            unique: set[str] = set(values)
 
             integers = random.sample(range(offset, params.n_context + offset), len(unique))
 
@@ -122,30 +132,34 @@ def hash(
 
             mapping.update({"[UNK]": Tokens.UNK})
 
-            observation[field.name] = list(map(lambda value: mapping[value], values))
+            fields[field.name] = list(map(lambda value: mapping[value], values))
 
-    return observation
+    return meta, fields
 
 
 def cdf(
-    observation: dict[str, str | list[int] | list[float | None]],
+    observation: tuple[AnnotationType, FieldType],
     manager: SystemManager,
-) -> dict[str, str | list[int] | np.ndarray]:
+) -> tuple[AnnotationType, FieldType]:
+    annotations, fields = observation
+
     for field in manager.schema.fields:
         if field.type in ["continuous", "temporal"]:
-            # TODO verify that this is caching properly
             digest: TDigest = manager.centroids.digests[field.name]
-            array = np.array(observation[field.name], dtype=np.float64)
-            observation[field.name] = digest.cdf(array)
+            values: list[float] = fields[field.name]
+            array = np.array(values, dtype=np.float64)
+            fields[field.name] = digest.cdf(array)
 
-    return observation
+    return annotations, fields
 
 
 def tensorfield(
-    observation: dict[str, str | list[int] | np.ndarray],
+    observation: tuple[AnnotationType, FieldType],
     params: Hyperparameters,
     manager: SystemManager,
-) -> tuple[TensorDict, torch.Tensor, tuple[str, str]]:
+) -> tuple[AnnotationType, TensorDict]:
+    annotations, fields = observation
+
     output = {}
 
     tensorclasses = dict(
@@ -156,23 +170,25 @@ def tensorfield(
     )
 
     for field in manager.schema.fields:
-        values = observation[field.name]
+        values = fields[field.name]
         tensorclass = tensorclasses[field.type]
         output[field.name] = tensorclass.new(values, params=params)
 
-    inputs = TensorDict(output, batch_size=1)
-    labels = torch.tensor(observation["label"])
-    meta = observation["sequence_id"], observation["event_id"]
-
-    return inputs, labels, meta
+    return annotations, TensorDict(output, batch_size=1)
 
 
-def mask(
-    observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
+def package(
+    observation: tuple[AnnotationType, TensorDict],
     params: Hyperparameters,
     manager: SystemManager,
-) -> tuple[TensorDict, TensorDict, tuple[str, str]]:
-    inputs, _, meta = observation
+    mode: str,
+) -> SequenceData:
+    (*meta, label), fields = observation
+
+    assert mode in ("pretrain", "finetune", "inference")
+
+    if mode in ["finetune", "inference"]:
+        return SupervisedData.new(inputs=fields, targets=torch.tensor(label), meta=tuple(meta))
 
     N, L = (1, params.n_context)
 
@@ -181,25 +197,11 @@ def mask(
     is_event_masked = torch.rand(N, L).lt(params.p_mask_event)
 
     for field in manager.schema.fields:
-        targets[field.name] = inputs[field.name].mask(is_event_masked, params=params)
+        targets[field.name] = fields[field.name].mask(is_event_masked, params=params)
 
     targets = TensorDict(targets, batch_size=1)
 
-    return inputs, targets, meta
-
-
-def package(
-    observation: tuple[TensorDict, torch.Tensor, tuple[str, str]],
-    params: Hyperparameters,
-    manager: SystemManager,
-    mode: str,
-) -> SequenceData:
-    assert mode in ("pretrain", "finetune", "inference")
-
-    if mode in ["finetune", "inference"]:
-        return SupervisedData.new(observation)
-
-    return PretrainingData.new(mask(observation=observation, params=params, manager=manager))
+    return PretrainingData.new(inputs=fields, targets=targets, meta=tuple(meta))
 
 
 def stream(
@@ -230,10 +232,8 @@ def stream(
 
 
 def collate(batch: list[SequenceData]) -> SequenceData:
-    stacked = torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)
-
-    if isinstance(batch[0], SupervisedData):
-        stacked.meta = [observation.meta for observation in batch]
+    stacked = torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)  # type: ignore
+    stacked.meta = [observation.meta for observation in batch]
 
     return stacked
 
@@ -259,12 +259,12 @@ def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
             padded = torch.where(is_padded, Tokens.PAD, indicators)
             is_valued = padded.eq(Tokens.VAL).long()
             values = torch.rand(N, L).mul(is_valued)
-            output[field.name] = tensorfield[field.type](content=values, lookup=padded, batch_size=[N])
+            output[field.name] = tensorfield[field.type](content=values, lookup=padded, batch_size=[N])  # type: ignore
 
         if field.type in ["discrete", "entity"]:
             limit = manager.levelsets.get_size(field) + len(Tokens) if field.type == "discrete" else L + len(Tokens)
             values = torch.randint(0, limit, (N, L))
             padded = torch.where(is_padded, Tokens.PAD, values)
-            output[field.name] = tensorfield[field.type](lookup=padded, batch_size=[N])
+            output[field.name] = tensorfield[field.type](lookup=padded, batch_size=[N])  # type: ignore
 
     return TensorDict(output, batch_size=N)

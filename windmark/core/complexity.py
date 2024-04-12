@@ -1,6 +1,6 @@
 from functools import partial
 
-from windmark.core.structs import Hyperparameters
+from windmark.core.constructs import Hyperparameters
 from windmark.core.managers import SystemManager
 
 

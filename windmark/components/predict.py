@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import flytekit as fk
+import torch
+from flytekit.types import file, directory
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import RichProgressBar
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -8,18 +10,23 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from windmark.core.architecture import SequenceModule
 from windmark.core.callbacks import ParquetBatchWriter
 from windmark.core.managers import SystemManager
-from windmark.core.structs import Hyperparameters
+from windmark.core.constructs import Hyperparameters
 
 
 @fk.task(requests=fk.Resources(cpu="32", mem="64Gi"))
 def predict_sequence_encoder(
-    checkpoint: fk.types.file.FlyteFile,
-    lifestreams: fk.types.directory.FlyteDirectory,
+    checkpoint: file.FlyteFile,
+    lifestreams: directory.FlyteDirectory,
     params: Hyperparameters,
     manager: SystemManager,
 ):
+    assert torch.cuda.is_available(), "GPU not found"
+
+    # significantly less memory is required during inference
+    params.batch_size *= 3
+
     module = SequenceModule.load_from_checkpoint(
-        checkpoint_path=checkpoint.path,
+        checkpoint_path=str(checkpoint.path),
         datapath=lifestreams.path,
         params=params,
         manager=manager,

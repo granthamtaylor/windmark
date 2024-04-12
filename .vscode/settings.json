@@ -1,7 +1,5 @@
 {
-  "python.testing.pytestArgs": [
-    "windmark/tests"
-  ],
+  "python.testing.pytestArgs": ["windmark/tests"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true
 }

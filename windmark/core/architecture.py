@@ -5,6 +5,7 @@ from functools import partial, partialmethod
 from typing import Annotated
 
 import lightning.pytorch as lit
+from lightning.pytorch.loggers import TensorBoardLogger
 import torch
 import torchmetrics
 from beartype import beartype
@@ -18,7 +19,7 @@ from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
 from windmark.core.operators import collate, stream, mock
-from windmark.core.structs import (
+from windmark.core.constructs import (
     ContinuousField,
     DiscreteField,
     EntityField,
@@ -183,11 +184,13 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         assert values.shape == indicators.shape, "values and indicators must always have the same shape"
 
-        assert torch.all(values.mul(indicators).eq(0.0)), "values should be imputed if not null, padded, or masked"
+        assert torch.all(
+            values.mul(indicators).eq(0.0), dim=None
+        ), "values should be imputed if not null, padded, or masked"
 
-        assert torch.all(values.lt(1.0)), "values should be less than 1.0"
+        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
 
-        assert torch.all(values.ge(0.0)), "values should be greater than or equal to 0.0"
+        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
 
         N, L = values.shape
 
@@ -508,9 +511,11 @@ class DecisionHead(torch.nn.Module):
 
         layers = []
 
+        norm = torch.nn.utils.parametrizations.weight_norm
+
         for index, sizes in enumerate(zip(dims[:-1], dims[1:])):
             if index < len(dims) - 2:
-                activation = torch.nn.ReLU()
+                activation = torch.nn.LeakyReLU()
             else:
                 activation = torch.nn.Identity()
 
@@ -518,7 +523,7 @@ class DecisionHead(torch.nn.Module):
                 torch.nn.Sequential(
                     OrderedDict(
                         [
-                            ("dense", torch.nn.Linear(*sizes)),
+                            ("dense", norm(torch.nn.Linear(*sizes))),
                             ("act", activation),
                         ]
                     )
@@ -671,7 +676,7 @@ def finetune(
         metric.update(probabilities, batch.targets)
         module.info(name=f"finetune-{strata}/{name}", value=metric)
 
-    if module.global_step % 10 == 0:
+    if (module.global_step % 10 == 0) and (isinstance(module.logger, TensorBoardLogger)):
         for index, values in enumerate(probabilities.unbind(dim=1)):
             label = module.manager.task.balancer.labels[index]
             tag = f'finetune-distribution/{module.manager.schema.target_id}="{label}"'
@@ -729,13 +734,13 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
 
 
 class SequenceModule(lit.LightningModule):
-    def __init__(self, datapath: str | os.PathLike, params: Hyperparameters, manager: SystemManager, mode: str):
+    def __init__(self, datapath: str, params: Hyperparameters, manager: SystemManager, mode: str):
         super().__init__()
 
         assert mode in ["pretrain", "finetune", "inference"]
 
         assert os.path.exists(datapath)
-        self.datapath: str | os.PathLike = datapath
+        self.datapath: str = datapath
 
         assert isinstance(params, Hyperparameters)
         self.params: Hyperparameters = params
@@ -763,7 +768,7 @@ class SequenceModule(lit.LightningModule):
         self.flops_per_batch = measure_flops(self, lambda: self(sample))
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorDict) -> OutputData:
+    def forward(self, inputs: TensorDict) -> OutputData:  # type: ignore
         field_mask, event_mask = create_attention_masks(inputs, manager=self.manager)
 
         fields = self.modular_field_embedder(inputs)
@@ -776,9 +781,7 @@ class SequenceModule(lit.LightningModule):
         return OutputData.new(sequence=sequence, reconstructions=reconstructions, predictions=predictions)
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
-        return torch.optim.AdamW(
-            filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr, weight_decay=self.params.weight_decay
-        )
+        return torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
 
     training_step = partialmethod(step, strata="train")  # type: ignore
     validation_step = partialmethod(step, strata="validate")  # type: ignore

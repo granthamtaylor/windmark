@@ -4,10 +4,10 @@ Windmark is a Python module designed for modeling complex, heterogeneous sequent
 
 ## Features
 
-- **Automated Machine Learning Pipeline:** Streamline the process of modeling sequential data with an automated pipeline.
-- **Workflow Orchestration with Flytekit:** Utilize Flytekit to manage and scale your machine learning workflows efficiently.
-- **Efficient Data Preprocessing with Polars:** Leverage Polars for fast and memory-efficient data preprocessing.
-- **Support for Complex, Heterogeneous Sequential Data:** Tailored to handle diverse sequential data formats effectively.
+- **Automated Machine Learning Pipeline**: Streamline the process of modeling sequential data with an automated pipeline.
+- **Workflow Orchestration with Flytekit**: Utilize Flytekit to manage and scale your machine learning workflows efficiently.
+- **Efficient Data Preprocessing with Polars**: Leverage Polars for fast and memory-efficient data preprocessing.
+- **Support for Complex, Heterogeneous SequentialData :** Tailored to handle diverse sequential data formats effectively.
 
 ## Installation
 
@@ -68,22 +68,22 @@ wm.train(
 
 ```
 
-## Backlog
+## Development Backlog
 
 ### Features
 
-- [ ] Data quality checks and data exploration visualizations
-- [ ] Larger-than-memory data preprocessing (Spark)
-- [ ] Support for alternative supervised learning tasks (Regression, Survival)
-- [ ] Automatically generated report of model performance
-- [ ] Model deployment pipeline
+- Data quality checks and data exploration visualizations
+- Larger-than-memory data preprocessing (Spark)
+- Support for alternative supervised learning tasks (Regression, Survival)
+- Automatically generated report of model performance
+- Model deployment pipeline
 
 ### Experiments
 
-- [ ] Confirm that attention masks are not harming performance
-- [ ] Confirm that attention masks are improving compute
-- [ ] Explore preprocessing bottlenecks
-- [ ] Explore streaming compute bottlenecks
+- Confirm that attention masks are not harming performance
+- Confirm that attention masks are improving compute
+- Explore preprocessing bottlenecks
+- Explore streaming compute bottlenecks
 
 ## Documentation
 

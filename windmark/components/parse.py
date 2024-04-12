@@ -1,7 +1,7 @@
 import flytekit as fk
 import polars as pl
 
-from windmark.core.structs import Field
+from windmark.core.constructs import Field
 
 
 @fk.task

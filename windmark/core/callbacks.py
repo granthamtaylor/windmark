@@ -8,7 +8,7 @@ from lightning.pytorch import callbacks
 import polars as pl
 import torch
 
-from windmark.core.structs import SupervisedData
+from windmark.core.constructs import SupervisedData
 
 
 class ParquetBatchWriter(callbacks.BasePredictionWriter):
@@ -69,7 +69,7 @@ class ThawedFinetuning(callbacks.BaseFinetuning):
     def __init__(self, transition: int):
         super().__init__()
 
-        self._unfreeze_at_epoch = transition
+        self.transition = transition
 
     def freeze_before_training(self, pl_module: lit.LightningModule):
         self.freeze(
@@ -87,7 +87,7 @@ class ThawedFinetuning(callbacks.BaseFinetuning):
         epoch: int,
         optimizer: torch.optim.Optimizer,
     ):
-        if epoch == self._unfreeze_at_epoch:
+        if epoch == self.transition:
             modules = [
                 pl_module.modular_field_embedder,
                 pl_module.field_encoder,

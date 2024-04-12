@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import flytekit as fk
+from flytekit.types import directory, file
 
 import torch
 from lightning.pytorch import Trainer
@@ -8,24 +9,24 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProg
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
-from windmark.core.callbacks import ThawedFinetuning
 from windmark.core.managers import SystemManager
-from windmark.core.structs import Hyperparameters
+from windmark.core.constructs import Hyperparameters
+from windmark.core.callbacks import ThawedFinetuning
 
 
 @fk.task(requests=fk.Resources(cpu="32", mem="64Gi"))
 def finetune_sequence_encoder(
-    lifestreams: fk.types.directory.FlyteDirectory,
-    checkpoint: fk.types.file.FlyteFile,
+    lifestreams: directory.FlyteDirectory,
+    checkpoint: file.FlyteFile,
     params: Hyperparameters,
     manager: SystemManager,
-) -> fk.types.file.FlyteFile:
-    assert torch.cuda.is_available()
+) -> file.FlyteFile:
+    assert torch.cuda.is_available(), "GPU not found"
 
     torch.set_float32_matmul_precision("medium")
 
     module = SequenceModule.load_from_checkpoint(
-        checkpoint_path=checkpoint.path,
+        checkpoint_path=str(checkpoint.path),
         datapath=lifestreams.path,
         params=params,
         manager=manager,
@@ -41,18 +42,21 @@ def finetune_sequence_encoder(
         strategy="auto",
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
-        max_epochs=params.max_epochs,
-        default_root_dir=root / "finetune",
+        max_epochs=params.max_finetune_epochs,
         min_epochs=(params.n_epochs_frozen + 1),
+        default_root_dir=root / "finetune",
         callbacks=[
             RichProgressBar(),
-            ThawedFinetuning(transition=params.n_epochs_frozen),
             EarlyStopping(monitor="finetune-validate/loss", patience=params.patience),
-            checkpoint := ModelCheckpoint(root / "finetune"),
+            # StochasticWeightAveraging(swa_lrs=params.swa_lr),
+            ThawedFinetuning(transition=params.n_epochs_frozen),
+            checkpoints := ModelCheckpoint(root / "finetune"),
         ],
     )
 
-    trainer.fit(module)
-    # trainer.test(module)
+    print(f"finished finetuning (checkpoint: {checkpoints.best_model_path})")
 
-    return fk.types.file.FlyteFile(checkpoint.best_model_path)
+    trainer.fit(module)
+    trainer.test(module)
+
+    return file.FlyteFile(checkpoints.best_model_path)

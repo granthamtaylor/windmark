@@ -40,9 +40,9 @@ def create_system_manager(
     centroids: CentroidManager,
     levelsets: LevelManager,
 ) -> SystemManager:
-    print(version := label())
+    version = label()
 
-    return SystemManager(
+    manager = SystemManager(
         version=version,
         schema=schema,
         task=task,
@@ -51,3 +51,7 @@ def create_system_manager(
         centroids=centroids,
         levelsets=levelsets,
     )
+
+    manager.show()
+
+    return manager

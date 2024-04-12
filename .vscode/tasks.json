@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Train",
+      "label": "$(run) Train",
       "type": "shell",
       "command": "just train",
       "presentation": {
@@ -11,7 +11,7 @@
       }
     },
     {
-      "label": "Check",
+      "label": "$(check) Check",
       "type": "shell",
       "command": "just check",
       "presentation": {
@@ -20,7 +20,7 @@
       }
     },
     {
-      "label": "Doc",
+      "label": "$(book) Doc",
       "type": "shell",
       "command": "just doc",
       "presentation": {
@@ -29,7 +29,7 @@
       }
     },
     {
-      "label": "Tensorboard",
+      "label": "$(graph) Tensorboard",
       "type": "shell",
       "command": "just tensorboard",
       "presentation": {

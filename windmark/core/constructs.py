@@ -92,7 +92,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Hidden dimension per field"""
     n_heads_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 4
     """Number of heads in field encoder"""
-    n_layers_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 2
+    n_layers_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 1
     """Number of layers in field encoder"""
     n_heads_event_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 8
     """Number of heads in event encoder"""
@@ -102,7 +102,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Dropout rate"""
     n_bands: Annotated[int, pydantic.Field(gt=1, le=16)] = 8
     """Precision of fourier feature encoders"""
-    head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 2
+    head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
     """How quickly to converge sequence representation"""
     n_quantiles: Annotated[int, pydantic.Field(gt=1, le=512)] = 64
     """Number of quantiles for continuous and temporal field"""
@@ -112,26 +112,28 @@ class Hyperparameters(DataClassJSONMixin):
     """Number of steps to take per epoch during pretraining"""
     n_finetune_steps: Annotated[int, pydantic.Field(gt=0)] = 128
     """Number of steps to take per epoch during finetuning"""
-    weight_decay: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.000001
-    """Optimizer weight decay"""
-    gradient_clip_val: Annotated[float, pydantic.Field(ge=0.0)] = 0.5
+    swa_lr: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.1e-2
+    """Stochastic Weight Averaging"""
+    gradient_clip_val: Annotated[float, pydantic.Field(gt=0.0)] = 0.5
     """Gradient clipping threshold"""
-    max_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)] = 256
-    """Maximum number of epochs for pretraining and finetuning"""
+    max_pretrain_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)] = 256
+    """Maximum number of epochs for pretraining"""
+    max_finetune_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)] = 256
+    """Maximum number of epochs for finetuning"""
     quantile_smoothing: Annotated[float, pydantic.Field(gt=0.0, lt=33.0)] = 1.0
     """Smoothing factor of continuous fields' quantile labels"""
     p_mask_event: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
     """Probability of masking any event"""
     p_mask_field: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
     """Probability of masking any field"""
-    n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)] = 12
+    n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)] = 8
     """Number of epochs to freeze encoder while finetuning"""
-    interpolation_rate: Annotated[float, pydantic.Field(ge=0.0, le=1.0)] = 0.125
+    interpolation_rate: Annotated[float, pydantic.Field(ge=0.0, le=1.0)] = 0.08
     """Interpolation rate of imbalanced classification labels"""
     learning_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.0001
-    """Learning rate"""
+    """Learning Rate"""
     patience: Annotated[int, pydantic.Field(ge=1, le=256)] = 16
-    """early_stopping_patience"""
+    """Number of Epochs Patience for Early Stopping"""
 
     @pydantic.model_validator(mode="after")
     def check_head_shape(self):
@@ -142,13 +144,7 @@ class Hyperparameters(DataClassJSONMixin):
 
     @pydantic.model_validator(mode="after")
     def check_finetuning_unfreeze(self):
-        assert self.n_epochs_frozen < self.max_epochs, "n_epochs_frozen must be less than max_epochs"
-
-        return self
-
-    @pydantic.model_validator(mode="after")
-    def check_weight_decay(self):
-        assert self.weight_decay < self.learning_rate, "weight decay must be less than learning rate"
+        assert self.n_epochs_frozen < self.max_finetune_epochs, "n_epochs_frozen must be less than max_finetune_epochs"
 
         return self
 
@@ -192,7 +188,7 @@ class DiscreteField:
 
         self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
 
-        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)
+        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
 
 @tensorclass
@@ -248,7 +244,7 @@ class ContinuousField:
         self.content *= ~is_masked
 
         # return SSL target
-        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)
+        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
 
 @tensorclass
@@ -267,13 +263,12 @@ TensorField: TypeAlias = ContinuousField | DiscreteField | EntityField | Tempora
 class PretrainingData:
     inputs: Annotated[TensorDict, TensorField]
     targets: Annotated[TensorDict, TargetField]
+    meta: list[tuple[str, str]] | tuple[str, str]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
-    def new(cls, batch: tuple[TensorDict, TensorDict, tuple[str, str]]):
-        inputs, targets, _ = batch
-
-        return cls(inputs=inputs, targets=targets, batch_size=[1])
+    def new(cls, inputs: TensorDict, targets: TensorDict, meta: tuple[str, ...]):
+        return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])
 
 
 @tensorclass
@@ -284,9 +279,7 @@ class SupervisedData:
 
     @jaxtyped(typechecker=beartype)
     @classmethod
-    def new(cls, batch: tuple[TensorDict, Tensor, tuple[str, str]]):
-        inputs, targets, meta = batch
-
+    def new(cls, inputs: TensorDict, targets: Tensor, meta: tuple[str, ...]):
         targets = targets.unsqueeze(0)
 
         return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])

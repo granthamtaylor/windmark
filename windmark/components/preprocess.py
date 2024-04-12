@@ -2,20 +2,19 @@ from pathlib import Path
 from zlib import crc32
 
 import flytekit as fk
+from flytekit.types import directory
 import polars as pl
 from rich.console import Console
 
 from windmark.core.managers import SystemManager
-from windmark.core.structs import Field
+from windmark.core.constructs import Field
 
 
 console = Console()
 
 
 @fk.task
-def preprocess_ledger_to_shards(
-    ledger: str, manager: SystemManager, slice_size: int
-) -> fk.types.directory.FlyteDirectory:
+def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size: int) -> directory.FlyteDirectory:
     assert len(manager.schema.fields) > 0
 
     lf = pl.scan_parquet(ledger)
@@ -91,4 +90,4 @@ def preprocess_ledger_to_shards(
 
     print(outpath)
 
-    return fk.types.directory.FlyteDirectory(outpath)
+    return directory.FlyteDirectory(outpath)

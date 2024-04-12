@@ -2,7 +2,7 @@ from functools import partial
 
 import flytekit as fk
 
-from windmark.core.structs import Hyperparameters
+from windmark.core.constructs import Hyperparameters
 from windmark.core.managers import SchemaManager, SplitManager
 import windmark.components as comp
 

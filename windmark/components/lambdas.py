@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import flytekit as fk
 
-from windmark.core.structs import Field, Centroid, LevelSet
+from windmark.core.constructs import Field, Centroid, LevelSet
 from windmark.core.managers import SchemaManager, CentroidManager, LevelManager
 
 

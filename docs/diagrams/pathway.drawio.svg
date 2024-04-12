@@ -1,4 +1,4 @@
-<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="521px" height="361px" viewBox="-0.5 -0.5 521 361" content="&lt;mxfile&gt;&lt;diagram id=&quot;KQKbzreSfEQFZWZSjVwA&quot; name=&quot;Page-1&quot;&gt;7Vhdb5swFP01eZ3AkIS95qPtHiZViqZtjw6+gFWDmXFC0l+/62AHKFkXrVW6ViEP8T2+xvY53IPFKJjnu1tFy+yrZCBGxGO7UbAYEeJ70zH+GWTfIFPfb4BUcWaTWmDFH8GNtOiGM6h6iVpKoXnZB2NZFBDrHkaVknU/LZGiP2tJUxgAq5iKIfqdM501aDT2WvwOeJq5mX3P9uTUJVugyiiTdQcKlqNgrqTUTSvfzUEY8hwvzbibP/QeF6ag0OcMsEJUeu/2Bgy3akMQa1kvW2CW6Vwg7mMTJ1D7Hxh4n8Yu/NntWxi5vWO0t1HChZhLIdVhuoBRiJIY8Uor+QCdnkkcwTrBnuGe7DYruVGxXXZgHwOqUrBZYQOZDXWGWR5uQeaA68IEBYJqvu1rS+0jkh7zWhaxYYk8Ter0A5M6eStS7Vq2VGzsTRewBSFLBFfwawMFrpp4zmyWRcoLGAiB9VaapkZjgkdpbj4rQXFcDqguft+CszrjGlYlPdBSY0ZftITvwJmUiRlXaDpcFhgjm6biZ1XTTYxYSm4KBuw4+tWk24LSsHtWFttLQus/1oCJM6i6tTPfeVTWtTIHvkRK5/bvv0DCYYG4d9TlKyQcVMiXQkOqqIZOQaDEqDDx7nH2RKocmyZNmaf7Wi0nqyV8Ui3HIrhItUwGsq6k4DHXCH6rkHLi3QCwNY0frgKeJyCJLing54/idtF/dMaKnjkOPLW25OptZ58EwoseBLyrt71UwMmbvpx8MlBwIFSfpL8q0OMwGZufwWWhO3hzneT2cB200dRK571WrYx7VAfBCar9E1T/A9MYtl8BDn2dbynB8jc=&lt;/diagram&gt;&lt;/mxfile&gt;">
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="521px" height="361px" viewBox="-0.5 -0.5 521 361" content="&lt;mxfile scale=&quot;1&quot; border=&quot;0&quot; disableSvgWarning=&quot;true&quot;&gt;&lt;diagram id=&quot;KQKbzreSfEQFZWZSjVwA&quot; name=&quot;Page-1&quot;&gt;7Vjfb5swEP5r8jqBISl5zY92e5hUKZq2PTr4AKsGM+OEpH/9zsEOUNIuWqt0q0Ie4vvujM/fxx0Wo2Ce7+4ULbOvkoEYEY/tRsFiRIgfTMf4Z5B9g0TTmwZIFWc2qAVW/BEs6Fl0wxlUvUAtpdC87IOxLAqIdQ+jSsm6H5ZI0V+1pCkMgFVMxRD9zpnO7C7GXot/Bp5mbmXfs56cumALVBllsu5AwXIUzJWUuhnluzkIQ57jpZl3+4z3mJiCQp8zwQpR6b3bGzDcqjVBrGW9bIFZpnOBuI9DXEDtf6DhfRo782fXtzBye0drb62ECzGXQqrDcgGjECUx4pVW8gE6nkkcwTpBz3BPdpuV3KjYph3Yx4CqFGxU2EBmQ51ploc7kDlgXhigQFDNt31tqX1E0mNcyyIOLJGnSb35wKRO3otUm8uWio296QK2IGSJ4Ap+baDArInnms2ySHkBAyGw3koz1NiY4FGam89KUBzTAdXF71twVmdcw6qkB1pqjOiLlvAduCZlbMYVNh0uC7SRTVPxs6pxEyOWkpuCATvOfjPptqA07F6UxXpJaPuPbcDENai6bWe+61FZt5U58DVS+v5Al/+0QMJhgbh31OUrJBxUyJdCQ6qohk5BoMSoMPHucfVEqhyHJkyZp/taLSerJXxSLcciuEi1TAayrqTgMdcIfquQcuLdArA1jR+uAp4nIIkuKeD0o3S76B86Y0UvHAeetrbk2tvOPgmEFz0IeNfe9loBJ+/6cvLJQMGBUH2S/qhAj8NkbH4Gl4Xu4M11ktvDddBGUyud91a1Mu5RHQQnqPZPUP0XTKPZfgU4+DrfUoLlbw==&lt;/diagram&gt;&lt;/mxfile&gt;">
     <defs/>
     <g>
         <path d="M 120 220 L 150 220 Q 160 220 160 210 L 160 150 Q 160 140 170 140 L 193.63 140" fill="none" stroke="#6c8ebf" stroke-miterlimit="10" pointer-events="stroke"/>
@@ -96,12 +96,4 @@
         </g>
         <rect x="5" y="290" width="110" height="20" rx="3" ry="3" fill="#f5f5f5" stroke="#666666" pointer-events="all"/>
     </g>
-    <switch>
-        <g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/>
-        <a transform="translate(0,-5)" xlink:href="https://www.diagrams.net/doc/faq/svg-export-text-problems" target="_blank">
-            <text text-anchor="middle" font-size="10px" x="50%" y="100%">
-                Text is not SVG - cannot display
-            </text>
-        </a>
-    </switch>
 </svg>
