@@ -35,14 +35,15 @@ if __name__ == "__main__":
 
     params = wm.Hyperparameters(
         n_pretrain_steps=800,
-        n_finetune_steps=300,
-        batch_size=192,
-        d_field=48,
+        n_finetune_steps=200,
+        n_context=160,
+        batch_size=256,
+        d_field=64,
         max_pretrain_epochs=128,
         max_finetune_epochs=256,
-        n_layers_event_encoder=8,
-        n_layers_field_encoder=1,
+        n_layers_event_encoder=4,
         learning_rate=0.0005,
+        patience=4,
     )
 
     wm.train(datapath=ledger, schema=schema, params=params, split=split)

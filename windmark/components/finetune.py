@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import flytekit as fk
 from flytekit.types import directory, file
 
@@ -21,8 +19,6 @@ def finetune_sequence_encoder(
     params: Hyperparameters,
     manager: SystemManager,
 ) -> file.FlyteFile:
-    assert torch.cuda.is_available(), "GPU not found"
-
     torch.set_float32_matmul_precision("medium")
 
     module = SequenceModule.load_from_checkpoint(
@@ -33,8 +29,11 @@ def finetune_sequence_encoder(
         mode="finetune",
     )
 
-    root = Path(fk.current_context().working_directory) / "checkpoints"
-
+    checkpointer = ModelCheckpoint(
+        dirpath="./checkpoints/finetune",
+        monitor="finetune-validate/loss",
+        filename=manager.version,
+    )
     trainer = Trainer(
         logger=TensorBoardLogger("logs", name="windmark", version=manager.version),
         accelerator="auto",
@@ -44,19 +43,16 @@ def finetune_sequence_encoder(
         gradient_clip_val=params.gradient_clip_val,
         max_epochs=params.max_finetune_epochs,
         min_epochs=(params.n_epochs_frozen + 1),
-        default_root_dir=root / "finetune",
         callbacks=[
             RichProgressBar(),
             EarlyStopping(monitor="finetune-validate/loss", patience=params.patience),
             # StochasticWeightAveraging(swa_lrs=params.swa_lr),
             ThawedFinetuning(transition=params.n_epochs_frozen),
-            checkpoints := ModelCheckpoint(root / "finetune"),
+            checkpointer,
         ],
     )
 
-    print(f"finished finetuning (checkpoint: {checkpoints.best_model_path})")
-
     trainer.fit(module)
-    trainer.test(module)
+    # trainer.test(module)
 
-    return file.FlyteFile(checkpoints.best_model_path)
+    return file.FlyteFile(checkpointer.best_model_path)

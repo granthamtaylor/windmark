@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import flytekit as fk
 from flytekit.types import file, directory
 import torch
@@ -18,8 +16,6 @@ def pretrain_sequence_encoder(
     params: Hyperparameters,
     manager: SystemManager,
 ) -> file.FlyteFile:
-    assert torch.cuda.is_available(), "GPU not found"
-
     torch.set_float32_matmul_precision("medium")
 
     module = SequenceModule(
@@ -29,8 +25,11 @@ def pretrain_sequence_encoder(
         mode="pretrain",
     )
 
-    root = Path(fk.current_context().working_directory) / "checkpoints"
-    root.mkdir()
+    checkpointer = ModelCheckpoint(
+        dirpath="./checkpoints/pretrain",
+        monitor="pretrain-validate/loss",
+        filename=manager.version,
+    )
 
     trainer = Trainer(
         logger=TensorBoardLogger("logs", name="windmark", version=manager.version),
@@ -40,18 +39,15 @@ def pretrain_sequence_encoder(
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
         max_epochs=params.max_pretrain_epochs,
-        default_root_dir=root / "pretrain",
         callbacks=[
             RichProgressBar(),
             EarlyStopping(monitor="pretrain-validate/loss", patience=params.patience),
             StochasticWeightAveraging(swa_lrs=params.swa_lr),
-            checkpoints := ModelCheckpoint(root / "pretrain"),
+            checkpointer,
         ],
     )
-
-    print(f"finished pretraining (checkpoint: {checkpoints.best_model_path})")
 
     trainer.fit(module)
     trainer.test(module)
 
-    return file.FlyteFile(checkpoints.best_model_path)
+    return file.FlyteFile(checkpointer.best_model_path)

@@ -1,8 +1,6 @@
 _list:
   @just --list
 
-# @poetry run pyflyte --verbose run windmark/pipelines/workflow.py pipeline
-
 # run pre-commit checks
 check:
   @git add .
@@ -27,6 +25,3 @@ whitepaper:
 # run training pipeline
 train:
   @poetry run python windmark/main.py
-
-plot:
-  @poetry run python windmark/plot.py

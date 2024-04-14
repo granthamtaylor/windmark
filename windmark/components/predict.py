@@ -1,7 +1,4 @@
-from pathlib import Path
-
 import flytekit as fk
-import torch
 from flytekit.types import file, directory
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import RichProgressBar
@@ -20,11 +17,6 @@ def predict_sequence_encoder(
     params: Hyperparameters,
     manager: SystemManager,
 ):
-    assert torch.cuda.is_available(), "GPU not found"
-
-    # significantly less memory is required during inference
-    params.batch_size *= 3
-
     module = SequenceModule.load_from_checkpoint(
         checkpoint_path=str(checkpoint.path),
         datapath=lifestreams.path,
@@ -32,9 +24,6 @@ def predict_sequence_encoder(
         manager=manager,
         mode="inference",
     )
-
-    outpath = Path(fk.current_context().working_directory) / "lifestreams"
-    outpath.mkdir()
 
     trainer = Trainer(
         logger=TensorBoardLogger("logs", name="windmark", version=manager.version),
