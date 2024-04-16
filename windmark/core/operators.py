@@ -11,6 +11,7 @@ from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
 from windmark.core.constructs import (
+    Field,
     ContinuousField,
     DiscreteField,
     EntityField,
@@ -72,7 +73,7 @@ def sample(
                     continue
 
         elif mode == "inference":
-            label = -1
+            label: int = sequence["target"][event]
 
         else:
             raise ValueError
@@ -95,62 +96,56 @@ def sample(
     return observations
 
 
-def tokenize(
-    observation: tuple[AnnotationType, FieldType],
-    manager: SystemManager,
-) -> tuple[AnnotationType, FieldType]:
-    annotations, fields = observation
+class ContextProcessor:
+    offset: int = len(Tokens)
 
-    for field in manager.schema.fields:
-        if field.type == "discrete":
-            mapping = manager.levelsets[field]
+    def __init__(self, manager: SystemManager, params: Hyperparameters):
+        self.manager: SystemManager = manager
+        self.params: Hyperparameters = params
 
-            values: list[str] = fields[field.name]
+    def process(self, observation: tuple[AnnotationType, FieldType]) -> tuple[AnnotationType, FieldType]:
+        annotations, fields = observation
 
-            fields[field.name] = list(map(lambda value: mapping[value], values))
+        for field in self.manager.schema.fields:
+            values = fields[field.name]
 
-    return annotations, fields
+            match field.type:
+                case "discrete":
+                    processed = self.tokenize(values=values, field=field)
 
+                case "entity":
+                    processed = self.hash(values=values)
 
-def hash(
-    observation: tuple[AnnotationType, FieldType],
-    manager: SystemManager,
-    params: Hyperparameters,
-) -> tuple[AnnotationType, FieldType]:
-    meta, fields = observation
-    offset = len(Tokens)
+                case "continuous" | "temporal":
+                    processed = self.cdf(values=values, field=field)
 
-    for field in manager.schema.fields:
-        if field.type == "entity":
-            values: list[str] = fields[field.name]
+                case _:
+                    raise NotImplementedError
 
-            unique: set[str] = set(values)
+            fields[field.name] = processed
 
-            integers = random.sample(range(offset, params.n_context + offset), len(unique))
+        return annotations, fields
 
-            mapping = dict(zip(unique, integers))
+    def tokenize(self, values: list[str], field: Field) -> list[int]:
+        mapping = self.manager.levelsets[field]
 
-            mapping.update({"[UNK]": Tokens.UNK})
+        return list(map(lambda value: mapping[value], values))
 
-            fields[field.name] = list(map(lambda value: mapping[value], values))
+    def hash(self, values: list[str]) -> list[int]:
+        unique: set[str] = set(values)
 
-    return meta, fields
+        integers = random.sample(range(self.offset, self.params.n_context + self.offset), len(unique))
 
+        mapping = dict(zip(unique, integers))
 
-def cdf(
-    observation: tuple[AnnotationType, FieldType],
-    manager: SystemManager,
-) -> tuple[AnnotationType, FieldType]:
-    annotations, fields = observation
+        mapping.update({"[UNK]": Tokens.UNK})
 
-    for field in manager.schema.fields:
-        if field.type in ["continuous", "temporal"]:
-            digest: TDigest = manager.centroids.digests[field.name]
-            values: list[float] = fields[field.name]
-            array = np.array(values, dtype=np.float64)
-            fields[field.name] = digest.cdf(array)
+        return list(map(lambda value: mapping[value], values))
 
-    return annotations, fields
+    def cdf(self, values: list[float], field: Field) -> np.ndarray:
+        digest: TDigest = self.manager.centroids.digests[field.name]
+        array = np.array(values, dtype=np.float64)
+        return digest.cdf(array)
 
 
 def tensorfield(
@@ -199,6 +194,10 @@ def package(
     for field in manager.schema.fields:
         targets[field.name] = fields[field.name].mask(is_event_masked, params=params)
 
+    ablations = []
+    for ablation in ablations:
+        fields[ablation].ablate()
+
     targets = TensorDict(targets, batch_size=1)
 
     return PretrainingData.new(inputs=fields, targets=targets, meta=tuple(meta))
@@ -214,6 +213,8 @@ def stream(
     assert mode in ["pretrain", "finetune", "inference"]
     assert split in ["train", "validate", "test"]
 
+    processor = ContextProcessor(manager=manager, params=params)
+
     return (
         datapipes.iter.FileLister(datapath, masks="*.avro")
         .shuffle()
@@ -222,9 +223,7 @@ def stream(
         .filter(partial(subset, split=split))
         .shuffle()
         .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))
-        .map(partial(tokenize, manager=manager))
-        .map(partial(cdf, manager=manager))
-        .map(partial(hash, manager=manager, params=params))
+        .map(processor.process)
         .shuffle()
         .map(partial(tensorfield, manager=manager, params=params))
         .map(partial(package, params=params, manager=manager, mode=mode))

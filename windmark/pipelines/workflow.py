@@ -36,7 +36,9 @@ def train(
 
     lifestreams = comp.preprocess(ledger=ledger, manager=system, slice_size=10)
 
-    pretrained = comp.pretrain(lifestreams=lifestreams, params=params, manager=system)
+    # pretrained = comp.pretrain(lifestreams=lifestreams, params=params, manager=system)
+
+    pretrained = "/home/grantham/windmark/checkpoints/pretrain/2024-04-14:dyer-throughway:DBCX.ckpt"
 
     finetuned = comp.finetune(checkpoint=pretrained, lifestreams=lifestreams, params=params, manager=system)
 

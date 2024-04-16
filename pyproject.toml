@@ -30,6 +30,7 @@ faker = "^24.4.0"
 humanize = "^4.9.0"
 plotly = "^5.20.0"
 seaborn = "^0.13.2"
+poetry-plugin-export = "^1.7.1"
 
 [tool.poetry.group.dev.dependencies]
 semver = "^3.0.2"
@@ -41,6 +42,7 @@ pytest = "^8.0.0"
 pytest-cov = "^4.1.0"
 nbformat = "^5.10.3"
 sphinx = "^7.2.6"
+pyjust = "^1.18.1"
 ipywidgets = "^8.1.2"
 
 [tool.ruff]

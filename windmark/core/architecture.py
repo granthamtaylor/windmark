@@ -559,9 +559,8 @@ def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
 
     metrics = dict(
         ap=torchmetrics.AveragePrecision,
-        f1=torchmetrics.F1Score,
         auc=torchmetrics.AUROC,
-        acc=torchmetrics.Accuracy,
+        f1=torchmetrics.F1Score,
     )
 
     collection = torchmetrics.MetricCollection(

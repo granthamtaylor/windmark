@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     params = wm.Hyperparameters(
         n_pretrain_steps=800,
-        n_finetune_steps=200,
+        n_finetune_steps=40,
         n_context=160,
         batch_size=256,
         d_field=64,

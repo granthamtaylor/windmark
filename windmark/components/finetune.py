@@ -53,6 +53,6 @@ def finetune_sequence_encoder(
     )
 
     trainer.fit(module)
-    # trainer.test(module)
+    trainer.test(module)
 
     return file.FlyteFile(checkpointer.best_model_path)

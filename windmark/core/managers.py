@@ -341,7 +341,7 @@ class SystemManager(DataClassJSONMixin):
     levelsets: LevelManager
 
     def show(self):
-        print(Panel.fit(self.version, title="Training Model"))
+        print(Panel.fit(f"[cyan]{self.version}", title="Training Model", padding=(1, 3)))
 
         self.task.balancer.show()
         self.sample.show()

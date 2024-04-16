@@ -24,6 +24,9 @@ class Tokens(IntEnum):
     PAD = 2
     MASK = 3
 
+    # FIXME need to add ablation token
+    # ABLATE = 4
+
 
 @dataclass
 class Field(DataClassJSONMixin):
@@ -114,7 +117,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Number of steps to take per epoch during finetuning"""
     swa_lr: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.1e-2
     """Stochastic Weight Averaging"""
-    gradient_clip_val: Annotated[float, pydantic.Field(gt=0.0)] = 0.5
+    gradient_clip_val: Annotated[float, pydantic.Field(gt=0.0)] = 0.25
     """Gradient clipping threshold"""
     max_pretrain_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)] = 256
     """Maximum number of epochs for pretraining"""
@@ -190,6 +193,9 @@ class DiscreteField:
 
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
+    def ablate(self):
+        self.lookup = torch.full_like(self.lookup, Tokens.UNK)
+
 
 @tensorclass
 class EntityField:
@@ -197,6 +203,7 @@ class EntityField:
 
     new = DiscreteField.new
     mask = DiscreteField.mask
+    ablate = DiscreteField.ablate
 
 
 @tensorclass
@@ -246,6 +253,10 @@ class ContinuousField:
         # return SSL target
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
+    def ablate(self):
+        self.lookup = torch.full_like(self.lookup, Tokens.UNK)
+        self.content = torch.zeros_like(self.lookup)
+
 
 @tensorclass
 class TemporalField:
@@ -254,6 +265,46 @@ class TemporalField:
 
     new = ContinuousField.new
     mask = ContinuousField.mask
+    ablate = ContinuousField.ablate
+
+
+@tensorclass
+class NeoTemporalField:
+    lookup: Int[Tensor, "N L"]
+
+    # INT 0..6 + len(Tokens)
+    day_of_week: Int[Tensor, "N L"]
+
+    # INT 0..365 + len(Tokens)
+    day_of_year: Int[Tensor, "N L"]
+
+    # FLOAT 0..1440
+    time_of_day: Float[Tensor, "N L"]
+
+    @jaxtyped(typechecker=beartype)
+    @classmethod
+    def new(cls, values, params: Hyperparameters) -> "NeoTemporalField":
+        padding = (params.n_context - len(values), 0)
+
+        values = np.nan_to_num(np.array(values, dtype=float))
+        lookup = np.where(np.isnan(values), Tokens.PAD, Tokens.VAL)
+
+        # day_of_week = (values.view("int64") - 4) % 7
+        # day_of_year = (values - values.astype("datetime64[Y]")) + 1
+        # time_of_day = (values - values.astype("datetime64[D]")).astype(int)
+
+        # this effectively creates `1-(1/inf)` to prevent an index error
+        # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
+        dampener = 1 - torch.finfo(torch.half).tiny
+
+        return cls(
+            content=torch.nn.functional.pad(torch.tensor(values), pad=padding, value=0.0)
+            .float()
+            .unsqueeze(0)
+            .mul(dampener),
+            lookup=torch.nn.functional.pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            batch_size=[1],
+        )
 
 
 TensorField: TypeAlias = ContinuousField | DiscreteField | EntityField | TemporalField
