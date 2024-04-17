@@ -31,7 +31,7 @@ def label() -> str:
     return f"{date}:{address}:{hashtag}"
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def create_system_manager(
     schema: SchemaManager,
     task: SupervisedTaskManager,

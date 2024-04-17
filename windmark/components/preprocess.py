@@ -13,7 +13,7 @@ from windmark.core.constructs import Field
 console = Console()
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size: int) -> directory.FlyteDirectory:
     assert len(manager.schema.fields) > 0
 

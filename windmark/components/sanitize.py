@@ -3,7 +3,7 @@ from pathlib import Path
 import flytekit as fk
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def sanitize_ledger_path(ledger: str) -> str:
     assert Path(ledger).exists(), "ledger path does not exist"
 

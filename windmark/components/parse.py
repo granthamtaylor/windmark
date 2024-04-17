@@ -4,7 +4,7 @@ import polars as pl
 from windmark.core.constructs import Field
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def parse_field_from_ledger(
     ledger: str,
     field: Field,

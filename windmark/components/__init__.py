@@ -9,7 +9,7 @@ from windmark.components.predict import predict_sequence_encoder as predict
 from windmark.components.export import export_module_to_onnx as export
 from windmark.components.system import create_system_manager as system
 from windmark.components.task import create_task_manager as task
-from windmark.components.lambdas import fan, collect
+from windmark.components.lambdas import fan, collect, extract
 from windmark.components.levels import create_unique_levels_from_ledger as levels
 
 
@@ -28,4 +28,5 @@ __all__ = [
     task,
     fan,
     collect,
+    extract,
 ]

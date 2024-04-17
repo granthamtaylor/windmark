@@ -2,16 +2,24 @@ import flytekit as fk
 import polars as pl
 
 from windmark.core.managers import SupervisedTaskManager, SplitManager, SampleManager
-from windmark.core.constructs import Hyperparameters
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def create_sample_manager(
     ledger: str,
-    params: Hyperparameters,
     task: SupervisedTaskManager,
+    batch_size: int,
+    n_pretrain_steps: int,
+    n_finetune_steps: int,
     split: SplitManager,
 ) -> SampleManager:
     n_events = pl.scan_parquet(ledger).select(pl.len()).collect().item()
 
-    return SampleManager(n_events=n_events, params=params, task=task, split=split)
+    return SampleManager(
+        n_events=n_events,
+        batch_size=batch_size,
+        n_pretrain_steps=n_pretrain_steps,
+        n_finetune_steps=n_finetune_steps,
+        task=task,
+        split=split,
+    )

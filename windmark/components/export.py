@@ -5,7 +5,7 @@ import flytekit as fk
 from windmark.core.architecture import SequenceModule
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def export_module_to_onnx(module: SequenceModule):
     filepath = Path(fk.current_context().working_directory) / "model.onnx"
 

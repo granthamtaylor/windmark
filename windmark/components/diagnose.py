@@ -4,7 +4,7 @@ import polars as pl
 from windmark.core.managers import SchemaManager
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def diagnose(ledger: pl.DataFrame, schema: SchemaManager):
     assert schema.sequence_id in ledger.columns
     assert schema.event_id in ledger.columns

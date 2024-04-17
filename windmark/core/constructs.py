@@ -214,10 +214,10 @@ class ContinuousField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, values, params: Hyperparameters) -> "ContinuousField":
-        padding = (params.n_context - len(values), 0)
-
+        lookup = np.where(np.isnan(values), Tokens.UNK, Tokens.VAL)
         values = np.nan_to_num(np.array(values, dtype=float))
-        lookup = np.where(np.isnan(values), Tokens.PAD, Tokens.VAL)
+
+        padding = (params.n_context - len(values), 0)
 
         # this effectively creates `1-(1/inf)` to prevent an index error
         # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
@@ -255,7 +255,7 @@ class ContinuousField:
 
     def ablate(self):
         self.lookup = torch.full_like(self.lookup, Tokens.UNK)
-        self.content = torch.zeros_like(self.lookup)
+        self.content = torch.zeros_like(self.content)
 
 
 @tensorclass
@@ -271,14 +271,8 @@ class TemporalField:
 @tensorclass
 class NeoTemporalField:
     lookup: Int[Tensor, "N L"]
-
-    # INT 0..6 + len(Tokens)
     day_of_week: Int[Tensor, "N L"]
-
-    # INT 0..365 + len(Tokens)
-    day_of_year: Int[Tensor, "N L"]
-
-    # FLOAT 0..1440
+    day_of_year: Float[Tensor, "N L"]
     time_of_day: Float[Tensor, "N L"]
 
     @jaxtyped(typechecker=beartype)
@@ -286,25 +280,24 @@ class NeoTemporalField:
     def new(cls, values, params: Hyperparameters) -> "NeoTemporalField":
         padding = (params.n_context - len(values), 0)
 
-        values = np.nan_to_num(np.array(values, dtype=float))
-        lookup = np.where(np.isnan(values), Tokens.PAD, Tokens.VAL)
-
-        # day_of_week = (values.view("int64") - 4) % 7
-        # day_of_year = (values - values.astype("datetime64[Y]")) + 1
-        # time_of_day = (values - values.astype("datetime64[D]")).astype(int)
-
-        # this effectively creates `1-(1/inf)` to prevent an index error
-        # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
-        dampener = 1 - torch.finfo(torch.half).tiny
+        lookup = np.where(np.isnan(values), Tokens.UNK, Tokens.VAL)
+        day_of_week = np.where(np.isnan(((values.view("int64") - 4) % 7) + len(Tokens)), Tokens.UNK, Tokens.VAL)
+        day_of_year = np.nan_to_num(values - values.astype("datetime64[Y]")) * (1 / 366)
+        time_of_day = np.nan_to_num((values - values.astype("datetime64[D]")).astype(int)) * (1 / 1440)
 
         return cls(
-            content=torch.nn.functional.pad(torch.tensor(values), pad=padding, value=0.0)
-            .float()
-            .unsqueeze(0)
-            .mul(dampener),
+            time_of_day=torch.nn.functional.pad(torch.tensor(time_of_day), pad=padding, value=0.0).unsqueeze(0),
+            day_of_year=torch.nn.functional.pad(torch.tensor(day_of_year), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            day_of_week=torch.nn.functional.pad(torch.tensor(day_of_week), pad=padding, value=Tokens.PAD).unsqueeze(0),
             lookup=torch.nn.functional.pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
             batch_size=[1],
         )
+
+    def ablate(self):
+        self.lookup = torch.full_like(self.lookup, Tokens.UNK)
+        self.day_of_week = torch.full_like(self.day_of_week, Tokens.UNK)
+        self.day_of_year = torch.zeros_like(self.day_of_year)
+        self.time_of_day = torch.zeros_like(self.time_of_day)
 
 
 TensorField: TypeAlias = ContinuousField | DiscreteField | EntityField | TemporalField

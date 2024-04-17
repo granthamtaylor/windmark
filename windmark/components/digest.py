@@ -5,7 +5,7 @@ from pytdigest import TDigest
 from windmark.core.managers import Field, Centroid
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def create_digest_centroids_from_ledger(ledger: str, field: Field, slice_size: int = 10_000) -> Centroid:
     digest = TDigest()
 

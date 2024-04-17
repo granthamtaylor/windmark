@@ -8,13 +8,16 @@ import windmark.components as comp
 
 
 @fk.workflow
-def train(
-    datapath: str,
-    schema: SchemaManager,
-    params: Hyperparameters,
-    split: SplitManager,
-):
+def train(datapath: str, schema: SchemaManager, params: Hyperparameters, split: SplitManager):
     ledger = comp.sanitize(ledger=datapath)
+
+    kappa = comp.extract.kappa(params=params)
+
+    batch_size = comp.extract.batch_size(params=params)
+
+    n_pretrain_steps = comp.extract.n_pretrain_steps(params=params)
+
+    n_finetune_steps = comp.extract.n_finetune_steps(params=params)
 
     fields = comp.fan.fields(schema=schema)
 
@@ -28,17 +31,22 @@ def train(
 
     levelsets = comp.collect.levelsets(levelsets=fanned_levelsets)
 
-    task = comp.task(ledger=ledger, schema=schema, params=params)
+    task = comp.task(ledger=ledger, schema=schema, kappa=kappa)
 
-    sample = comp.sample(ledger=ledger, params=params, task=task, split=split)
+    sample = comp.sample(
+        ledger=ledger,
+        batch_size=batch_size,
+        n_pretrain_steps=n_pretrain_steps,
+        n_finetune_steps=n_finetune_steps,
+        task=task,
+        split=split,
+    )
 
     system = comp.system(schema=schema, task=task, sample=sample, split=split, centroids=centroids, levelsets=levelsets)
 
     lifestreams = comp.preprocess(ledger=ledger, manager=system, slice_size=10)
 
-    # pretrained = comp.pretrain(lifestreams=lifestreams, params=params, manager=system)
-
-    pretrained = "/home/grantham/windmark/checkpoints/pretrain/2024-04-14:dyer-throughway:DBCX.ckpt"
+    pretrained = comp.pretrain(lifestreams=lifestreams, params=params, manager=system)
 
     finetuned = comp.finetune(checkpoint=pretrained, lifestreams=lifestreams, params=params, manager=system)
 

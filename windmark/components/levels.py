@@ -4,7 +4,7 @@ import polars as pl
 from windmark.core.managers import Field, LevelSet
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def create_unique_levels_from_ledger(ledger: str, field: Field) -> LevelSet:
     if field.type not in ["discrete"]:
         return LevelSet.empty(name=field.name)

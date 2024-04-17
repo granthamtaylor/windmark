@@ -2,14 +2,13 @@ import flytekit as fk
 import polars as pl
 
 from windmark.core.managers import SchemaManager, SupervisedTaskManager, BalanceManager
-from windmark.core.constructs import Hyperparameters
 
 
-@fk.task
+@fk.task(cache=True, cache_version="1.0")
 def create_task_manager(
     ledger: str,
     schema: SchemaManager,
-    params: Hyperparameters,
+    kappa: float,
 ) -> SupervisedTaskManager:
     lf = pl.scan_parquet(ledger)
 
@@ -27,6 +26,6 @@ def create_task_manager(
     labels: list[str] = records["labels"]
     counts: list[int] = records["counts"]
 
-    balancer = BalanceManager(labels=labels, counts=counts, kappa=params.interpolation_rate)
+    balancer = BalanceManager(labels=labels, counts=counts, kappa=kappa)
 
     return SupervisedTaskManager(task="classification", n_targets=len(records["labels"]), balancer=balancer)

@@ -11,7 +11,7 @@ from rich.panel import Panel
 from pytdigest import TDigest
 from mashumaro.mixins.json import DataClassJSONMixin
 
-from windmark.core.constructs import Hyperparameters, Field, Centroid, LevelSet
+from windmark.core.constructs import Field, Centroid, LevelSet
 
 console = Console()
 
@@ -183,7 +183,9 @@ class SplitManager(DataClassJSONMixin):
 @dataclasses.dataclass
 class SampleManager(DataClassJSONMixin):
     n_events: int
-    params: Hyperparameters
+    batch_size: int
+    n_pretrain_steps: int
+    n_finetune_steps: int
     task: SupervisedTaskManager
     split: SplitManager
 
@@ -194,8 +196,8 @@ class SampleManager(DataClassJSONMixin):
         # expected finetuning steps per epoch
         self.pretraining: dict[str, float] = {}
         for subset in ["train", "validate", "test"]:
-            sample_rate = (self.params.n_pretrain_steps * self.params.batch_size) / (self.split[subset] * self.n_events)
-            assert sample_rate < 1.0, warn(mode="pretraining", n_steps=self.params.n_pretrain_steps, split=subset)
+            sample_rate = (self.n_pretrain_steps * self.batch_size) / (self.split[subset] * self.n_events)
+            assert sample_rate < 1.0, warn(mode="pretraining", n_steps=self.n_pretrain_steps, split=subset)
             self.pretraining[subset] = sample_rate
 
         n_targets = 0
@@ -205,8 +207,8 @@ class SampleManager(DataClassJSONMixin):
         # expected finetuning steps per epoch
         self.finetuning: dict[str, float] = {}
         for subset in ["train", "validate", "test"]:
-            sample_rate = (self.params.n_finetune_steps * self.params.batch_size) / (self.split[subset] * n_targets)
-            assert sample_rate < 1.0, warn(mode="finetuning", n_steps=self.params.n_finetune_steps, split=subset)
+            sample_rate = (self.n_finetune_steps * self.batch_size) / (self.split[subset] * n_targets)
+            assert sample_rate < 1.0, warn(mode="finetuning", n_steps=self.n_finetune_steps, split=subset)
             self.finetuning[subset] = sample_rate
 
     def show(self) -> None:
@@ -230,7 +232,7 @@ class SampleManager(DataClassJSONMixin):
 
             return table
 
-        n_inference_batches: int = int(self.split["test"] * self.n_events / self.params.batch_size)
+        n_inference_batches: int = int(self.split["test"] * self.n_events / self.batch_size)
 
         renderables = Group(
             render("pretrain"),
