@@ -7,12 +7,13 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProg
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture import SequenceModule
-from windmark.core.managers import SystemManager
+from windmark.core.managers import SystemManager, LabelManager
 from windmark.core.constructs import Hyperparameters
 from windmark.core.callbacks import ThawedFinetuning
+from windmark.core.orchestration import task
 
 
-@fk.task(requests=fk.Resources(cpu="32", mem="64Gi"))
+@task(requests=fk.Resources(cpu="32", mem="64Gi"))
 def finetune_sequence_encoder(
     lifestreams: directory.FlyteDirectory,
     checkpoint: file.FlyteFile,
@@ -20,6 +21,8 @@ def finetune_sequence_encoder(
     manager: SystemManager,
 ) -> file.FlyteFile:
     torch.set_float32_matmul_precision("medium")
+
+    version: str = LabelManager.from_path(checkpoint.path)
 
     module = SequenceModule.load_from_checkpoint(
         checkpoint_path=str(checkpoint.path),
@@ -32,10 +35,10 @@ def finetune_sequence_encoder(
     checkpointer = ModelCheckpoint(
         dirpath="./checkpoints/finetune",
         monitor="finetune-validate/loss",
-        filename=manager.version,
+        filename=version,
     )
     trainer = Trainer(
-        logger=TensorBoardLogger("logs", name="windmark", version=manager.version),
+        logger=TensorBoardLogger("logs", name="windmark", version=version),
         accelerator="auto",
         devices="auto",
         strategy="auto",

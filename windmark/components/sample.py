@@ -1,10 +1,10 @@
-import flytekit as fk
 import polars as pl
 
 from windmark.core.managers import SupervisedTaskManager, SplitManager, SampleManager
+from windmark.core.orchestration import task
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def create_sample_manager(
     ledger: str,
     task: SupervisedTaskManager,

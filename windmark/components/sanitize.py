@@ -1,9 +1,10 @@
 from pathlib import Path
 
-import flytekit as fk
+
+from windmark.core.orchestration import task
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def sanitize_ledger_path(ledger: str) -> str:
     assert Path(ledger).exists(), "ledger path does not exist"
 

@@ -134,7 +134,9 @@ class Hyperparameters(DataClassJSONMixin):
     interpolation_rate: Annotated[float, pydantic.Field(ge=0.0, le=1.0)] = 0.08
     """Interpolation rate of imbalanced classification labels"""
     learning_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.0001
-    """Learning Rate"""
+    """Learning Rate during Pretraining"""
+    learning_rate_dampener: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.1
+    """Learning Rate Modifier during Finetuning"""
     patience: Annotated[int, pydantic.Field(ge=1, le=256)] = 16
     """Number of Epochs Patience for Early Stopping"""
 

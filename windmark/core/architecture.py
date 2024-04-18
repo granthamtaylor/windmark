@@ -779,7 +779,12 @@ class SequenceModule(lit.LightningModule):
         return OutputData.new(sequence=sequence, reconstructions=reconstructions, predictions=predictions)
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
-        return torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
+        if self.mode == "finetune":
+            lr = self.lr * self.params.learning_rate_dampener
+        else:
+            lr = self.lr
+
+        return torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=lr)
 
     training_step = partialmethod(step, strata="train")  # type: ignore
     validation_step = partialmethod(step, strata="validate")  # type: ignore

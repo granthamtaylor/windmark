@@ -1,10 +1,10 @@
-import flytekit as fk
 import polars as pl
 
 from windmark.core.managers import SchemaManager, SupervisedTaskManager, BalanceManager
+from windmark.core.orchestration import task
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def create_task_manager(
     ledger: str,
     schema: SchemaManager,

@@ -1,7 +1,7 @@
 import windmark as wm
 
 if __name__ == "__main__":
-    ledger = "/home/grantham/windmark/data/mini-ledger.parquet"
+    ledger = "/home/grantham/windmark/data/ledger.parquet"
 
     split = wm.SequenceSplitter(
         train=0.60,
@@ -23,27 +23,26 @@ if __name__ == "__main__":
         merchant_name="entity",
         timestamp="temporal",
         card="entity",
-        # mcc="discrete",
-        # has_bad_pin="discrete",
-        # has_bad_zipcode="discrete",
-        # has_bad_card_number="discrete",
-        # has_insufficient_balance="discrete",
-        # has_bad_expiration="discrete",
-        # has_technical_glitch="discrete",
-        # has_bad_cvv="discrete",
+        mcc="discrete",
+        has_bad_pin="discrete",
+        has_bad_zipcode="discrete",
+        has_bad_card_number="discrete",
+        has_insufficient_balance="discrete",
+        has_bad_expiration="discrete",
+        has_technical_glitch="discrete",
+        has_bad_cvv="discrete",
     )
 
     params = wm.Hyperparameters(
-        n_pretrain_steps=800,
-        n_finetune_steps=40,
-        n_context=160,
-        batch_size=256,
+        n_pretrain_steps=500,
+        n_finetune_steps=100,
+        n_context=128,
+        batch_size=192,
         d_field=64,
         max_pretrain_epochs=128,
-        max_finetune_epochs=256,
-        n_layers_event_encoder=4,
-        learning_rate=0.0005,
-        patience=6,
+        max_finetune_epochs=128,
+        learning_rate=0.0002,
+        patience=8,
     )
 
     wm.train(datapath=ledger, schema=schema, params=params, split=split)

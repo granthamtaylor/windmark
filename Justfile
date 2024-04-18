@@ -25,3 +25,7 @@ whitepaper:
 # run training pipeline
 train:
   @poetry run python windmark/main.py
+
+# clear pyflyte cache
+clear:
+  @poetry run pyflyte local-cache clear

@@ -1,12 +1,14 @@
 import math
-import datetime
 import dataclasses
 import functools
+from datetime import datetime
+import string
+import random
 
+from faker import Faker
 import numpy as np
 from rich.console import Console, Group
 from rich.table import Table
-from rich import print
 from rich.panel import Panel
 from pytdigest import TDigest
 from mashumaro.mixins.json import DataClassJSONMixin
@@ -280,7 +282,7 @@ class CentroidManager(DataClassJSONMixin):
                 if types[field] == "continuous":
                     values.append(f"{value:.3f}")
                 elif types[field] == "temporal":
-                    values.append(datetime.datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M"))  # type: ignore
+                    values.append(datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M"))  # type: ignore
                 else:
                     raise NotImplementedError
 
@@ -334,7 +336,6 @@ class LevelManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class SystemManager(DataClassJSONMixin):
-    version: str
     schema: SchemaManager
     task: SupervisedTaskManager
     sample: SampleManager
@@ -343,9 +344,30 @@ class SystemManager(DataClassJSONMixin):
     levelsets: LevelManager
 
     def show(self):
-        print(Panel.fit(f"[cyan]{self.version}", title="Training Model", padding=(1, 3)))
-
         self.task.balancer.show()
         self.sample.show()
         self.centroids.show(schema=self.schema)
         self.levelsets.show()
+
+
+class LabelManager:
+    @classmethod
+    def version(cls) -> str:
+        fake = Faker()
+
+        address = fake.street_name().replace(" ", "-").lower()
+
+        hashtag = ("").join(random.choice(string.ascii_uppercase) for _ in range(4))
+
+        return f"{address}:{hashtag}"
+
+    @classmethod
+    def from_path(cls, pathname: str, add_date: bool = True) -> str:
+        filename = pathname.split("/")[-1]
+        version = filename.split(".")[0]
+
+        if add_date:
+            date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            return f"{date}:{version}"
+        else:
+            return version

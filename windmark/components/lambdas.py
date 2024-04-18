@@ -1,12 +1,12 @@
 from types import SimpleNamespace
 
-import flytekit as fk
 
 from windmark.core.constructs import Field, Centroid, LevelSet, Hyperparameters
 from windmark.core.managers import SchemaManager, CentroidManager, LevelManager
+from windmark.core.orchestration import task
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def fan_fields(schema: SchemaManager) -> list[Field]:
     return schema.fields
 
@@ -16,12 +16,12 @@ fan = SimpleNamespace(
 )
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def collect_centroids(centroids: list[Centroid]) -> CentroidManager:
     return CentroidManager(centroids=centroids)
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def collect_levelsets(levelsets: list[LevelSet]) -> LevelManager:
     return LevelManager(levelsets=levelsets)
 
@@ -32,22 +32,22 @@ collect = SimpleNamespace(
 )
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def extract_kappa(params: Hyperparameters) -> float:
     return params.interpolation_rate
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def extract_batch_size(params: Hyperparameters) -> int:
     return params.batch_size
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def extract_n_pretrain_steps(params: Hyperparameters) -> int:
     return params.n_pretrain_steps
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task
 def extract_n_finetune_steps(params: Hyperparameters) -> int:
     return params.n_finetune_steps
 

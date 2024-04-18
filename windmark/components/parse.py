@@ -2,9 +2,10 @@ import flytekit as fk
 import polars as pl
 
 from windmark.core.constructs import Field
+from windmark.core.orchestration import task
 
 
-@fk.task(cache=True, cache_version="1.0")
+@task(requests=fk.Resources(cpu="32", mem="64Gi"))
 def parse_field_from_ledger(
     ledger: str,
     field: Field,
