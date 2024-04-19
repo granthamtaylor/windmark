@@ -1,7 +1,7 @@
 import windmark as wm
 
 if __name__ == "__main__":
-    ledger = "/home/grantham/windmark/data/ledger.parquet"
+    ledger = "/home/grantham/windmark/data/mini-ledger.parquet"
 
     split = wm.SequenceSplitter(
         train=0.60,
@@ -34,13 +34,14 @@ if __name__ == "__main__":
     )
 
     params = wm.Hyperparameters(
-        n_pretrain_steps=500,
-        n_finetune_steps=100,
+        n_pretrain_steps=400,
+        n_finetune_steps=30,
         n_context=128,
-        batch_size=192,
-        d_field=64,
-        max_pretrain_epochs=128,
-        max_finetune_epochs=128,
+        batch_size=128,
+        d_field=48,
+        max_pretrain_epochs=64,
+        max_finetune_epochs=64,
+        n_epochs_frozen=8,
         learning_rate=0.0002,
         patience=8,
     )

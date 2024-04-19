@@ -14,6 +14,7 @@ from tensordict import TensorDict
 from tensordict.prototype import tensorclass
 from torch import Tensor
 from mashumaro.mixins.json import DataClassJSONMixin
+from torch.nn.functional import pad
 
 
 class Tokens(IntEnum):
@@ -23,9 +24,7 @@ class Tokens(IntEnum):
     UNK = 1
     PAD = 2
     MASK = 3
-
-    # FIXME need to add ablation token
-    # ABLATE = 4
+    ABLATE = 4
 
 
 @dataclass
@@ -177,7 +176,7 @@ class DiscreteField:
         padding = (params.n_context - len(values), 0)
 
         array = np.array(values, dtype=int)
-        lookup = torch.nn.functional.pad(torch.tensor(array), pad=padding, value=Tokens.PAD).unsqueeze(0)
+        lookup = pad(torch.tensor(array), pad=padding, value=Tokens.PAD).unsqueeze(0)
 
         return cls(lookup=lookup, batch_size=[1])
 
@@ -196,7 +195,7 @@ class DiscreteField:
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
     def ablate(self):
-        self.lookup = torch.full_like(self.lookup, Tokens.UNK)
+        self.lookup = torch.full_like(self.lookup, Tokens.ABLATE)
 
 
 @tensorclass
@@ -226,11 +225,8 @@ class ContinuousField:
         dampener = 1 - torch.finfo(torch.half).tiny
 
         return cls(
-            content=torch.nn.functional.pad(torch.tensor(values), pad=padding, value=0.0)
-            .float()
-            .unsqueeze(0)
-            .mul(dampener),
-            lookup=torch.nn.functional.pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            content=pad(torch.tensor(values), pad=padding, value=0.0).float().unsqueeze(0).mul(dampener),
+            lookup=pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
             batch_size=[1],
         )
 
@@ -256,49 +252,74 @@ class ContinuousField:
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
     def ablate(self):
-        self.lookup = torch.full_like(self.lookup, Tokens.UNK)
+        self.lookup = torch.full_like(self.lookup, Tokens.ABLATE)
         self.content = torch.zeros_like(self.content)
 
 
 @tensorclass
 class TemporalField:
     lookup: Int[Tensor, "N L"]
-    content: Float[Tensor, "N L"]
-
-    new = ContinuousField.new
-    mask = ContinuousField.mask
-    ablate = ContinuousField.ablate
-
-
-@tensorclass
-class NeoTemporalField:
-    lookup: Int[Tensor, "N L"]
+    week_of_year: Int[Tensor, "N L"]
     day_of_week: Int[Tensor, "N L"]
-    day_of_year: Float[Tensor, "N L"]
+    hour_of_year: Int[Tensor, "N L"]
     time_of_day: Float[Tensor, "N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
-    def new(cls, values, params: Hyperparameters) -> "NeoTemporalField":
+    def new(cls, values, params: Hyperparameters) -> "TemporalField":
         padding = (params.n_context - len(values), 0)
 
         lookup = np.where(np.isnan(values), Tokens.UNK, Tokens.VAL)
-        day_of_week = np.where(np.isnan(((values.view("int64") - 4) % 7) + len(Tokens)), Tokens.UNK, Tokens.VAL)
-        day_of_year = np.nan_to_num(values - values.astype("datetime64[Y]")) * (1 / 366)
-        time_of_day = np.nan_to_num((values - values.astype("datetime64[D]")).astype(int)) * (1 / 1440)
+        week_of_year = np.nan_to_num(
+            ((values.astype("datetime64[D]") - values.astype("datetime64[Y]")) / 7) + len(Tokens), nan=Tokens.UNK
+        )
+        day_of_week = np.nan_to_num((((values.view("int64") - 4) % 7) + len(Tokens)), nan=Tokens.UNK)
+        time_of_day = np.nan_to_num(
+            (values.astype("datetime64[s]") - values.astype("datetime64[D]")).astype(np.int64)
+        ) * (1 / (1440 * 60))
+
+        hour_of_year = np.nan_to_num(
+            (values.astype("datetime64[h]") - values.astype("datetime64[D]")) + len(Tokens), nan=Tokens.UNK
+        )
 
         return cls(
-            time_of_day=torch.nn.functional.pad(torch.tensor(time_of_day), pad=padding, value=0.0).unsqueeze(0),
-            day_of_year=torch.nn.functional.pad(torch.tensor(day_of_year), pad=padding, value=Tokens.PAD).unsqueeze(0),
-            day_of_week=torch.nn.functional.pad(torch.tensor(day_of_week), pad=padding, value=Tokens.PAD).unsqueeze(0),
-            lookup=torch.nn.functional.pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            lookup=pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            week_of_year=pad(torch.tensor(week_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            day_of_week=pad(torch.tensor(day_of_week.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            time_of_day=pad(torch.tensor(time_of_day.astype(np.float32)), pad=padding, value=0.0).unsqueeze(0),
+            hour_of_year=pad(torch.tensor(hour_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0),
             batch_size=[1],
         )
 
+    @jaxtyped(typechecker=beartype)
+    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+        N, L = (1, params.n_context)
+
+        mask_token = torch.full((N, L), Tokens.MASK)
+
+        # fine out what to mask
+        is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
+        is_masked = is_field_masked | is_event_masked
+
+        # creating discrete targets
+        timespan = self.hour_of_year
+
+        is_not_valued = self.lookup != 0
+        targets = timespan.masked_scatter(is_not_valued, timespan)
+
+        # mask original values
+        self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
+        self.week_of_year = self.week_of_year.masked_scatter(is_masked, mask_token)
+        self.day_of_week = self.day_of_week.masked_scatter(is_masked, mask_token)
+        self.time_of_day *= ~is_masked
+
+        # return SSL target
+        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
+
     def ablate(self):
-        self.lookup = torch.full_like(self.lookup, Tokens.UNK)
-        self.day_of_week = torch.full_like(self.day_of_week, Tokens.UNK)
-        self.day_of_year = torch.zeros_like(self.day_of_year)
+        self.lookup = torch.full_like(self.lookup, Tokens.ABLATE)
+        self.week_of_year = torch.full_like(self.week_of_year, Tokens.ABLATE)
+        self.day_of_week = torch.full_like(self.day_of_week, Tokens.ABLATE)
         self.time_of_day = torch.zeros_like(self.time_of_day)
 
 

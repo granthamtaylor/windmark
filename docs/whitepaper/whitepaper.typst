@@ -344,7 +344,7 @@ ModularFieldEmbeddingSystem(
 )
 ```
 
-Upon passing in the above `TensorDict` into the `ModularFieldEmbeddingSystem`, the MFES will iterate over each of the four discrete fields, embedding each of them with their respective `DiscreteFieldEmbedder` to create four tensors, each of dimensionality $RR^(N times L times C)$. After embedding each discrete field, the `ModularFieldEmbeddingSystem` will then concatenate the embeddings into a single tensor of dimensionality $RR^(N times L times F times C)$, which is then passed into the field encoder.
+Upon passing the above `TensorDict` into the `ModularFieldEmbeddingSystem`, the MFES will iterate over each of the four discrete fields, embedding each of them with their respective `DiscreteFieldEmbedder` to create four tensors, each of dimensionality $RR^(N times L times C)$. After embedding each discrete field, the `ModularFieldEmbeddingSystem` will then concatenate the embeddings into a single tensor of dimensionality $RR^(N times L times F times C)$, which is then passed into the field encoder.
 
 Representing the non-valued states (padded, null, or masked) is trivial in this case. They are additional tokens available within the `DiscreteFieldEmbedder`'s embedding table. This is almost exactly like language models with two exceptions:
 + In this case each unique field embedding module has its own embeddings for these non-valued states. The special token embeddings are not shared.

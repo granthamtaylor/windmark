@@ -116,8 +116,11 @@ class ContextProcessor:
                 case "entity":
                     processed = self.hash(values=values)
 
-                case "continuous" | "temporal":
+                case "continuous":
                     processed = self.cdf(values=values, field=field)
+
+                case "temporal":
+                    processed = np.array(values, dtype="datetime64")
 
                 case _:
                     raise NotImplementedError
@@ -253,12 +256,32 @@ def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
     )
 
     for field in manager.schema.fields:
-        if field.type in ["continuous", "temporal"]:
+        if field.type in ["continuous"]:
             indicators = torch.randint(0, len(Tokens), (N, L))
             padded = torch.where(is_padded, Tokens.PAD, indicators)
             is_valued = padded.eq(Tokens.VAL).long()
             values = torch.rand(N, L).mul(is_valued)
             output[field.name] = tensorfield[field.type](content=values, lookup=padded, batch_size=[N])  # type: ignore
+
+        if field.type in ["temporal"]:
+            lookup = torch.randint(0, len(Tokens), (N, L))
+
+            padded = torch.where(is_padded, Tokens.PAD, indicators)
+            is_valued = padded.eq(Tokens.VAL)
+
+            hour_of_year = torch.randint(0, 366 * 24, (N, L))
+            time_of_day = torch.rand(N, L).mul(is_valued).mul(1 / 1441)
+            week_of_year = torch.where(is_valued, torch.randint(0, 53, (N, L)).add(len(Tokens)), lookup)
+            day_of_week = torch.where(is_valued, torch.randint(0, 7, (N, L)).add(len(Tokens)), lookup)
+
+            output[field.name] = tensorfield[field.type](
+                lookup=padded,
+                week_of_year=week_of_year,
+                day_of_week=day_of_week,
+                time_of_day=time_of_day,
+                hour_of_year=hour_of_year,
+                batch_size=[N],
+            )  # type: ignore
 
         if field.type in ["discrete", "entity"]:
             limit = manager.levelsets.get_size(field) + len(Tokens) if field.type == "discrete" else L + len(Tokens)

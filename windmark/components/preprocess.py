@@ -26,7 +26,7 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
                 return pl.col(field.name).cast(pl.Float32)
 
             case "temporal":
-                return pl.col(field.name).dt.epoch(time_unit="s").cast(pl.Float32)
+                return pl.col(field.name).cast(pl.Datetime)
 
             case "discrete" | "entity":
                 return pl.col(field.name).fill_null("[UNK]")
@@ -62,8 +62,8 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
     lifestreams = (
         lf.select(
             *[format(field) for field in manager.schema.fields],
-            target=pl.col(manager.schema.target_id).replace(label_map).cast(pl.Int32).fill_null(-1),
-            event_id=manager.schema.event_id,
+            manager.schema.event_id,
+            pl.col(manager.schema.target_id).replace(label_map).cast(pl.Int32).fill_null(-1),
             sequence_id=manager.schema.sequence_id,
             order_by=manager.schema.order_by,
             split=assign_split(manager.schema.sequence_id),
@@ -73,8 +73,8 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
         .agg(
             *[field.name for field in manager.schema.fields],
             size=pl.count().cast(pl.Int32),
-            event_ids=pl.col("event_id"),
-            target=pl.col("target"),
+            event_ids=pl.col(manager.schema.event_id),
+            target=pl.col(manager.schema.target_id),
             split=pl.col("split").last(),
         )
         .collect()
