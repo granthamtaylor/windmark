@@ -1,4 +1,7 @@
+import string
+import random
 from typing import TypeAlias
+import datetime
 
 import numpy as np
 import torch
@@ -6,6 +9,7 @@ from beartype import beartype
 from jaxtyping import Bool, Float, Int, jaxtyped
 from tensordict.prototype import tensorclass
 from torch import Tensor
+from pytdigest import TDigest
 from torch.nn.functional import pad
 
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest
@@ -26,10 +30,16 @@ class DiscreteField:
 
     @jaxtyped(typechecker=beartype)
     @classmethod
-    def new(cls, values: list[int], params: Hyperparameters) -> "DiscreteField":
-        padding = (params.n_context - len(values), 0)
+    def new(
+        cls, values: list[str], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+    ) -> "DiscreteField":
+        mapping = manager.levelsets[field]
 
-        array = np.array(values, dtype=int)
+        tokens = list(map(lambda value: mapping[value], values))
+
+        padding = (params.n_context - len(tokens), 0)
+
+        array = np.array(tokens, dtype=int)
         lookup = pad(torch.tensor(array), pad=padding, value=Tokens.PAD).unsqueeze(0)
 
         return cls(lookup=lookup, batch_size=[1])
@@ -60,12 +70,45 @@ class DiscreteField:
         N, L, T = values.shape
         return torch.nn.functional.one_hot(targets.lookup.reshape(N * L), num_classes=T).float()
 
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "DiscreteField":
+        mappings = manager.levelsets.mappings[field.name]
+
+        levels = list(mappings.keys())
+
+        L = params.n_context
+
+        values = random.choices(levels, k=L)
+
+        return cls.new(values=values, field=field, params=params, manager=manager)
+
 
 @tensorclass
 class EntityField:
     lookup: Int[Tensor, "N L"]
 
-    new = DiscreteField.new
+    @jaxtyped(typechecker=beartype)
+    @classmethod
+    def new(
+        cls, values: list[str], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+    ) -> "EntityField":
+        unique: set[str] = set(values)
+
+        integers = random.sample(range(len(Tokens), params.n_context + len(Tokens)), len(unique))
+
+        mapping = dict(zip(unique, integers))
+
+        mapping.update({"[UNK]": Tokens.UNK})
+
+        tokens = list(map(lambda value: mapping[value], values))
+
+        padding = (params.n_context - len(tokens), 0)
+
+        array = np.array(tokens, dtype=int)
+        lookup = pad(torch.tensor(array), pad=padding, value=Tokens.PAD).unsqueeze(0)
+
+        return cls(lookup=lookup, batch_size=[1])
+
     mask = DiscreteField.mask
     ablate = DiscreteField.ablate
     postprocess = DiscreteField.postprocess
@@ -73,6 +116,15 @@ class EntityField:
     @classmethod
     def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
         return params.n_context + len(Tokens)
+
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "EntityField":
+        L = params.n_context
+
+        letters = string.ascii_letters
+        values = ["".join(random.choices(letters, k=2)) for _ in range(L)]
+
+        return cls.new(values=values, field=field, params=params, manager=manager)
 
 
 @tensorclass
@@ -82,18 +134,24 @@ class ContinuousField:
 
     @jaxtyped(typechecker=beartype)
     @classmethod
-    def new(cls, values, params: Hyperparameters) -> "ContinuousField":
-        lookup = np.where(np.isnan(values), Tokens.UNK, Tokens.VAL)
-        values = np.nan_to_num(np.array(values, dtype=float))
+    def new(
+        cls, values: list[float | None], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+    ) -> "ContinuousField":
+        digest: TDigest = manager.centroids.digests[field.name]
+        array = np.array(values, dtype=np.float64)
+        cdfs = digest.cdf(array)
 
-        padding = (params.n_context - len(values), 0)
+        lookup = np.where(np.isnan(cdfs), Tokens.UNK, Tokens.VAL)
+        content = np.nan_to_num(np.array(cdfs, dtype=float))
+
+        padding = (params.n_context - len(content), 0)
 
         # this effectively creates `1-(1/inf)` to prevent an index error
         # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
         dampener = 1 - torch.finfo(torch.half).tiny
 
         return cls(
-            content=pad(torch.tensor(values), pad=padding, value=0.0).float().unsqueeze(0).mul(dampener),
+            content=pad(torch.tensor(content), pad=padding, value=0.0).float().unsqueeze(0).mul(dampener),
             lookup=pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
             batch_size=[1],
         )
@@ -132,6 +190,14 @@ class ContinuousField:
         N, L, T = values.shape
         return smoothen(targets=targets.lookup, size=params.n_quantiles, sigma=params.quantile_smoothing)
 
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "ContinuousField":
+        L = params.n_context
+
+        values = [random.uniform(-100, 100) for _ in range(L)]
+
+        return cls.new(values=values, field=field, params=params, manager=manager)
+
 
 @tensorclass
 class TemporalField:
@@ -143,20 +209,23 @@ class TemporalField:
 
     @jaxtyped(typechecker=beartype)
     @classmethod
-    def new(cls, values, params: Hyperparameters) -> "TemporalField":
-        padding = (params.n_context - len(values), 0)
+    def new(
+        cls, values: list[datetime.datetime], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+    ) -> "TemporalField":
+        array = np.array(values, dtype="datetime64")
+        padding = (params.n_context - len(array), 0)
 
-        lookup = np.where(np.isnan(values), Tokens.UNK, Tokens.VAL)
+        lookup = np.where(np.isnan(array), Tokens.UNK, Tokens.VAL)
         week_of_year = np.nan_to_num(
-            ((values.astype("datetime64[D]") - values.astype("datetime64[Y]")) / 7) + len(Tokens), nan=Tokens.UNK
+            ((array.astype("datetime64[D]") - array.astype("datetime64[Y]")) / 7) + len(Tokens), nan=Tokens.UNK
         )
-        day_of_week = np.nan_to_num((((values.view("int64") - 4) % 7) + len(Tokens)), nan=Tokens.UNK)
+        day_of_week = np.nan_to_num((((array.view("int64") - 4) % 7) + len(Tokens)), nan=Tokens.UNK)
         time_of_day = np.nan_to_num(
-            (values.astype("datetime64[s]") - values.astype("datetime64[D]")).astype(np.int64)
+            (array.astype("datetime64[s]") - array.astype("datetime64[D]")).astype(np.int64)
         ) * (1 / (1440 * 60))
 
         hour_of_year = np.nan_to_num(
-            (values.astype("datetime64[h]") - values.astype("datetime64[D]")) + len(Tokens), nan=Tokens.UNK
+            (array.astype("datetime64[h]") - array.astype("datetime64[D]")) + len(Tokens), nan=Tokens.UNK
         )
 
         return cls(
@@ -207,6 +276,20 @@ class TemporalField:
     def postprocess(cls, values, targets, params) -> torch.Tensor:
         N, L, T = values.shape
         return smoothen(targets=targets.lookup, size=(366 * 24), sigma=params.quantile_smoothing)
+
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TemporalField":
+        start_date = datetime.datetime(2000, 1, 1)
+        end_date = datetime.datetime(2020, 12, 31)
+
+        delta = end_date - start_date
+        delta_seconds = int(delta.total_seconds())
+
+        L = params.n_context
+
+        values = [start_date + datetime.timedelta(seconds=random.randint(0, delta_seconds)) for _ in range(L)]
+
+        return cls.new(values=values, field=field, params=params, manager=manager)
 
 
 TensorField: TypeAlias = ContinuousField | DiscreteField | EntityField | TemporalField

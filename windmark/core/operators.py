@@ -3,25 +3,21 @@ from functools import partial
 from typing import TypeAlias, Any
 
 import fastavro
-import numpy as np
 import torch
-from pytdigest import TDigest
 from tensordict import TensorDict
 from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
-from windmark.core.constructs.tensorfields import (
-    ContinuousField,
-    DiscreteField,
-    EntityField,
-    TemporalField,
-)
-from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest
+from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.interface import FieldInterface
 from windmark.core.constructs.packages import SupervisedData, PretrainingData, SequenceData
 
 
-def read(filename):
+AnnotationType: TypeAlias = tuple[str, str, int]
+FieldType: TypeAlias = dict[str, list[Any]]
+
+
+def read(filename: str) -> list[dict[str, Any]]:
     with open(filename, "rb") as f:
         reader = fastavro.reader(f)
         records = [record for record in reader]
@@ -29,12 +25,8 @@ def read(filename):
     return records
 
 
-def subset(sequence: dict, split: str) -> bool:
+def subset(sequence: dict[str, Any], split: str) -> bool:
     return sequence["split"] == split
-
-
-AnnotationType: TypeAlias = tuple[str, str, int]
-FieldType: TypeAlias = dict[str, Any]
 
 
 def sample(
@@ -93,61 +85,6 @@ def sample(
     return observations
 
 
-class ContextProcessor:
-    offset: int = len(Tokens)
-
-    def __init__(self, manager: SystemManager, params: Hyperparameters):
-        self.manager: SystemManager = manager
-        self.params: Hyperparameters = params
-
-    def process(self, observation: tuple[AnnotationType, FieldType]) -> tuple[AnnotationType, FieldType]:
-        annotations, fields = observation
-
-        for field in self.manager.schema.fields:
-            values = fields[field.name]
-
-            match field.type:
-                case "discrete":
-                    processed = self.tokenize(values=values, field=field)
-
-                case "entity":
-                    processed = self.hash(values=values)
-
-                case "continuous":
-                    processed = self.cdf(values=values, field=field)
-
-                case "temporal":
-                    processed = np.array(values, dtype="datetime64")
-
-                case _:
-                    raise NotImplementedError
-
-            fields[field.name] = processed
-
-        return annotations, fields
-
-    def tokenize(self, values: list[str], field: FieldRequest) -> list[int]:
-        mapping = self.manager.levelsets[field]
-
-        return list(map(lambda value: mapping[value], values))
-
-    def hash(self, values: list[str]) -> list[int]:
-        unique: set[str] = set(values)
-
-        integers = random.sample(range(self.offset, self.params.n_context + self.offset), len(unique))
-
-        mapping = dict(zip(unique, integers))
-
-        mapping.update({"[UNK]": Tokens.UNK})
-
-        return list(map(lambda value: mapping[value], values))
-
-    def cdf(self, values: list[float], field: FieldRequest) -> np.ndarray:
-        digest: TDigest = self.manager.centroids.digests[field.name]
-        array = np.array(values, dtype=np.float64)
-        return digest.cdf(array)
-
-
 def tensorfield(
     observation: tuple[AnnotationType, FieldType],
     params: Hyperparameters,
@@ -160,7 +97,7 @@ def tensorfield(
     for field in manager.schema.fields:
         values = fields[field.name]
         tensorfield = FieldInterface.tensorfield(field)
-        output[field.name] = tensorfield.new(values, params=params)
+        output[field.name] = tensorfield.new(values=values, field=field, params=params, manager=manager)
 
     return annotations, TensorDict(output, batch_size=1)
 
@@ -206,8 +143,6 @@ def stream(
     assert mode in ["pretrain", "finetune", "inference"]
     assert split in ["train", "validate", "test"]
 
-    processor = ContextProcessor(manager=manager, params=params)
-
     return (
         datapipes.iter.FileLister(datapath, masks="*.avro")
         .shuffle()
@@ -216,11 +151,25 @@ def stream(
         .filter(partial(subset, split=split))
         .shuffle()
         .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))
-        .map(processor.process)
         .shuffle()
         .map(partial(tensorfield, manager=manager, params=params))
         .map(partial(package, params=params, manager=manager, mode=mode))
     )
+
+
+def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
+    observations = []
+
+    for _ in range(params.batch_size):
+        tree = {}
+
+        for field in manager.schema.fields:
+            tensorfield = FieldInterface.tensorfield(field)
+            tree[field.name] = tensorfield.mock(field=field, params=params, manager=manager)
+
+        observations.append(TensorDict(tree, batch_size=[1]))
+
+    return torch.stack(observations, dim=0).squeeze(1)
 
 
 def collate(batch: list[SequenceData]) -> SequenceData:
@@ -228,55 +177,3 @@ def collate(batch: list[SequenceData]) -> SequenceData:
     stacked.meta = [observation.meta for observation in batch]
 
     return stacked
-
-
-def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
-    output = {}
-
-    N = params.batch_size
-    L = params.n_context
-
-    is_padded = torch.arange(L).expand(N, L).lt(torch.randint(1, L, [N]).unsqueeze(-1)).bool()
-
-    tensorfield = dict(
-        continuous=ContinuousField,
-        temporal=TemporalField,
-        discrete=DiscreteField,
-        entity=EntityField,
-    )
-
-    for field in manager.schema.fields:
-        if field.type in ["continuous"]:
-            indicators = torch.randint(0, len(Tokens), (N, L))
-            padded = torch.where(is_padded, Tokens.PAD, indicators)
-            is_valued = padded.eq(Tokens.VAL).long()
-            values = torch.rand(N, L).mul(is_valued)
-            output[field.name] = tensorfield[field.type](content=values, lookup=padded, batch_size=[N])  # type: ignore
-
-        if field.type in ["temporal"]:
-            lookup = torch.randint(0, len(Tokens), (N, L))
-
-            padded = torch.where(is_padded, Tokens.PAD, indicators)
-            is_valued = padded.eq(Tokens.VAL)
-
-            hour_of_year = torch.randint(0, 366 * 24, (N, L))
-            time_of_day = torch.rand(N, L).mul(is_valued).mul(1 / 1441)
-            week_of_year = torch.where(is_valued, torch.randint(0, 53, (N, L)).add(len(Tokens)), lookup)
-            day_of_week = torch.where(is_valued, torch.randint(0, 7, (N, L)).add(len(Tokens)), lookup)
-
-            output[field.name] = tensorfield[field.type](
-                lookup=padded,
-                week_of_year=week_of_year,
-                day_of_week=day_of_week,
-                time_of_day=time_of_day,
-                hour_of_year=hour_of_year,
-                batch_size=[N],
-            )  # type: ignore
-
-        if field.type in ["discrete", "entity"]:
-            limit = manager.levelsets.get_size(field) + len(Tokens) if field.type == "discrete" else L + len(Tokens)
-            values = torch.randint(0, limit, (N, L))
-            padded = torch.where(is_padded, Tokens.PAD, values)
-            output[field.name] = tensorfield[field.type](lookup=padded, batch_size=[N])  # type: ignore
-
-    return TensorDict(output, batch_size=N)

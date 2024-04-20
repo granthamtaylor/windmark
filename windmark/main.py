@@ -37,7 +37,7 @@ if __name__ == "__main__":
         n_pretrain_steps=400,
         n_finetune_steps=30,
         n_context=128,
-        batch_size=128,
+        batch_size=192,
         d_field=48,
         max_pretrain_epochs=64,
         max_finetune_epochs=64,
