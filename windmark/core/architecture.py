@@ -494,7 +494,7 @@ class EventDecoder(torch.nn.Module):
                     d_target = params.n_quantiles
 
                 case "temporal":
-                    d_target = (366 * 24) + len(Tokens)
+                    d_target = 366 * 24
 
                 case _:
                     raise NotImplementedError
@@ -699,9 +699,7 @@ def pretrain(
             )
 
         elif field.type in ["temporal"]:
-            labels = smoothen(
-                targets=targets.lookup, size=(366 * 24) + len(Tokens), sigma=module.params.quantile_smoothing
-            )
+            labels = smoothen(targets=targets.lookup, size=(366 * 24), sigma=module.params.quantile_smoothing)
 
         else:
             assert field.type in ["discrete", "entity"]
