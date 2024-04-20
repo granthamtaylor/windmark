@@ -8,7 +8,7 @@ import lightning.pytorch as lit
 import torch
 import torchmetrics
 from beartype import beartype
-from jaxtyping import Bool, Float, Int, jaxtyped
+from jaxtyping import Bool, Float, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from tensordict import TensorDict
 from torch import Tensor
@@ -18,20 +18,10 @@ from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
 from windmark.core.operators import collate, stream, mock
-from windmark.core.constructs import (
-    ContinuousField,
-    DiscreteField,
-    EntityField,
-    TemporalField,
-    TargetField,
-    PretrainingData,
-    SupervisedData,
-    OutputData,
-    Field,
-    Hyperparameters,
-    SequenceData,
-    Tokens,
-)
+from windmark.core.constructs.tensorfields import TargetField
+from windmark.core.constructs.general import Tokens, Hyperparameters
+from windmark.core.constructs.interface import FieldInterface
+from windmark.core.constructs.packages import PretrainingData, SupervisedData, OutputData, SequenceData
 
 
 @jaxtyped(typechecker=beartype)
@@ -94,185 +84,6 @@ class LearnedTensor(torch.nn.Module):
         return self.tensor
 
 
-class DiscreteFieldEmbedder(torch.nn.Module):
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: Field):
-        """
-        Initialize discrete field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (Field): The field to be embedded
-        """
-        super().__init__()
-
-        self.field: Field = field
-        self.embeddings = torch.nn.Embedding(manager.levelsets.get_size(field) + len(Tokens), params.d_field)
-
-    def forward(self, inputs: DiscreteField) -> Tensor:
-        return self.embeddings(inputs.lookup)
-
-
-class EntityFieldEmbedder(torch.nn.Module):
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: Field):
-        super().__init__()
-        """
-        Initialize entity field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (Field): The field to be embedded
-        """
-
-        self.field: Field = field
-        self.embeddings = torch.nn.Embedding(params.n_context + len(Tokens), params.d_field)
-
-    def forward(self, inputs: EntityField) -> Tensor:
-        return self.embeddings(inputs.lookup)
-
-
-class ContinuousFieldEmbedder(torch.nn.Module):
-    """
-    ContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
-
-    Attributes:
-        linear (torch.nn.Linear): A linear layer for transforming the input.
-        positional (torch.nn.Embedding): An embedding layer for positional encoding.
-        weights (Tensor): The weights for the Fourier features.
-    """
-
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: Field):
-        """
-        Initialize continuous field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (Field): The field to be embedded
-        """
-
-        super().__init__()
-
-        self.field: Field = field
-
-        offset = 3
-
-        weights = torch.logspace(start=-params.n_bands, end=offset, steps=params.n_bands + offset + 1, base=2)
-
-        self.linear = torch.nn.Linear(2 * len(weights), params.d_field)
-        self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
-
-    @jaxtyped(typechecker=beartype)
-    def forward(
-        self,
-        inputs: ContinuousField | TemporalField,
-    ) -> Float[Tensor, "N L F"]:
-        """
-        Performs the forward pass of the FourierFeatureEncoder.
-
-        Args:
-            inputs (Float[Tensor, "N L"]): The input tensor.
-
-        Returns:
-            Float[Tensor, "N L F"]: The Fourier features of the input.
-        """
-
-        values = inputs.content
-        indicators = inputs.lookup
-
-        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
-
-        assert torch.all(
-            values.mul(indicators).eq(0.0), dim=None
-        ), "values should be imputed if not null, padded, or masked"
-
-        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
-
-        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
-
-        N, L = values.shape
-
-        # weight inputs with buffers of precision bands
-        weighted = values.sub(indicators).view(N * L).unsqueeze(dim=1).mul(self.weights)
-
-        # apply sine and cosine functions to weighted inputs
-        fourier = torch.sin(weighted), torch.cos(weighted)
-
-        # project sinusoidal representations with MLP
-        projections = self.linear(torch.cat(fourier, dim=1)).view(N, L, -1)
-
-        return projections
-
-
-class TemporalFieldEmbedder(torch.nn.Module):
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: Field):
-        """
-        Initialize continuous field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (Field): The field to be embedded
-        """
-
-        super().__init__()
-
-        self.field: Field = field
-
-        offset = 0
-
-        weights = torch.logspace(start=-params.n_bands, end=offset, steps=params.n_bands + offset + 1, base=2)
-
-        self.linear = torch.nn.Linear(2 * len(weights), params.d_field)
-        self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
-
-        self.embeddings = torch.nn.ModuleDict(
-            dict(
-                week_of_year=torch.nn.Embedding(53 + len(Tokens), params.d_field),
-                day_of_week=torch.nn.Embedding(7 + len(Tokens), params.d_field),
-            )
-        )
-
-    @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TemporalField) -> Float[Tensor, "N L F"]:
-        """
-        Performs the forward pass of the FourierFeatureEncoder.
-
-        Args:
-            inputs (Float[Tensor, "N L"]): The input tensor.
-
-        Returns:
-            Float[Tensor, "N L F"]: The Fourier features of the input.
-        """
-
-        assert inputs.time_of_day.shape == inputs.lookup.shape, "values and indicators must always have the same shape"
-
-        assert torch.all(
-            inputs.time_of_day.mul(inputs.lookup).eq(0.0), dim=None
-        ), "values should be imputed if not null, padded, or masked"
-
-        assert torch.all(inputs.time_of_day.lt(1.0), dim=None), "values should be less than 1.0"
-
-        assert torch.all(inputs.time_of_day.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
-
-        N, L = inputs.time_of_day.shape
-
-        # weight inputs with buffers of precision bands
-        weighted = inputs.time_of_day.view(N * L).unsqueeze(dim=1).mul(self.weights)
-
-        # apply sine and cosine functions to weighted inputs
-        fourier = torch.sin(weighted), torch.cos(weighted)
-
-        # project sinusoidal representations with MLP
-        projections = self.linear(torch.cat(fourier, dim=1)).view(N, L, -1)
-
-        projections += self.embeddings["week_of_year"](inputs.week_of_year)
-        projections += self.embeddings["day_of_week"](inputs.day_of_week)
-
-        return projections
-
-
 class ModularFieldEmbeddingSystem(torch.nn.Module):
     """
     ModularFieldEmbeddingSystem is a PyTorch module for embedding fields.
@@ -290,15 +101,8 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
 
         embedders: dict[str, torch.nn.Module] = {}
 
-        embedder_map: dict[str, type] = dict(
-            discrete=DiscreteFieldEmbedder,
-            continuous=ContinuousFieldEmbedder,
-            entity=EntityFieldEmbedder,
-            temporal=TemporalFieldEmbedder,
-        )
-
         for field in manager.schema.fields:
-            embedder = embedder_map[field.type]
+            embedder = FieldInterface.embedder(field)
             embedders[field.name] = embedder(params=params, manager=manager, field=field)
 
         self.embedders = torch.nn.ModuleDict(embedders)
@@ -483,25 +287,11 @@ class EventDecoder(torch.nn.Module):
         projections = {}
 
         for field in manager.schema.fields:
-            match field.type:
-                case "discrete":
-                    d_target = manager.levelsets.get_size(field)
-
-                case "entity":
-                    d_target = params.n_context
-
-                case "continuous":
-                    d_target = params.n_quantiles
-
-                case "temporal":
-                    d_target = 366 * 24
-
-                case _:
-                    raise NotImplementedError
+            tensorfield = FieldInterface.tensorfield(field)
 
             projections[field.name] = torch.nn.Conv1d(
                 in_channels=len(manager.schema) * params.d_field,
-                out_channels=d_target + len(Tokens),
+                out_channels=tensorfield.get_target_size(params=params, manager=manager, field=field),
                 kernel_size=1,
             )
 
@@ -633,51 +423,6 @@ def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
     )
 
 
-@jaxtyped(typechecker=beartype)
-def smoothen(targets: Int[torch.Tensor, "N L"], size: int, sigma: float) -> Float[torch.Tensor, "NL _"]:
-    """Apply gaussian smoothing to continuous targets with fixed offset for special tokens
-
-    Arguments:
-        targets (Int[torch.Tensor, "N L"]): Target label indices.
-        size (int): The number of quantiles to smoothen over.
-        sigma (float): Gaussian smoothing factor
-
-    Returns:
-        Float[torch.Tensor, "N L _"]: Smoothened quantile targets.
-    """
-    device = targets.device
-
-    N, L = targets.size()
-
-    range_tensor = torch.arange(0, size + len(Tokens), device=device).float()
-
-    # expand and reshape to match the batch and sequence dimensions
-    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0).expand(N, L, size + len(Tokens))
-    labels_expanded = targets.float().unsqueeze(-1)
-
-    # create gaussian distribution for each label in the sequence
-    gaussian = torch.exp(-0.5 * ((range_tensor - labels_expanded) ** 2) / sigma**2)
-    gaussian /= gaussian.sum(dim=-1, keepdim=True)
-
-    # one-hot encoding for labels at or below the threshold
-    one_hot = torch.zeros_like(gaussian).scatter_(-1, targets.unsqueeze(-1), 1.0)
-
-    # determine which labels are above the threshold
-    is_above_threshold = targets >= len(Tokens)
-
-    # prevent gaussian bleeding for labels above the threshold
-    start_bleed = torch.zeros_like(targets, dtype=torch.float32) + len(Tokens)
-    start_positions = torch.where(is_above_threshold, start_bleed, targets.float())
-    prevent_bleed_mask = range_tensor >= start_positions.unsqueeze(-1)
-
-    # re-normalize
-    gaussian_masked = gaussian * prevent_bleed_mask.float()
-    gaussian_masked /= gaussian_masked.sum(dim=-1, keepdim=True)
-
-    # combine using the condition
-    return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot).reshape(N * L, -1)
-
-
 def pretrain(
     module: "SequenceModule",
     batch: PretrainingData,
@@ -692,18 +437,9 @@ def pretrain(
 
         N, L, T = values.shape
 
-        # smoothen the targets for continuous fields
-        if field.type in ["continuous"]:
-            labels = smoothen(
-                targets=targets.lookup, size=module.params.n_quantiles, sigma=module.params.quantile_smoothing
-            )
+        tensorfield = FieldInterface.tensorfield(field)
 
-        elif field.type in ["temporal"]:
-            labels = smoothen(targets=targets.lookup, size=(366 * 24), sigma=module.params.quantile_smoothing)
-
-        else:
-            assert field.type in ["discrete", "entity"]
-            labels = torch.nn.functional.one_hot(targets.lookup.reshape(N * L), num_classes=T).float()
+        labels = tensorfield.postprocess(values=values, targets=targets, params=module.params)
 
         mask = targets.is_masked.reshape(N * L)
         values = values.reshape(N * L, T)

@@ -3,10 +3,10 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import RichProgressBar
 from lightning.pytorch.loggers import TensorBoardLogger
 
-from windmark.core.architecture import SequenceModule
+from windmark.core.architecture.encoders import SequenceModule
 from windmark.core.callbacks import ParquetBatchWriter
 from windmark.core.managers import SystemManager, LabelManager
-from windmark.core.constructs import Hyperparameters
+from windmark.core.constructs.general import Hyperparameters
 from windmark.core.orchestration import task
 
 

@@ -7,7 +7,7 @@ import polars as pl
 from rich.console import Console
 
 from windmark.core.managers import SystemManager
-from windmark.core.constructs import Field
+from windmark.core.constructs.general import FieldRequest
 from windmark.core.orchestration import task
 
 
@@ -20,7 +20,7 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
 
     lf = pl.scan_parquet(ledger)
 
-    def format(field: Field) -> pl.Expr:
+    def format(field: FieldRequest) -> pl.Expr:
         match field.type:
             case "continuous":
                 return pl.col(field.name).cast(pl.Float32)

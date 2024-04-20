@@ -1,18 +1,18 @@
 import polars as pl
 from pytdigest import TDigest
 
-from windmark.core.managers import Field, Centroid
+from windmark.core.constructs.general import Centroid, FieldRequest
 from windmark.core.orchestration import task
 
 
 @task
-def create_digest_centroids_from_ledger(ledger: str, field: Field, slice_size: int = 10_000) -> Centroid:
+def create_digest_centroids_from_ledger(ledger: str, field: FieldRequest, slice_size: int = 10_000) -> Centroid:
     digest = TDigest()
 
     if field.type not in ["continuous", "temporal"]:
         return Centroid.empty(field.name)
 
-    def format(field: Field) -> pl.Expr:
+    def format(field: FieldRequest) -> pl.Expr:
         if field.type == "continuous":
             return pl.col(field.name)
         else:

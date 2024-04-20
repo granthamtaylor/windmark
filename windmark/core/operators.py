@@ -10,18 +10,15 @@ from tensordict import TensorDict
 from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
-from windmark.core.constructs import (
-    Field,
+from windmark.core.constructs.tensorfields import (
     ContinuousField,
     DiscreteField,
     EntityField,
-    Hyperparameters,
-    SupervisedData,
-    PretrainingData,
-    SequenceData,
-    Tokens,
     TemporalField,
 )
+from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest
+from windmark.core.constructs.interface import FieldInterface
+from windmark.core.constructs.packages import SupervisedData, PretrainingData, SequenceData
 
 
 def read(filename):
@@ -129,7 +126,7 @@ class ContextProcessor:
 
         return annotations, fields
 
-    def tokenize(self, values: list[str], field: Field) -> list[int]:
+    def tokenize(self, values: list[str], field: FieldRequest) -> list[int]:
         mapping = self.manager.levelsets[field]
 
         return list(map(lambda value: mapping[value], values))
@@ -145,7 +142,7 @@ class ContextProcessor:
 
         return list(map(lambda value: mapping[value], values))
 
-    def cdf(self, values: list[float], field: Field) -> np.ndarray:
+    def cdf(self, values: list[float], field: FieldRequest) -> np.ndarray:
         digest: TDigest = self.manager.centroids.digests[field.name]
         array = np.array(values, dtype=np.float64)
         return digest.cdf(array)
@@ -160,17 +157,10 @@ def tensorfield(
 
     output = {}
 
-    tensorclasses = dict(
-        discrete=DiscreteField,
-        continuous=ContinuousField,
-        entity=EntityField,
-        temporal=TemporalField,
-    )
-
     for field in manager.schema.fields:
         values = fields[field.name]
-        tensorclass = tensorclasses[field.type]
-        output[field.name] = tensorclass.new(values, params=params)
+        tensorfield = FieldInterface.tensorfield(field)
+        output[field.name] = tensorfield.new(values, params=params)
 
     return annotations, TensorDict(output, batch_size=1)
 

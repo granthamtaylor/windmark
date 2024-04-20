@@ -2,7 +2,7 @@ from pathlib import Path
 
 import flytekit as fk
 
-from windmark.core.architecture import SequenceModule
+from windmark.core.architecture.encoders import SequenceModule
 from windmark.core.orchestration import task
 
 

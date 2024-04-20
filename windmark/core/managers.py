@@ -13,7 +13,7 @@ from rich.panel import Panel
 from pytdigest import TDigest
 from mashumaro.mixins.json import DataClassJSONMixin
 
-from windmark.core.constructs import Field, Centroid, LevelSet
+from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest
 
 console = Console()
 
@@ -31,7 +31,7 @@ class SchemaManager(DataClassJSONMixin):
     event_id: str
     order_by: str
     target_id: str
-    fields: list[Field]
+    fields: list[FieldRequest]
 
     @classmethod
     def create(
@@ -42,10 +42,10 @@ class SchemaManager(DataClassJSONMixin):
         target_id: str,
         **fieldinfo: str,
     ) -> "SchemaManager":
-        fields: list[Field] = []
+        fields: list[FieldRequest] = []
 
         for field in fieldinfo.items():
-            fields.append(Field(*field))
+            fields.append(FieldRequest(*field))
 
         return cls(
             sequence_id=sequence_id,
@@ -299,14 +299,14 @@ class LevelManager(DataClassJSONMixin):
     def __post_init__(self):
         self.mappings = {levelset.name: levelset.mapping for levelset in self.levelsets if levelset.is_valid}
 
-    def get_size(self, field: Field) -> int:
-        assert isinstance(field, Field)
+    def get_size(self, field: FieldRequest) -> int:
+        assert isinstance(field, FieldRequest)
 
         # ! need to subtract one because "[UNK]" is hardcoded into enum
         return len(self.mappings[field.name]) - 1
 
-    def __getitem__(self, field: Field) -> dict[str, int]:
-        assert isinstance(field, Field)
+    def __getitem__(self, field: FieldRequest) -> dict[str, int]:
+        assert isinstance(field, FieldRequest)
         return self.mappings[field.name]
 
     def show(self):

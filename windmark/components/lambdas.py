@@ -1,13 +1,13 @@
 from types import SimpleNamespace
 
 
-from windmark.core.constructs import Field, Centroid, LevelSet, Hyperparameters
+from windmark.core.constructs.general import Centroid, LevelSet, Hyperparameters, FieldRequest
 from windmark.core.managers import SchemaManager, CentroidManager, LevelManager
 from windmark.core.orchestration import task
 
 
 @task
-def fan_fields(schema: SchemaManager) -> list[Field]:
+def fan_fields(schema: SchemaManager) -> list[FieldRequest]:
     return schema.fields
 
 
