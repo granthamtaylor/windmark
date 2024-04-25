@@ -124,9 +124,10 @@ def package(
     for field in manager.schema.fields:
         targets[field.name] = fields[field.name].mask(is_event_masked, params=params)
 
-    ablations = []
-    for ablation in ablations:
-        fields[ablation].ablate()
+    pruned_fields = []
+    for pruned_field in pruned_fields:
+        assert pruned_field in fields.keys(), f'pruned field "{pruned_field}" not found'
+        fields[pruned_field].ablate()
 
     targets = TensorDict(targets, batch_size=1)
 

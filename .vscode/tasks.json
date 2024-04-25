@@ -20,18 +20,18 @@
       }
     },
     {
-      "label": "$(book) Doc",
+      "label": "$(graph) Tensorboard",
       "type": "shell",
-      "command": "poetry run just doc",
+      "command": "poetry run just tensorboard",
       "presentation": {
         "reveal": "always",
         "panel": "new"
       }
     },
     {
-      "label": "$(graph) Tensorboard",
+      "label": "$(book) Whitepaper",
       "type": "shell",
-      "command": "poetry run just tensorboard",
+      "command": "poetry run just whitepaper",
       "presentation": {
         "reveal": "always",
         "panel": "new"

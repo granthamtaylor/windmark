@@ -48,6 +48,8 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters, split: 
 
     pretrained = comp.pretrain(lifestreams=lifestreams, params=params, manager=system)
 
+    # pretrained = "checkpoints/pretrain/brandon-terrace:IRVE.ckpt"
+
     finetuned = comp.finetune(checkpoint=pretrained, lifestreams=lifestreams, params=params, manager=system)
 
     comp.predict(checkpoint=finetuned, params=params, manager=system, lifestreams=lifestreams)

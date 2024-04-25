@@ -1,5 +1,12 @@
 {
   "python.testing.pytestArgs": ["windmark/tests"],
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true
+  "python.testing.pytestEnabled": true,
+  "grammarly.selectors": [
+    {
+      "language": "typst",
+      "scheme": "file",
+      "pattern": "docs/whitepaper/whitepaper.typst"
+    }
+  ]
 }

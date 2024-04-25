@@ -8,7 +8,7 @@ import lightning.pytorch as lit
 import torch
 import torchmetrics
 from beartype import beartype
-from jaxtyping import Bool, Float, jaxtyped
+from jaxtyping import Float, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from tensordict import TensorDict
 from torch import Tensor
@@ -19,34 +19,9 @@ from torchdata import datapipes
 from windmark.core.managers import SystemManager
 from windmark.core.operators import collate, stream, mock
 from windmark.core.constructs.tensorfields import TargetField
-from windmark.core.constructs.general import Tokens, Hyperparameters
+from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.interface import FieldInterface
 from windmark.core.constructs.packages import PretrainingData, SupervisedData, OutputData, SequenceData
-
-
-@jaxtyped(typechecker=beartype)
-def create_attention_masks(inputs: TensorDict, manager: SystemManager) -> tuple[Tensor, Tensor]:
-    is_non_valued = []
-
-    for field in manager.schema.fields:
-        values = inputs[(field.name, "lookup")]
-
-        is_padded = values.eq(Tokens.PAD)
-        is_unknown = values.eq(Tokens.UNK)
-        is_non_valued.append(is_padded | is_unknown)
-
-    is_non_valued = torch.stack(is_non_valued, dim=-1)
-
-    N, L, F = is_non_valued.shape
-
-    field_mask = ~is_non_valued.view(N * L, F)
-    event_mask = ~is_non_valued.amin(-1)
-
-    # FIXME this could be better
-    return (
-        ~(field_mask.unsqueeze(-1) & field_mask.unsqueeze(-2)),
-        ~(event_mask.unsqueeze(-1) & event_mask.unsqueeze(-2)),
-    )
 
 
 class LearnedTensor(torch.nn.Module):
@@ -149,11 +124,6 @@ class FieldEncoder(torch.nn.Module):
 
         super().__init__()
 
-        identity = torch.eye(len(manager.schema)).bool().unsqueeze(0)
-        self.register_buffer("identity", identity)
-
-        self.H = params.n_heads_field_encoder
-
         layer = torch.nn.TransformerEncoderLayer(
             d_model=params.d_field,
             nhead=params.n_heads_field_encoder,
@@ -166,11 +136,7 @@ class FieldEncoder(torch.nn.Module):
         self.positional = LearnedTensor(len(manager.schema), params.d_field)
 
     @jaxtyped(typechecker=beartype)
-    def forward(
-        self,
-        fields: Float[Tensor, "N L F C"],
-        mask: Bool[Tensor, "NL F F"],
-    ) -> Float[Tensor, "N L FC"]:
+    def forward(self, fields: Float[Tensor, "N L F C"]) -> Float[Tensor, "N L FC"]:
         """
         Performs the forward pass of the FieldEncoder.
 
@@ -182,7 +148,6 @@ class FieldEncoder(torch.nn.Module):
         """
 
         N, L, F, C = fields.shape
-        # H = self.H
 
         # NL F C
         batched = fields.view(N * L, F, C)
@@ -190,14 +155,7 @@ class FieldEncoder(torch.nn.Module):
         # NL F C
         batched += self.positional().unsqueeze(dim=0).expand(N * L, F, C)
 
-        # NLH F F
-        # identity = self.identity.expand((N * L * H, F, F))
-
-        # NLH F F
-        # masks = torch.repeat_interleave(mask, H, dim=0) & ~identity
-
         # NL F C
-        # events = self.encoder(batched, mask=masks).view(N, L, F * C)
         events = self.encoder(batched).view(N, L, F * C)
 
         # N L FC
@@ -220,8 +178,6 @@ class EventEncoder(torch.nn.Module):
 
         super().__init__()
 
-        self.H = params.n_heads_event_encoder
-
         layer = torch.nn.TransformerEncoderLayer(
             d_model=len(manager.schema) * params.d_field,
             nhead=params.n_heads_event_encoder,
@@ -235,16 +191,8 @@ class EventEncoder(torch.nn.Module):
         self.class_token = LearnedTensor(1, len(manager.schema) * params.d_field)
 
     @jaxtyped(typechecker=beartype)
-    def forward(
-        self,
-        events: Float[Tensor, "N L FC"],
-        mask: Bool[Tensor, "N L L"],
-    ) -> tuple[
-        Float[Tensor, "N FC"],
-        Float[Tensor, "N L FC"],
-    ]:
+    def forward(self, events: Float[Tensor, "N L FC"]) -> tuple[Float[Tensor, "N FC"], Float[Tensor, "N L FC"]]:
         N, L, FC = events.shape
-        # H = self.H
 
         # N L FC
         events += self.positional().unsqueeze(0).expand(N, L, FC)
@@ -255,11 +203,7 @@ class EventEncoder(torch.nn.Module):
         # N L+1 FC
         concatenated = torch.cat((class_token, events), dim=1)
 
-        # NH L+1 L+1
-        # masks = torch.nn.functional.pad(mask, (1, 0, 1, 0), value=0).repeat_interleave(H, dim=0)
-
         # N L+1 FC
-        # encoded = self.encoder(concatenated, mask=masks)
         encoded = self.encoder(concatenated)
 
         # (N 1 FC), (N L FC)
@@ -328,7 +272,7 @@ class EventDecoder(torch.nn.Module):
 
 class DecisionHead(torch.nn.Module):
     """
-    A PyTorch module representing a classification head. This module is used to map the encoded fields to the target classes.
+    A PyTorch module representing a decision head. This module is used to map the encoded fields to the target classes.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
@@ -380,7 +324,7 @@ class DecisionHead(torch.nn.Module):
 
     def forward(self, inputs: Float[Tensor, "N FC"]) -> Float[Tensor, "N T"]:
         """
-        Defines the forward pass of the ClassificationHead.
+        Defines the forward pass of the DecisionHead.
 
         Args:
             inputs (torch.Tensor): The input tensor.
@@ -563,11 +507,9 @@ class SequenceModule(lit.LightningModule):
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> OutputData:  # type: ignore
-        field_mask, event_mask = create_attention_masks(inputs, manager=self.manager)
-
         fields = self.modular_field_embedder(inputs)
-        events = self.field_encoder(fields, mask=field_mask)
-        sequence, representations = self.event_encoder(events, mask=event_mask)
+        events = self.field_encoder(fields)
+        sequence, representations = self.event_encoder(events)
 
         predictions = self.decision_head(sequence)
         reconstructions = self.event_decoder(representations)

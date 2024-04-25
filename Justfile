@@ -2,7 +2,7 @@ _list:
   @just --list
 
 # run pre-commit checks
-check:
+check: whitepaper
   @git add .
   @poetry run pre-commit
 
@@ -20,7 +20,7 @@ doc:
 
 # compile whitepaper with typst
 whitepaper:
-  @typst watch docs/whitepaper/whitepaper.typst --root=docs
+  @typst compile docs/whitepaper/whitepaper.typst --root=docs
 
 # run training pipeline
 train:
