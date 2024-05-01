@@ -1,12 +1,8 @@
 import windmark as wm
 
-ledger = "/home/grantham/windmark/data/mini-ledger.parquet"
+ledger = "/home/grantham/windmark/data/ledger.parquet"
 
-split = wm.SequenceSplitter(
-    train=0.60,
-    validate=0.20,
-    test=0.20,
-)
+split = wm.SequenceSplitter(train=0.60, validate=0.20, test=0.20)
 
 schema = wm.Schema.create(
     # structural
@@ -35,13 +31,15 @@ schema = wm.Schema.create(
 )
 
 params = wm.Hyperparameters(
-    n_pretrain_steps=300,
-    n_finetune_steps=50,
+    n_pretrain_steps=800,
+    n_finetune_steps=200,
     n_context=192,
-    batch_size=128,
+    batch_size=96,
     d_field=64,
     max_pretrain_epochs=512,
     max_finetune_epochs=256,
+    n_layers_event_encoder=10,
+    n_layers_field_encoder=1,
     learning_rate=0.0001,
     patience=16,
 )

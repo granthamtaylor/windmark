@@ -7,6 +7,11 @@
       "language": "typst",
       "scheme": "file",
       "pattern": "docs/whitepaper/whitepaper.typst"
+    },
+    {
+      "language": "typst",
+      "scheme": "file",
+      "pattern": "docs/whitepaper/whitepaper.typ"
     }
   ]
 }

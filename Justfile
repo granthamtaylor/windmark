@@ -20,7 +20,11 @@ doc:
 
 # compile whitepaper with typst
 whitepaper:
-  @typst compile docs/whitepaper/whitepaper.typst --root=docs
+  @typst compile docs/whitepaper/whitepaper.typ docs/whitepaper/build/windmark.pdf  --root=docs
+  @pandoc docs/whitepaper/whitepaper.typ -o docs/whitepaper/build/windmark.md
+  @pandoc docs/whitepaper/whitepaper.typ -o docs/whitepaper/build/windmark.docx
+  @pandoc docs/whitepaper/whitepaper.typ -o docs/whitepaper/build/windmark.html
+  @zip -r whitepaper.zip docs
 
 # run training pipeline
 train:

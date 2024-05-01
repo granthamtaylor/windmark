@@ -113,8 +113,6 @@ class BalanceManager(DataClassJSONMixin):
         weights = list(map(lambda x: sum(ratio) / x, self.interpolation))
         self.weights = list(map(lambda x: x / min(weights), weights))
 
-        self.kappa = self.kappa
-
     def show(self):
         table = Table(title=f"Balance Manager (kappa={self.kappa:.2%})")
 
@@ -313,7 +311,6 @@ class LevelManager(DataClassJSONMixin):
         table = Table(title="Level Manager")
 
         table.add_column("Field Names", justify="right", style="cyan", no_wrap=True)
-
         table.add_column("Depth", style="cyan", no_wrap=True)
         table.add_column("Levels", style="cyan", no_wrap=False)
 

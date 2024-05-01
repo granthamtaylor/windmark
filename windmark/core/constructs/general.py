@@ -91,7 +91,7 @@ class Hyperparameters(DataClassJSONMixin):
     """Precision of fourier feature encoders"""
     head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
     """How quickly to converge sequence representation"""
-    n_quantiles: Annotated[int, pydantic.Field(gt=1, le=512)] = 64
+    n_quantiles: Annotated[int, pydantic.Field(gt=1, le=512)] = 128
     """Number of quantiles for continuous and temporal field"""
 
     # training
