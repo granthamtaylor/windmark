@@ -16,7 +16,7 @@ class Tokens(IntEnum):
     UNK = 1
     PAD = 2
     MASK = 3
-    ABLATE = 4
+    PRUNE = 4
 
 
 @dataclass

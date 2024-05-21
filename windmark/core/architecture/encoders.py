@@ -150,10 +150,7 @@ class FieldEncoder(torch.nn.Module):
         N, L, F, C = fields.shape
 
         # NL F C
-        batched = fields.view(N * L, F, C)
-
-        # NL F C
-        batched += self.positional().unsqueeze(dim=0).expand(N * L, F, C)
+        batched = fields.view(N * L, F, C) + self.positional()
 
         # NL F C
         events = self.encoder(batched).view(N, L, F * C)
@@ -188,17 +185,17 @@ class EventEncoder(torch.nn.Module):
         self.encoder = torch.nn.TransformerEncoder(layer, num_layers=params.n_layers_event_encoder)
 
         self.positional = LearnedTensor(params.n_context, len(manager.schema) * params.d_field)
-        self.class_token = LearnedTensor(1, len(manager.schema) * params.d_field)
+        self.class_token = LearnedTensor(1, 1, len(manager.schema) * params.d_field)
 
     @jaxtyped(typechecker=beartype)
     def forward(self, events: Float[Tensor, "N L FC"]) -> tuple[Float[Tensor, "N FC"], Float[Tensor, "N L FC"]]:
         N, L, FC = events.shape
 
         # N L FC
-        events += self.positional().unsqueeze(0).expand(N, L, FC)
+        events += self.positional()
 
         # N 1 FC
-        class_token = self.class_token().unsqueeze(0).expand(N, 1, FC)
+        class_token = self.class_token().expand(N, 1, FC)
 
         # N L+1 FC
         concatenated = torch.cat((class_token, events), dim=1)

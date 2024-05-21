@@ -24,7 +24,7 @@ def smoothen(targets: Int[torch.Tensor, "N L"], size: int, sigma: float) -> Floa
     range_tensor = torch.arange(0, size + len(Tokens), device=device).float()
 
     # expand and reshape to match the batch and sequence dimensions
-    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0).expand(N, L, size + len(Tokens))
+    range_tensor = range_tensor.unsqueeze(0).unsqueeze(0)
     labels_expanded = targets.float().unsqueeze(-1)
 
     # create gaussian distribution for each label in the sequence

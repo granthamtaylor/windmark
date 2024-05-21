@@ -7,6 +7,7 @@ import torch
 from tensordict import TensorDict
 from torchdata import datapipes
 
+
 from windmark.core.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.interface import FieldInterface
@@ -36,10 +37,6 @@ def sample(
     split: str,
     mode: str,
 ) -> list[tuple[AnnotationType, FieldType]]:
-    observations = []
-
-    assert split == sequence["split"]
-
     for event in range(sequence["size"]):
         if mode == "pretrain":
             if manager.sample.pretraining[split] < random.random():
@@ -69,20 +66,17 @@ def sample(
 
         window = slice(max(0, event - params.n_context), event)
 
-        annotations: AnnotationType = (
-            str(sequence["sequence_id"]),
-            str(sequence["event_ids"][event]),
-            label,
-        )
+        sequence_id = str(sequence["sequence_id"])
+        event_id = str(sequence["event_ids"][event])
+
+        annotations: AnnotationType = (sequence_id, event_id, label)
 
         fields = {}
 
         for field in manager.schema.fields:
             fields[field.name] = sequence[field.name][window]
 
-        observations.append((annotations, fields))
-
-    return observations
+        yield annotations, fields
 
 
 def tensorfield(
@@ -127,7 +121,7 @@ def package(
     pruned_fields = []
     for pruned_field in pruned_fields:
         assert pruned_field in fields.keys(), f'pruned field "{pruned_field}" not found'
-        fields[pruned_field].ablate()
+        fields[pruned_field].prune()
 
     targets = TensorDict(targets, batch_size=1)
 

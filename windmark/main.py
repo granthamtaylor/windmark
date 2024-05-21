@@ -31,16 +31,18 @@ schema = wm.Schema.create(
 )
 
 params = wm.Hyperparameters(
-    n_pretrain_steps=800,
-    n_finetune_steps=200,
-    n_context=192,
-    batch_size=96,
-    d_field=64,
-    max_pretrain_epochs=512,
-    max_finetune_epochs=256,
-    n_layers_event_encoder=10,
+    n_pretrain_steps=600,
+    n_finetune_steps=100,
+    n_context=10,
+    batch_size=1024,
+    d_field=120,
+    max_pretrain_epochs=1024,
+    max_finetune_epochs=512,
+    n_layers_event_encoder=12,
+    n_heads_event_encoder=12,
     n_layers_field_encoder=1,
-    learning_rate=0.0001,
+    n_heads_field_encoder=8,
+    learning_rate=0.000005,
     patience=16,
 )
 

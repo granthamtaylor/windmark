@@ -58,8 +58,8 @@ class DiscreteField:
 
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
-    def ablate(self):
-        self.lookup = torch.full_like(self.lookup, Tokens.ABLATE)
+    def prune(self):
+        self.lookup = torch.full_like(self.lookup, Tokens.PRUNE)
 
     @classmethod
     def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
@@ -110,7 +110,7 @@ class EntityField:
         return cls(lookup=lookup, batch_size=[1])
 
     mask = DiscreteField.mask
-    ablate = DiscreteField.ablate
+    prune = DiscreteField.prune
     postprocess = DiscreteField.postprocess
 
     @classmethod
@@ -177,8 +177,8 @@ class ContinuousField:
         # return SSL target
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
-    def ablate(self):
-        self.lookup = torch.full_like(self.lookup, Tokens.ABLATE)
+    def prune(self):
+        self.lookup = torch.full_like(self.lookup, Tokens.PRUNE)
         self.content = torch.zeros_like(self.content)
 
     @classmethod
@@ -262,10 +262,10 @@ class TemporalField:
         # return SSL target
         return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
-    def ablate(self):
-        self.lookup = torch.full_like(self.lookup, Tokens.ABLATE)
-        self.week_of_year = torch.full_like(self.week_of_year, Tokens.ABLATE)
-        self.day_of_week = torch.full_like(self.day_of_week, Tokens.ABLATE)
+    def prune(self):
+        self.lookup = torch.full_like(self.lookup, Tokens.PRUNE)
+        self.week_of_year = torch.full_like(self.week_of_year, Tokens.PRUNE)
+        self.day_of_week = torch.full_like(self.day_of_week, Tokens.PRUNE)
         self.time_of_day = torch.zeros_like(self.time_of_day)
 
     @classmethod
