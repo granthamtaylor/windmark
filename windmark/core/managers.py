@@ -13,7 +13,7 @@ from rich.panel import Panel
 from pytdigest import TDigest
 from mashumaro.mixins.json import DataClassJSONMixin
 
-from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest
+from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest, FieldType
 
 console = Console()
 
@@ -34,18 +34,20 @@ class SchemaManager(DataClassJSONMixin):
     fields: list[FieldRequest]
 
     @classmethod
-    def create(
+    def new(
         cls,
         sequence_id: str,
         event_id: str,
         order_by: str,
         target_id: str,
-        **fieldinfo: str,
+        **fieldinfo: FieldType | str,
     ) -> "SchemaManager":
         fields: list[FieldRequest] = []
 
         for field in fieldinfo.items():
-            fields.append(FieldRequest(*field))
+            fields.append(FieldRequest.new(*field))
+
+        assert len([field for field in fields if not field.type.is_static]) > 0, "include at least one dynamic field"
 
         return cls(
             sequence_id=sequence_id,
@@ -75,11 +77,11 @@ class SchemaManager(DataClassJSONMixin):
 
     @functools.cached_property
     def static(self) -> list[FieldRequest]:
-        return [field for field in self.fields if field.type.startswith("static")]
+        return [field for field in self.fields if field.is_static]
 
     @functools.cached_property
     def dynamic(self) -> list[FieldRequest]:
-        return [field for field in self.fields if not field.type.startswith("static")]
+        return [field for field in self.fields if not field.is_static]
 
 
 @dataclasses.dataclass
@@ -270,7 +272,7 @@ class CentroidManager(DataClassJSONMixin):
     def show(self, schema: SchemaManager):
         percentiles = [0.0, 0.05, 0.25, 0.50, 0.75, 0.95, 1.0]
 
-        types: dict[str, str] = {field.name: field.type for field in schema.fields}
+        fieldtypes: dict[str, FieldType] = {field.name: field.type for field in schema.fields}
 
         table = Table(title="Centroid Manager")
 
@@ -279,20 +281,21 @@ class CentroidManager(DataClassJSONMixin):
         for percentile in percentiles:
             table.add_column(f"Q({percentile:.2})", style="cyan", no_wrap=True)
 
-        for field, digest in self.digests.items():
+        for fieldname, digest in self.digests.items():
             values = []
 
             for percentile in percentiles:
                 value = digest.inverse_cdf(percentile)  # type: ignore
 
-                if types[field] in ["continuous", "static_continuous"]:
-                    values.append(f"{value:.3f}")
-                elif types[field] == "temporal":
-                    values.append(datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M"))  # type: ignore
-                else:
-                    raise NotImplementedError
+                match fieldtypes[fieldname]:
+                    case FieldType.Numbers | FieldType.Number:
+                        values.append(f"{value:.3f}")
+                    case FieldType.Timestamps | FieldType.Timestamp:
+                        values.append(datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M"))  # type: ignore
+                    case _:
+                        raise NotImplementedError
 
-            table.add_row(field, *values)
+            table.add_row(fieldname, *values)
 
         console.print(table)
 

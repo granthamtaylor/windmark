@@ -5,7 +5,7 @@ import torch
 from beartype import beartype
 from jaxtyping import Float, jaxtyped
 
-from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest
+from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest, FieldType
 from windmark.core.constructs.tensorfields import (
     DiscreteField,
     ContinuousField,
@@ -18,7 +18,7 @@ from windmark.core.managers import SystemManager
 
 
 class DiscreteFieldEmbedder(torch.nn.Module):
-    static: bool = False
+    type: FieldType = FieldType.Categories
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
@@ -39,7 +39,7 @@ class DiscreteFieldEmbedder(torch.nn.Module):
 
 
 class StaticDiscreteFieldEmbedder(torch.nn.Module):
-    static: bool = True
+    type: FieldType = FieldType.Category
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
@@ -62,7 +62,7 @@ class StaticDiscreteFieldEmbedder(torch.nn.Module):
 
 
 class EntityFieldEmbedder(torch.nn.Module):
-    static: bool = False
+    type: FieldType = FieldType.Entities
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
@@ -83,7 +83,7 @@ class EntityFieldEmbedder(torch.nn.Module):
 
 
 class ContinuousFieldEmbedder(torch.nn.Module):
-    static: bool = False
+    type: FieldType = FieldType.Numbers
     """
     ContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
 
@@ -154,7 +154,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
 
 class StaticContinuousFieldEmbedder(torch.nn.Module):
-    static: bool = True
+    type: FieldType = FieldType.Number
     """
     StaticContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
 
@@ -223,7 +223,7 @@ class StaticContinuousFieldEmbedder(torch.nn.Module):
 
 
 class TemporalFieldEmbedder(torch.nn.Module):
-    static: bool = False
+    type: FieldType = FieldType.Timestamps
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """

@@ -1,6 +1,6 @@
 from typing import TypeVar
 
-from windmark.core.constructs.general import FieldRequest
+from windmark.core.constructs.general import FieldRequest, FieldType
 from windmark.core.architecture.embedders import (
     DiscreteFieldEmbedder,
     EntityFieldEmbedder,
@@ -20,13 +20,13 @@ from windmark.core.constructs.tensorfields import (
 
 
 class FieldInterface:
-    modules: dict[str, dict[str, TypeVar]] = {
-        "continuous": {"tensorfield": ContinuousField, "embedder": ContinuousFieldEmbedder},
-        "discrete": {"tensorfield": DiscreteField, "embedder": DiscreteFieldEmbedder},
-        "static_continuous": {"tensorfield": StaticContinuousField, "embedder": StaticContinuousFieldEmbedder},
-        "static_discrete": {"tensorfield": StaticDiscreteField, "embedder": StaticDiscreteFieldEmbedder},
-        "entity": {"tensorfield": EntityField, "embedder": EntityFieldEmbedder},
-        "temporal": {"tensorfield": TemporalField, "embedder": TemporalFieldEmbedder},
+    modules: dict[FieldType, dict[str, TypeVar]] = {
+        FieldType.Numbers: {"tensorfield": ContinuousField, "embedder": ContinuousFieldEmbedder},
+        FieldType.Categories: {"tensorfield": DiscreteField, "embedder": DiscreteFieldEmbedder},
+        FieldType.Number: {"tensorfield": StaticContinuousField, "embedder": StaticContinuousFieldEmbedder},
+        FieldType.Category: {"tensorfield": StaticDiscreteField, "embedder": StaticDiscreteFieldEmbedder},
+        FieldType.Entities: {"tensorfield": EntityField, "embedder": EntityFieldEmbedder},
+        FieldType.Timestamps: {"tensorfield": TemporalField, "embedder": TemporalFieldEmbedder},
     }
 
     @classmethod

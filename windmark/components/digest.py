@@ -1,7 +1,7 @@
 import polars as pl
 from pytdigest import TDigest
 
-from windmark.core.constructs.general import Centroid, FieldRequest
+from windmark.core.constructs.general import Centroid, FieldRequest, FieldType
 from windmark.core.orchestration import task
 
 
@@ -9,11 +9,11 @@ from windmark.core.orchestration import task
 def create_digest_centroids_from_ledger(ledger: str, field: FieldRequest, slice_size: int = 10_000) -> Centroid:
     digest = TDigest()
 
-    if field.type not in ["continuous", "temporal", "static_continuous"]:
+    if field.type not in [FieldType.Number, FieldType.Numbers, FieldType.Timestamps, FieldType.Timestamps]:
         return Centroid.empty(field.name)
 
     def format(field: FieldRequest) -> pl.Expr:
-        if field.type in ["continuous", "static_continuous"]:
+        if field.type in [FieldType.Number, FieldType.Numbers]:
             return pl.col(field.name)
         else:
             return pl.col(field.name).dt.epoch(time_unit="s")

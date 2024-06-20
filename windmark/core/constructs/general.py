@@ -1,6 +1,7 @@
 import re
 import functools
-from enum import IntEnum
+from collections import namedtuple
+from enum import IntEnum, Enum
 from typing import Annotated
 from dataclasses import dataclass
 
@@ -19,22 +20,47 @@ class Tokens(IntEnum):
     PRUNE = 4
 
 
+class FieldType(namedtuple("Field", ["name", "is_static"]), Enum):
+    # dynamic
+    Numbers = ("Numbers", False)
+    Categories = ("Categories", False)
+    Timestamps = ("Timestamps", False)
+    Entities = ("Entities", False)
+
+    # static
+    Number = ("Number", True)
+    Category = ("Category", True)
+    Timestamp = ("Timestamp", True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
 @dataclass
 class FieldRequest(DataClassJSONMixin):
     name: str
-    type: str
+    fieldtype: str
 
-    def __post_init__(self):
-        assert self.type in [
-            "discrete",
-            "continuous",
-            "entity",
-            "temporal",
-            "static_continuous",
-            "static_discrete",
-        ]
+    @classmethod
+    def new(cls, name: str, fieldtype: FieldType | str) -> "FieldRequest":
+        if isinstance(fieldtype, str):
+            # check if valid field type
+            if fieldtype.capitalize() in FieldType._member_names_:
+                fieldtype: FieldType = FieldType[fieldtype.capitalize()]
+            else:
+                raise KeyError
 
-        assert re.match(r"^[a-z][a-z0-9_]*$", self.name), f"invalid field name {self.name}"
+        assert re.match(r"^[a-z][a-z0-9_]*$", name), f"invalid field name {name}"
+
+        return cls(name=name, fieldtype=str(fieldtype))
+
+    @functools.cached_property
+    def type(self) -> FieldType:
+        return FieldType[self.fieldtype]
+
+    @functools.cached_property
+    def is_static(self) -> bool:
+        return FieldType[self.fieldtype].is_static
 
 
 @dataclass

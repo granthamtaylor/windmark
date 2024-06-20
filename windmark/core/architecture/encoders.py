@@ -100,16 +100,22 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
         for field in self.embedders.keys():
             embedder = self.embedders[field]
             embedding = embedder(inputs[field])
-            if embedder.static:
+            if embedder.type.is_static:
                 static.append(embedding)
-            elif not embedder.static:
+            elif not embedder.type.is_static:
                 dynamic.append(embedding)
 
         # N L Fd C
         dynamic_fields = torch.stack(dynamic, dim=-1).permute(0, 1, 3, 2)
 
+        N, L, Fd, C = dynamic_fields.shape
+
         # N Fs FdC
-        static_fields = torch.stack(static, dim=-1).permute(0, 2, 1)
+        if len(static) > 0:
+            static_fields = torch.stack(static, dim=-1).permute(0, 2, 1)
+        else:
+            # empty if static fields are not available
+            static_fields = torch.empty(size=(N, 0, Fd * C), device=dynamic_fields.device)
 
         # (N L Fd C), (N Fs FdC)
         return dynamic_fields, static_fields

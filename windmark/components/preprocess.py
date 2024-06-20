@@ -7,7 +7,7 @@ import polars as pl
 from rich.console import Console
 
 from windmark.core.managers import SystemManager
-from windmark.core.constructs.general import FieldRequest
+from windmark.core.constructs.general import FieldRequest, FieldType
 from windmark.core.orchestration import task
 
 
@@ -23,19 +23,19 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
     def format(field: FieldRequest) -> pl.Expr:
         col = pl.col(field.name)
         match field.type:
-            case "continuous":
+            case FieldType.Numbers:
                 return col.cast(pl.Float32)
 
-            case "static_continuous":
+            case FieldType.Number:
                 return col.first().cast(pl.Float32)
 
-            case "temporal":
+            case FieldType.Timestamps:
                 return col.cast(pl.Datetime)
 
-            case "discrete" | "entity":
+            case FieldType.Categories | FieldType.Entities:
                 return col.fill_null("[UNK]")
 
-            case "static_discrete":
+            case FieldType.Category:
                 return col.first().fill_null("[UNK]")
 
             case _:
@@ -93,8 +93,6 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
     for sequence in lifestreams:
         sequence.write_avro(outpath / f"{index}.avro", name="lifestream")
         index += 1
-
-    print(sequence.select("tenure", "amount"))
 
     console.print(f"[red]INFO:[/] finished preprocessing [bold]{index}[/] lifestream shards")
 
