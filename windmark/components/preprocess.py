@@ -21,15 +21,22 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
     lf = pl.scan_parquet(ledger)
 
     def format(field: FieldRequest) -> pl.Expr:
+        col = pl.col(field.name)
         match field.type:
             case "continuous":
-                return pl.col(field.name).cast(pl.Float32)
+                return col.cast(pl.Float32)
+
+            case "static_continuous":
+                return col.first().cast(pl.Float32)
 
             case "temporal":
-                return pl.col(field.name).cast(pl.Datetime)
+                return col.cast(pl.Datetime)
 
             case "discrete" | "entity":
-                return pl.col(field.name).fill_null("[UNK]")
+                return col.fill_null("[UNK]")
+
+            case "static_discrete":
+                return col.first().fill_null("[UNK]")
 
             case _:
                 raise NotImplementedError
@@ -61,7 +68,7 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
 
     lifestreams = (
         lf.select(
-            *[format(field) for field in manager.schema.fields],
+            *[field.name for field in manager.schema.fields],
             manager.schema.event_id,
             pl.col(manager.schema.target_id).replace(label_map).cast(pl.Int32).fill_null(-1),
             sequence_id=manager.schema.sequence_id,
@@ -71,7 +78,7 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
         .sort("sequence_id", "order_by")
         .group_by("sequence_id", maintain_order=True)
         .agg(
-            *[field.name for field in manager.schema.fields],
+            *[format(field) for field in manager.schema.fields],
             size=pl.count().cast(pl.Int32),
             event_ids=pl.col(manager.schema.event_id),
             target=pl.col(manager.schema.target_id),
@@ -86,6 +93,8 @@ def preprocess_ledger_to_shards(ledger: str, manager: SystemManager, slice_size:
     for sequence in lifestreams:
         sequence.write_avro(outpath / f"{index}.avro", name="lifestream")
         index += 1
+
+    print(sequence.select("tenure", "amount"))
 
     console.print(f"[red]INFO:[/] finished preprocessing [bold]{index}[/] lifestream shards")
 

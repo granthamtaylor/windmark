@@ -84,6 +84,55 @@ class DiscreteField:
 
 
 @tensorclass
+class StaticDiscreteField:
+    lookup: Int[Tensor, "N"]  # noqa: F821
+
+    @jaxtyped(typechecker=beartype)
+    @classmethod
+    def new(
+        cls, values: str, field: FieldRequest, params: Hyperparameters, manager: SystemManager
+    ) -> "StaticDiscreteField":
+        mapping = manager.levelsets[field]
+        lookup = torch.tensor([mapping[values]])
+
+        return cls(lookup=lookup, batch_size=[1])
+
+    @jaxtyped(typechecker=beartype)
+    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+        _ = is_event_masked
+
+        N = 1
+
+        mask_token = torch.full((N,), Tokens.MASK)
+
+        is_field_masked = torch.rand(1).lt(params.p_mask_field)
+
+        targets = self.lookup.clone()
+
+        self.lookup = self.lookup.masked_scatter(is_field_masked, mask_token)
+
+        return TargetField(lookup=targets, is_masked=is_field_masked, batch_size=self.batch_size)  # type: ignore
+
+    prune = DiscreteField.prune
+    get_target_size = DiscreteField.get_target_size
+
+    @classmethod
+    def postprocess(cls, values, targets, params) -> torch.Tensor:
+        N, T = values.shape
+        return torch.nn.functional.one_hot(targets.lookup.reshape(N), num_classes=T).float()
+
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "StaticDiscreteField":
+        mappings = manager.levelsets.mappings[field.name]
+
+        levels = list(mappings.keys())
+
+        value = random.choice(levels)
+
+        return cls.new(values=value, field=field, params=params, manager=manager)
+
+
+@tensorclass
 class EntityField:
     lookup: Int[Tensor, "N L"]
 
@@ -197,6 +246,74 @@ class ContinuousField:
         values = [random.uniform(-100, 100) for _ in range(L)]
 
         return cls.new(values=values, field=field, params=params, manager=manager)
+
+
+@tensorclass
+class StaticContinuousField:
+    lookup: Int[Tensor, "N"]  # noqa: F821
+    content: Float[Tensor, "N"]  # noqa: F821
+
+    @jaxtyped(typechecker=beartype)
+    @classmethod
+    def new(
+        cls, values: float | None, field: FieldRequest, params: Hyperparameters, manager: SystemManager
+    ) -> "StaticContinuousField":
+        digest: TDigest = manager.centroids.digests[field.name]
+
+        if values is None:
+            lookup: int = Tokens.UNK
+            content: float = 0.0
+
+        else:
+            lookup: int = Tokens.VAL
+            content: float = digest.cdf(values)
+
+        # this effectively creates `1-(1/inf)` to prevent an index error
+        # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
+        dampener = 1 - torch.finfo(torch.half).tiny
+
+        return cls(
+            content=torch.tensor([content]).unsqueeze(0).mul(dampener),
+            lookup=torch.tensor([lookup]).unsqueeze(0),
+            batch_size=[1],
+        )
+
+    @jaxtyped(typechecker=beartype)
+    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+        _ = is_event_masked
+        N = 1
+        mask_token = torch.full((N,), Tokens.MASK)
+
+        # fine out what to mask
+        is_field_masked = torch.rand(N).lt(params.p_mask_field)
+
+        # creating discrete targets
+        quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(Tokens))
+        is_not_valued = self.lookup != 0
+        targets = quantiles.masked_scatter(is_not_valued, quantiles)
+
+        # mask original values
+        self.lookup = self.lookup.masked_scatter(is_field_masked, mask_token)
+        self.content *= ~is_field_masked
+
+        # return SSL target
+        return TargetField(lookup=targets, is_masked=is_field_masked, batch_size=self.batch_size)  # type: ignore
+
+    prune = ContinuousField.prune
+    get_target_size = ContinuousField.get_target_size
+
+    @classmethod
+    def postprocess(cls, values, targets, params) -> torch.Tensor:
+        N, T = values.shape
+
+        # FIXME smoothen function will break here
+        return smoothen(targets=targets.lookup, size=params.n_quantiles, sigma=params.quantile_smoothing)
+
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "StaticContinuousField":
+        value = random.uniform(-100, 100)
+
+        return cls.new(values=value, field=field, params=params, manager=manager)
 
 
 @tensorclass

@@ -75,9 +75,10 @@ class ThawedFinetuning(callbacks.BaseFinetuning):
         self.freeze(
             [
                 pl_module.modular_field_embedder,
-                pl_module.field_encoder,
+                pl_module.dynamic_field_encoder,
                 pl_module.event_encoder,
                 pl_module.event_decoder,
+                pl_module.static_field_decoder,
             ]
         )
 
@@ -90,7 +91,7 @@ class ThawedFinetuning(callbacks.BaseFinetuning):
         if epoch == self.transition:
             modules = [
                 pl_module.modular_field_embedder,
-                pl_module.field_encoder,
+                pl_module.dynamic_field_encoder,
                 pl_module.event_encoder,
             ]
 

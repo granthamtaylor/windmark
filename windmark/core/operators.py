@@ -15,7 +15,7 @@ from windmark.core.constructs.packages import SupervisedData, PretrainingData, S
 
 
 AnnotationType: TypeAlias = tuple[str, str, int]
-FieldType: TypeAlias = dict[str, list[Any]]
+FieldType: TypeAlias = dict[str, list[Any] | Any]
 
 
 def read(filename: str) -> list[dict[str, Any]]:
@@ -73,8 +73,11 @@ def sample(
 
         fields = {}
 
-        for field in manager.schema.fields:
+        for field in manager.schema.dynamic:
             fields[field.name] = sequence[field.name][window]
+
+        for field in manager.schema.static:
+            fields[field.name] = sequence[field.name]
 
         yield annotations, fields
 

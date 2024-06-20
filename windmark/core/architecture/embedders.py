@@ -6,11 +6,20 @@ from beartype import beartype
 from jaxtyping import Float, jaxtyped
 
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest
-from windmark.core.constructs.tensorfields import DiscreteField, ContinuousField, EntityField, TemporalField
+from windmark.core.constructs.tensorfields import (
+    DiscreteField,
+    ContinuousField,
+    EntityField,
+    TemporalField,
+    StaticDiscreteField,
+    StaticContinuousField,
+)
 from windmark.core.managers import SystemManager
 
 
 class DiscreteFieldEmbedder(torch.nn.Module):
+    static: bool = False
+
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
         Initialize discrete field embedder.
@@ -25,11 +34,36 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         self.field: FieldRequest = field
         self.embeddings = torch.nn.Embedding(manager.levelsets.get_size(field) + len(Tokens), params.d_field)
 
-    def forward(self, inputs: DiscreteField) -> torch.Tensor:
+    def forward(self, inputs: DiscreteField) -> Float[torch.Tensor, "N L C"]:
+        return self.embeddings(inputs.lookup)
+
+
+class StaticDiscreteFieldEmbedder(torch.nn.Module):
+    static: bool = True
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
+        """
+        Initialize discrete field embedder.
+
+        Args:
+            params (Hyperparameters): The hyperparameters for the architecture.
+            manager (SystemManager): The pipeline system manager.
+            field (Field): The field to be embedded
+        """
+        super().__init__()
+
+        self.field: FieldRequest = field
+        self.embeddings = torch.nn.Embedding(
+            manager.levelsets.get_size(field) + len(Tokens), params.d_field * len(manager.schema.dynamic)
+        )
+
+    def forward(self, inputs: StaticDiscreteField) -> Float[torch.Tensor, "N FdC"]:
         return self.embeddings(inputs.lookup)
 
 
 class EntityFieldEmbedder(torch.nn.Module):
+    static: bool = False
+
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
         """
@@ -49,6 +83,7 @@ class EntityFieldEmbedder(torch.nn.Module):
 
 
 class ContinuousFieldEmbedder(torch.nn.Module):
+    static: bool = False
     """
     ContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
 
@@ -80,7 +115,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: ContinuousField) -> Float[torch.Tensor, "N L F"]:
+    def forward(self, inputs: ContinuousField) -> Float[torch.Tensor, "N L C"]:
         """
         Performs the forward pass of the FourierFeatureEncoder.
 
@@ -88,7 +123,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
             inputs (Float[Tensor, "N L"]): The input tensor.
 
         Returns:
-            Float[Tensor, "N L F"]: The Fourier features of the input.
+            Float[Tensor, "N L C"]: The Fourier features of the input.
         """
 
         values = inputs.content
@@ -118,7 +153,78 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         return projections
 
 
+class StaticContinuousFieldEmbedder(torch.nn.Module):
+    static: bool = True
+    """
+    StaticContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
+
+    Attributes:
+        linear (torch.nn.Linear): A linear layer for transforming the input.
+        positional (torch.nn.Embedding): An embedding layer for positional encoding.
+        weights (Tensor): The weights for the Fourier features.
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
+        """
+        Initialize continuous field embedder.
+
+        Args:
+            params (Hyperparameters): The hyperparameters for the architecture.
+            manager (SystemManager): The pipeline system manager.
+            field (Field): The field to be embedded
+        """
+
+        super().__init__()
+
+        self.field: FieldRequest = field
+
+        offset = 3
+
+        weights = torch.logspace(start=-params.n_bands, end=offset, steps=params.n_bands + offset + 1, base=2)
+
+        self.linear = torch.nn.Linear(2 * len(weights), params.d_field * len(manager.schema.dynamic))
+        self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
+
+    @jaxtyped(typechecker=beartype)
+    def forward(self, inputs: StaticContinuousField) -> Float[torch.Tensor, "N FdC"]:
+        """
+        Performs the forward pass of the FourierFeatureEncoder.
+
+        Args:
+            inputs (Float[Tensor, "N"]): The input tensor.
+
+        Returns:
+            Float[Tensor, "N F"]: The Fourier features of the input.
+        """
+
+        values = inputs.content
+        indicators = inputs.lookup
+
+        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
+
+        assert torch.all(
+            values.mul(indicators).eq(0.0), dim=None
+        ), "values should be imputed if not null, padded, or masked"
+
+        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
+
+        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
+
+        # weight inputs with buffers of precision bands
+        weighted = values.sub(indicators).mul(self.weights)
+
+        # apply sine and cosine functions to weighted inputs
+        fourier = torch.cat((torch.sin(weighted), torch.cos(weighted)), dim=1)
+
+        # project sinusoidal representations with MLP
+        projections = self.linear(fourier)
+
+        return projections
+
+
 class TemporalFieldEmbedder(torch.nn.Module):
+    static: bool = False
+
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
         Initialize continuous field embedder.
@@ -148,7 +254,7 @@ class TemporalFieldEmbedder(torch.nn.Module):
         )
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TemporalField) -> Float[torch.Tensor, "N L F"]:
+    def forward(self, inputs: TemporalField) -> Float[torch.Tensor, "N L C"]:
         """
         Performs the forward pass of the FourierFeatureEncoder.
 

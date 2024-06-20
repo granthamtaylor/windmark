@@ -128,7 +128,7 @@ No matter how skilled or experienced a model developer cannot sufficiently explo
 
 When modeling complex sequential data with tabular models, model developers rely upon such aggregative window functions to capture the complex signal that would otherwise be lost. These window functions are extremely computationally expensive to calculate at scale, and it takes a great deal of time and domain expertise to know which features to prioritize. However, even beyond the costly computational and domain expertise requirements, calculating hundreds of arbitrarily unique window functions in real time requires teams of dedicated on-call engineers.
 
-Lastly, GBMs, being _greedy_ learners, are especially prone to overfitting with many tabular features. You can not simply throw thousands of infinitely many potential features into the model, or its performance will start to degrade. This constraint adds even more complexity to the optimization process, as the model developer now must iteratively prune the tabular features from the model while also considering the model's performance and the computational requirements to deploy the model.
+Lastly, GBMs, being _greedy_ learners, are especially prone to overfitting with many tabular features. You cannot simply throw thousands of infinitely many potential features into the model, or its performance will start to degrade. This constraint adds even more complexity to the optimization process, as the model developer now must iteratively prune the tabular features from the model while also considering the model's performance and the computational requirements to deploy the model.
 
 These factors culminate in a painful, manual iterative process of engineering tabular features, training models with them, and then pruning the tabular features for the sake of model complexity and real-time compute requirements. Because of all of these costs of modeling sequential data with tabular models, many organizations cannot address many problems that would otherwise provide tremendous value-add. This unfortunate combination of constraints is why traditional modeling techniques can require years to develop and deploy despite being relatively simple from a machine learning perspective.
 
@@ -238,7 +238,7 @@ A great analogy for hierarchical transformer architecture comes from computer vi
 
 The hierarchical transformer architecture dramatically reduces the memory complexity of the model. Self-attention is notorious for its quadratic memory complexity (both during training and inference) with respect to context size. By utilizing two transformer-encoders to attend the fields and events separately, we do not require extensive memory requirements for sufficiently long contexts. In effect, we have reduced the memory complexity from a worst-case of $O((L F)^2)$ into a less prohibitive $O(L^2 F + L F^2)$. Within the typical ranges of $L$ (128 to 512) and $F$ (5 to 20), this reduces memory requirements by a bit over an order of magnitude.
 
-TabBERT, while elegant, did come with some major drawbacks. The most significant limitation is that TabBERT coerces continuous fields ($RR^(N times L times F)$) into a categorical data type ($WW^(N times L times F)$). For example, the model can not represent the dollar amounts associated with a transaction unless you bin them into categorical levels:
+TabBERT, while elegant, did come with some major drawbacks. The most significant limitation is that TabBERT coerces continuous fields ($RR^(N times L times F)$) into a categorical data type ($WW^(N times L times F)$). For example, the model cannot represent the dollar amounts associated with a transaction unless you bin them into categorical levels:
 
 #figure(
     align(center)[#table(
@@ -263,7 +263,6 @@ Lastly, LSTM networks are prone to exploding gradients and require linear time c
 === UniTTab
 In 2023, Prometeia, a small Italian consulting firm, published _One Transformer for All-Time Series: Representing and Training with Time-Dependent Heterogeneous Tabular Data_, in which they introduced the UniTTab architecture. Their novelties included using Fourier feature encodings to represent floating point field values without discretizing them. They referenced the NeRF paper (Neural Radiance Fields), which highlighted how Fourier feature encodings provide neural networks with a better representation of floating point values than passing in raw scalar values. @unittab @nerf @fourier
 
-// FIXME replace youtube video with paper
 Fourier feature encodings effectively embed the true value of continuous inputs. They are quite similar to the sinusoidal positional embeddings used by the original transformer-based models @bert. The authors of _Fourier Features Let Networks Learn High-Frequency Functions in Low Dimensional Domains_ discussed this approach at #link("https://www.youtube.com/watch?v=nVA6K6Sn2S4&t=171s")[a NeurIPS 2020 spotlight]. @fourier
 
 UniTTab also adapted TabBERT's custom self-supervised learning task to work with continuous fields. Instead of reconstructing the raw scalar values of each field via regression, UniTTab simplified the problem into one of ordinal classification, in which the model attempts to determine the discretized bin of masked continuous field values. They modified the loss function to "smoothen" the loss if the predicted bin is "closer" to the actual value, a technique that they described as "neighborhood loss smoothing."
@@ -277,7 +276,7 @@ TabBERT and UniTTab both contributed a great deal to complex sequential modeling
 We introduce a novel approach to consolidate the embedding strategies of the previous papers with a focus on automation and extensibility, providing the following benefits:
 + Combine the abilities of the above papers (supporting discrete, continuous field types) while providing improved support for nullable heterogeneous fields without requiring a set schema for each "row type."
 + Introduce a unique representation of "entities" and geospatial coordinates. We define an "entity" as a discrete input with a finite but impractically large input space, such as a device ID, a login session, a phone number, or a merchant name.
-+ Supports arbitrarily complex field types, such as text, images, video, and audio, by leveraging foundation models to embed field values for each universal modality as required.
++ Support arbitrarily complex field types, such as text, images, video, and audio, by leveraging foundation models to embed field values for each universal modality as required.
 
 To embed the wide variety of these fields, we have developed the Modular Field Embedding System (MFES) to initiate and route modular field types. The MFES manages a set of unique field embedders for each supported field type with extensibility in mind, so embedders for new field types may be independently managed as a "plugin" system.
 
@@ -553,9 +552,9 @@ As before, this instance of `ModularFieldEmbeddingSystem` with heterogeneous fie
 Working with dates and timestamps might seem challenging, but we can approach it similarly to how we handled continuous fields.
 
 We parse timestamps into three input parts:
-1. The week of the year: An integer between 1 and 53.
-2. The day of the week: An integer between 1 and 7.
-3. The minute of the day: An integer between $24 dot 60$.
++ The week of the year: An integer between 1 and 53.
++ The day of the week: An integer between 1 and 7.
++ The minute of the day: An integer between $24 dot 60$.
 
 These three input parts capture the signal regarding event seasonality. Unlike continuous fields, each of these three inputs fits a known, fixed range such that a calculation of the CDFs is not required.
 

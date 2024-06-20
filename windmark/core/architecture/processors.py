@@ -1,3 +1,5 @@
+from functools import reduce
+
 from beartype import beartype
 import torch
 from jaxtyping import Float, Int, jaxtyped
@@ -6,20 +8,24 @@ from windmark.core.constructs.general import Tokens
 
 
 @jaxtyped(typechecker=beartype)
-def smoothen(targets: Int[torch.Tensor, "N L"], size: int, sigma: float) -> Float[torch.Tensor, "NL _"]:
+def smoothen(
+    targets: Int[torch.Tensor, "N *L"],  # noqa: F821
+    size: int,
+    sigma: float,
+) -> Float[torch.Tensor, "..."]:  # noqa: F821
     """Apply gaussian smoothing to continuous targets with fixed offset for special tokens
 
     Arguments:
-        targets (Int[torch.Tensor, "N L"]): Target label indices.
+        targets (Int[torch.Tensor, "N *L"]): Target label indices.
         size (int): The number of quantiles to smoothen over.
         sigma (float): Gaussian smoothing factor
 
     Returns:
-        Float[torch.Tensor, "N L _"]: Smoothened quantile targets.
+        Float[torch.Tensor]: Smoothened quantile targets.
     """
     device = targets.device
 
-    N, L = targets.size()
+    dim: int = reduce(lambda x, y: x * y, list(targets.shape))
 
     range_tensor = torch.arange(0, size + len(Tokens), device=device).float()
 
@@ -47,4 +53,4 @@ def smoothen(targets: Int[torch.Tensor, "N L"], size: int, sigma: float) -> Floa
     gaussian_masked /= gaussian_masked.sum(dim=-1, keepdim=True)
 
     # combine using the condition
-    return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot).reshape(N * L, -1)
+    return torch.where(is_above_threshold.unsqueeze(-1), gaussian_masked, one_hot).reshape(dim, -1)

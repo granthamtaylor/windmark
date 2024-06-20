@@ -40,7 +40,8 @@ SequenceData: TypeAlias = PretrainingData | SupervisedData
 @tensorclass
 class OutputData:
     sequence: Float[Tensor, "N FC"]
-    reconstructions: TensorDict
+    decoded_events: TensorDict
+    decoded_static_fields: TensorDict
     predictions: Float[Tensor, "N T"]
 
     @jaxtyped(typechecker=beartype)
@@ -48,11 +49,18 @@ class OutputData:
     def new(
         cls,
         sequence: Float[Tensor, "N FC"],
-        reconstructions: TensorDict,
+        decoded_events: TensorDict,
+        decoded_static_fields: TensorDict,
         predictions: Float[Tensor, "N T"],
     ):
-        assert sequence.shape[0] == reconstructions.shape[0] == predictions.shape[0]
+        assert sequence.shape[0] == decoded_events.shape[0] == decoded_static_fields.shape[0] == predictions.shape[0]
 
         L = sequence.shape[0]
 
-        return cls(sequence=sequence, reconstructions=reconstructions, predictions=predictions, batch_size=[L])
+        return cls(
+            sequence=sequence,
+            decoded_events=decoded_events,
+            decoded_static_fields=decoded_static_fields,
+            predictions=predictions,
+            batch_size=[L],
+        )

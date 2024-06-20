@@ -25,7 +25,14 @@ class FieldRequest(DataClassJSONMixin):
     type: str
 
     def __post_init__(self):
-        assert self.type in ["discrete", "continuous", "entity", "temporal"]
+        assert self.type in [
+            "discrete",
+            "continuous",
+            "entity",
+            "temporal",
+            "static_continuous",
+            "static_discrete",
+        ]
 
         assert re.match(r"^[a-z][a-z0-9_]*$", self.name), f"invalid field name {self.name}"
 

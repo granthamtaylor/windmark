@@ -7,7 +7,7 @@ from windmark.core.orchestration import task
 
 @task
 def create_unique_levels_from_ledger(ledger: str, field: FieldRequest) -> LevelSet:
-    if field.type not in ["discrete"]:
+    if field.type not in ["discrete", "static_discrete"]:
         return LevelSet.empty(name=field.name)
 
     levels: list[str] = (

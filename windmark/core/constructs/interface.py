@@ -6,12 +6,16 @@ from windmark.core.architecture.embedders import (
     EntityFieldEmbedder,
     ContinuousFieldEmbedder,
     TemporalFieldEmbedder,
+    StaticDiscreteFieldEmbedder,
+    StaticContinuousFieldEmbedder,
 )
 from windmark.core.constructs.tensorfields import (
     DiscreteField,
     EntityField,
     ContinuousField,
     TemporalField,
+    StaticDiscreteField,
+    StaticContinuousField,
 )
 
 
@@ -19,6 +23,8 @@ class FieldInterface:
     modules: dict[str, dict[str, TypeVar]] = {
         "continuous": {"tensorfield": ContinuousField, "embedder": ContinuousFieldEmbedder},
         "discrete": {"tensorfield": DiscreteField, "embedder": DiscreteFieldEmbedder},
+        "static_continuous": {"tensorfield": StaticContinuousField, "embedder": StaticContinuousFieldEmbedder},
+        "static_discrete": {"tensorfield": StaticDiscreteField, "embedder": StaticDiscreteFieldEmbedder},
         "entity": {"tensorfield": EntityField, "embedder": EntityFieldEmbedder},
         "temporal": {"tensorfield": TemporalField, "embedder": TemporalFieldEmbedder},
     }

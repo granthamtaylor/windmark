@@ -9,11 +9,11 @@ from windmark.core.orchestration import task
 def create_digest_centroids_from_ledger(ledger: str, field: FieldRequest, slice_size: int = 10_000) -> Centroid:
     digest = TDigest()
 
-    if field.type not in ["continuous", "temporal"]:
+    if field.type not in ["continuous", "temporal", "static_continuous"]:
         return Centroid.empty(field.name)
 
     def format(field: FieldRequest) -> pl.Expr:
-        if field.type == "continuous":
+        if field.type in ["continuous", "static_continuous"]:
             return pl.col(field.name)
         else:
             return pl.col(field.name).dt.epoch(time_unit="s")

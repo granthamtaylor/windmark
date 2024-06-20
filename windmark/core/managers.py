@@ -73,6 +73,14 @@ class SchemaManager(DataClassJSONMixin):
     def __len__(self) -> int:
         return len(self.fields)
 
+    @functools.cached_property
+    def static(self) -> list[FieldRequest]:
+        return [field for field in self.fields if field.type.startswith("static")]
+
+    @functools.cached_property
+    def dynamic(self) -> list[FieldRequest]:
+        return [field for field in self.fields if not field.type.startswith("static")]
+
 
 @dataclasses.dataclass
 class BalanceManager(DataClassJSONMixin):
@@ -277,7 +285,7 @@ class CentroidManager(DataClassJSONMixin):
             for percentile in percentiles:
                 value = digest.inverse_cdf(percentile)  # type: ignore
 
-                if types[field] == "continuous":
+                if types[field] in ["continuous", "static_continuous"]:
                     values.append(f"{value:.3f}")
                 elif types[field] == "temporal":
                     values.append(datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M"))  # type: ignore

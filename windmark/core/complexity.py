@@ -4,6 +4,7 @@ from windmark.core.constructs.general import Hyperparameters
 from windmark.core.managers import SystemManager
 
 
+# FIXME this is wrong because of FATA-Trans implementations
 def _calculate_bert_memory_complexity(
     batch_size: int,
     max_seq_len: int,

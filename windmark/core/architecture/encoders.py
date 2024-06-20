@@ -83,7 +83,7 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
         self.embedders = torch.nn.ModuleDict(embedders)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorDict) -> Float[Tensor, "N L F C"]:
+    def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N L Fd C"], Float[Tensor, "N Fs FdC"]]:
         """
         Performs the forward pass of the ModularFieldEmbeddingSystem.
 
@@ -94,23 +94,30 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
             Float[Tensor, "N L F"]: The embedded fields.
         """
 
-        embeddings = []
+        dynamic = []
+        static = []
 
         for field in self.embedders.keys():
             embedder = self.embedders[field]
             embedding = embedder(inputs[field])
-            embeddings.append(embedding)
+            if embedder.static:
+                static.append(embedding)
+            elif not embedder.static:
+                dynamic.append(embedding)
 
-        # N L C F
-        stacked = torch.stack(embeddings, dim=-1)
+        # N L Fd C
+        dynamic_fields = torch.stack(dynamic, dim=-1).permute(0, 1, 3, 2)
 
-        # N L F C
-        return stacked.permute(0, 1, 3, 2)
+        # N Fs FdC
+        static_fields = torch.stack(static, dim=-1).permute(0, 2, 1)
+
+        # (N L Fd C), (N Fs FdC)
+        return dynamic_fields, static_fields
 
 
-class FieldEncoder(torch.nn.Module):
+class DynamicFieldEncoder(torch.nn.Module):
     """
-    FieldEncoder is a PyTorch module for encoding fields.
+    DynamicFieldEncoder is a PyTorch module for encoding dynamic fields.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
@@ -133,29 +140,29 @@ class FieldEncoder(torch.nn.Module):
 
         self.encoder = torch.nn.TransformerEncoder(layer, num_layers=params.n_layers_field_encoder)
 
-        self.positional = LearnedTensor(len(manager.schema), params.d_field)
+        self.positional = LearnedTensor(len(manager.schema.dynamic), params.d_field)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, fields: Float[Tensor, "N L F C"]) -> Float[Tensor, "N L FC"]:
+    def forward(self, dynamic: Float[Tensor, "N L Fd C"]) -> Float[Tensor, "N L FdC"]:
         """
-        Performs the forward pass of the FieldEncoder.
+        Performs the forward pass of the DynamicFieldEncoder.
 
         Args:
-            inputs (Float[Tensor, "N L F C"]): The input tensor.
+            inputs (Float[Tensor, "N L Fd C"]): The input tensor.
 
         Returns:
-            Float[Tensor, "N L F C"]: The encoded fields.
+            Float[Tensor, "N L Fd C"]: The encoded dynamic fields.
         """
 
-        N, L, F, C = fields.shape
+        N, L, Fd, C = dynamic.shape
 
-        # NL F C
-        batched = fields.view(N * L, F, C) + self.positional()
+        # NL Fd C
+        batched = dynamic.view(N * L, Fd, C) + self.positional()
 
-        # NL F C
-        events = self.encoder(batched).view(N, L, F * C)
+        # NL Fd C
+        events = self.encoder(batched).view(N, L, Fd * C)
 
-        # N L FC
+        # N L FdC
         return events
 
 
@@ -176,7 +183,7 @@ class EventEncoder(torch.nn.Module):
         super().__init__()
 
         layer = torch.nn.TransformerEncoderLayer(
-            d_model=len(manager.schema) * params.d_field,
+            d_model=len(manager.schema.dynamic) * params.d_field,
             nhead=params.n_heads_event_encoder,
             batch_first=True,
             dropout=params.dropout,
@@ -184,29 +191,38 @@ class EventEncoder(torch.nn.Module):
 
         self.encoder = torch.nn.TransformerEncoder(layer, num_layers=params.n_layers_event_encoder)
 
-        self.positional = LearnedTensor(params.n_context, len(manager.schema) * params.d_field)
-        self.class_token = LearnedTensor(1, 1, len(manager.schema) * params.d_field)
+        Fd = len(manager.schema.dynamic)
+        Fs = len(manager.schema.static)
+
+        self.positional = LearnedTensor(1 + params.n_context + Fs, Fd * params.d_field)
+        self.class_token = LearnedTensor(1, 1, Fd * params.d_field)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, events: Float[Tensor, "N L FC"]) -> tuple[Float[Tensor, "N FC"], Float[Tensor, "N L FC"]]:
-        N, L, FC = events.shape
+    def forward(
+        self,
+        events: Float[Tensor, "N L FdC"],
+        static: Float[Tensor, "N Fs FdC"],
+    ) -> tuple[
+        Float[Tensor, "N FdC"],
+        Float[Tensor, "N L FdC"],
+        Float[Tensor, "N Fs FdC"],
+    ]:
+        N, L, FdC = events.shape
+        N, Fs, FdC = static.shape
 
-        # N L FC
-        events += self.positional()
+        # N 1 FdC
+        class_token = self.class_token().expand(N, 1, FdC)
 
-        # N 1 FC
-        class_token = self.class_token().expand(N, 1, FC)
+        # N L+1+Fs FdC
+        concatenated = torch.cat((class_token, events, static), dim=1)
 
-        # N L+1 FC
-        concatenated = torch.cat((class_token, events), dim=1)
+        # N L+1+Fs FdC
+        encoded = self.encoder(concatenated + self.positional())
 
-        # N L+1 FC
-        encoded = self.encoder(concatenated)
+        # (N 1 FdC), (N L FdC), (N Fs FdC)
+        sequence, encoded_events, encoded_static = encoded.split((1, L, Fs), dim=1)
 
-        # (N 1 FC), (N L FC)
-        sequence, events = encoded.split((1, L), dim=1)
-
-        return sequence.squeeze(dim=1), events
+        return sequence.squeeze(dim=1), encoded_events, encoded_static
 
 
 class EventDecoder(torch.nn.Module):
@@ -227,11 +243,11 @@ class EventDecoder(torch.nn.Module):
 
         projections = {}
 
-        for field in manager.schema.fields:
+        for field in manager.schema.dynamic:
             tensorfield = FieldInterface.tensorfield(field)
 
             projections[field.name] = torch.nn.Conv1d(
-                in_channels=len(manager.schema) * params.d_field,
+                in_channels=len(manager.schema.dynamic) * params.d_field,
                 out_channels=tensorfield.get_target_size(params=params, manager=manager, field=field),
                 kernel_size=1,
             )
@@ -241,13 +257,13 @@ class EventDecoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        inputs: Float[Tensor, "N L FC"],
+        inputs: Float[Tensor, "N L FdC"],
     ) -> Annotated[TensorDict, Float[Tensor, "N L _"]]:
         """
         Performs the forward pass of the EventDecoder.
 
         Args:
-            inputs (Float[Tensor, "N L FC"]): The input tensor.
+            inputs (Float[Tensor, "N L FdC"]): The input tensor.
 
         Returns:
             TensorDict[Float[Tensor, "N L _"]]: A dictionary of output tensors for each field.
@@ -255,7 +271,7 @@ class EventDecoder(torch.nn.Module):
 
         N = inputs.shape[0]
 
-        # N, FC, L
+        # N, FdC, L
         permuted = inputs.permute(0, 2, 1)
 
         events = {}
@@ -264,6 +280,63 @@ class EventDecoder(torch.nn.Module):
             events[field] = projection(permuted).permute(0, 2, 1)
 
         # N, L, ?
+        return TensorDict(events, batch_size=N)
+
+
+class StaticFieldDecoder(torch.nn.Module):
+    """
+    StaticFieldDecoder is a PyTorch module for decoding masked static fields from their contextualized representations.
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager):
+        """
+        Initialize the static field decoder.
+
+        Args:
+            params (Hyperparameters): The hyperparameters for the architecture.
+            manager (SystemManager): The pipeline system manager.
+        """
+
+        super().__init__()
+
+        projections = {}
+
+        for field in manager.schema.static:
+            tensorfield = FieldInterface.tensorfield(field)
+
+            projections[field.name] = torch.nn.Linear(
+                len(manager.schema.static) * len(manager.schema.dynamic) * params.d_field,
+                tensorfield.get_target_size(params=params, manager=manager, field=field),
+            )
+
+        self.projections = torch.nn.ModuleDict(projections)
+
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self,
+        inputs: Float[Tensor, "N Fs FdC"],
+    ) -> Annotated[TensorDict, Float[Tensor, "N _"]]:
+        """
+        Performs the forward pass of the EventDecoder.
+
+        Args:
+            inputs (Float[Tensor, "N L FdC"]): The input tensor.
+
+        Returns:
+            TensorDict[Float[Tensor, "N L _"]]: A dictionary of output tensors for each field.
+        """
+
+        N, Fs, FdC = inputs.shape
+
+        # N, FsFdC
+        permuted = inputs.view(N, Fs * FdC)
+
+        events = {}
+
+        for field, projection in self.projections.items():
+            events[field] = projection(permuted)
+
+        # N, ?
         return TensorDict(events, batch_size=N)
 
 
@@ -287,14 +360,14 @@ class DecisionHead(torch.nn.Module):
                 lambda x: params.head_shape_log_base**x,
                 range(
                     math.ceil(math.log(manager.task.n_targets, params.head_shape_log_base)),
-                    math.ceil(math.log(len(manager.schema) * params.d_field, params.head_shape_log_base)),
+                    math.ceil(math.log(len(manager.schema.dynamic) * params.d_field, params.head_shape_log_base)),
                 ),
             )
         )
 
         hidden.reverse()
 
-        dims = [len(manager.schema) * params.d_field, *hidden, manager.task.n_targets]
+        dims = [len(manager.schema.dynamic) * params.d_field, *hidden, manager.task.n_targets]
 
         layers = []
 
@@ -372,8 +445,10 @@ def pretrain(
 ) -> Tensor:
     losses = []
 
-    for field in module.manager.schema.fields:
-        values: Tensor = output.reconstructions[field.name]
+    Fs = len(module.manager.schema.static)
+
+    for field in module.manager.schema.dynamic:
+        values: Tensor = output.decoded_events[field.name]
         targets: TargetField = batch.targets[field.name]
 
         N, L, T = values.shape
@@ -385,7 +460,24 @@ def pretrain(
         mask = targets.is_masked.reshape(N * L)
         values = values.reshape(N * L, T)
 
-        loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean()
+        loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * L
+        losses.append(loss)
+        module.info(f"pretrain-{strata}/{field.name}-loss", loss)
+
+    for field in module.manager.schema.static:
+        values: Tensor = output.decoded_static_fields[field.name]
+        targets: TargetField = batch.targets[field.name]
+
+        N, T = values.shape
+
+        tensorfield = FieldInterface.tensorfield(field)
+
+        labels = tensorfield.postprocess(values=values, targets=targets, params=module.params)
+
+        mask = targets.is_masked.reshape(N)
+        values = values.reshape(N, T)
+
+        loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * Fs
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
@@ -485,9 +577,10 @@ class SequenceModule(lit.LightningModule):
         self.manager: SystemManager = manager
 
         self.modular_field_embedder = ModularFieldEmbeddingSystem(params=params, manager=manager)
-        self.field_encoder = FieldEncoder(params=params, manager=manager)
+        self.dynamic_field_encoder = DynamicFieldEncoder(params=params, manager=manager)
         self.event_encoder = EventEncoder(params=params, manager=manager)
 
+        self.static_field_decoder = StaticFieldDecoder(params=params, manager=manager)
         self.event_decoder = EventDecoder(params=params, manager=manager)
         self.decision_head = DecisionHead(params=params, manager=manager)
 
@@ -504,14 +597,20 @@ class SequenceModule(lit.LightningModule):
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> OutputData:  # type: ignore
-        fields = self.modular_field_embedder(inputs)
-        events = self.field_encoder(fields)
-        sequence, representations = self.event_encoder(events)
+        dynamic_fields, static_fields = self.modular_field_embedder(inputs)
+        events = self.dynamic_field_encoder(dynamic_fields)
+        sequence, encoded_events, encoded_static_fields = self.event_encoder(events, static_fields)
 
         predictions = self.decision_head(sequence)
-        reconstructions = self.event_decoder(representations)
+        decoded_events = self.event_decoder(encoded_events)
+        decoded_static_fields = self.static_field_decoder(encoded_static_fields)
 
-        return OutputData.new(sequence=sequence, reconstructions=reconstructions, predictions=predictions)
+        return OutputData.new(
+            sequence=sequence,
+            decoded_events=decoded_events,
+            decoded_static_fields=decoded_static_fields,
+            predictions=predictions,
+        )
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
         if self.mode == "finetune":
