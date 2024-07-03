@@ -21,77 +21,77 @@ fields:
   # ibc: category
   ubc: category
   hrb: category
-  nq: category
-  urb: category
-  cbc: category
-  bf: category
-  # nob: category
-  # created_at: category
-  oq: category
-  peb: number
-  dm: number
-  kn: number
-  pn: number
-  pob: number
-  wm: number
-  yqb: number
-  ej: number
-  ef: number
-  gsb: number
-  gauge2_score: number
-  total_balance_on_active_account1: number
-  ccc: number
-  tr: number
-  vm: number
-  total_repayments_on_active_acco5: number
-  reb: number
-  tp: number
-  ygc: number
-  xm: number
-  rh: number
-  hn: number
-  pic: number
-  fs: number
-  em: number
-  wmb: number
-  mu: number
-  azb: number
-  ueb: number
-  zd: number
-  jg: number
-  mhc: number
-  total_repayments_on_active_acco2: number
-  hh: number
-  tg: number
-  vyb: number
-  seb: number
-  qeb: number
-  oic: number
-  yeb: number
-  gg: number
-  mr: number
-  teb: number
-  an: number
-  xe: number
-  qic: number
-  ye: number
-  sr: number
-  ah: number
-  fb: number
-  total_balance_on_default_accoun4: number
-  eb: number
-  lrb: number
-  rrb: number
-  tic: number
-  xzb: number
-  bn: number
-  izb: number
-  drb: number
-  bh: number
-  st: number
-  nic: number
-  bcc: number
-  jyb: number
-  cs: number
-  mzb: number
-  as: number
+  # nq: category
+  # urb: category
+  # cbc: category
+  # bf: category
+  # # nob: category
+  # # created_at: category
+  # oq: category
+  # peb: number
+  # dm: number
+  # kn: number
+  # pn: number
+  # pob: number
+  # wm: number
+  # yqb: number
+  # ej: number
+  # ef: number
+  # gsb: number
+  # gauge2_score: number
+  # total_balance_on_active_account1: number
+  # ccc: number
+  # tr: number
+  # vm: number
+  # total_repayments_on_active_acco5: number
+  # reb: number
+  # tp: number
+  # ygc: number
+  # xm: number
+  # rh: number
+  # hn: number
+  # pic: number
+  # fs: number
+  # em: number
+  # wmb: number
+  # mu: number
+  # azb: number
+  # ueb: number
+  # zd: number
+  # jg: number
+  # mhc: number
+  # total_repayments_on_active_acco2: number
+  # hh: number
+  # tg: number
+  # vyb: number
+  # seb: number
+  # qeb: number
+  # oic: number
+  # yeb: number
+  # gg: number
+  # mr: number
+  # teb: number
+  # an: number
+  # xe: number
+  # qic: number
+  # ye: number
+  # sr: number
+  # ah: number
+  # fb: number
+  # total_balance_on_default_accoun4: number
+  # eb: number
+  # lrb: number
+  # rrb: number
+  # tic: number
+  # xzb: number
+  # bn: number
+  # izb: number
+  # drb: number
+  # bh: number
+  # st: number
+  # nic: number
+  # bcc: number
+  # jyb: number
+  # cs: number
+  # mzb: number
+  # as: number

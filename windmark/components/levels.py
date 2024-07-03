@@ -13,7 +13,7 @@ def create_unique_levels_from_lifestream(lifestreams: directory.FlyteDirectory, 
     if field.type not in [FieldType.Category, FieldType.Categories]:
         return LevelSet.empty(name=field.name)
 
-    print(f"starting to create levels for field {field.name}")
+    print(f'- creating state manager for field "{field.name}"')
 
     levels = set()
 

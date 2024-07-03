@@ -14,7 +14,7 @@ def create_digest_centroids_from_lifestream(lifestreams: directory.FlyteDirector
     if field.type not in [FieldType.Number, FieldType.Numbers]:
         return Centroid.empty(field.name)
 
-    print(f"starting to create digests for field {field.name}")
+    print(f'- creating state manager for field "{field.name}"')
 
     digest = TDigest()
 

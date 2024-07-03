@@ -159,3 +159,5 @@ checkpoints/*
 !.gitkeep
 
 *.zip
+
+outputs

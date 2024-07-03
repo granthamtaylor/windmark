@@ -27,6 +27,4 @@ def create_split_manager(
     for split in list(splits.keys()):
         assert split in ["train", "test", "validate"]
 
-    proportions: dict[str, int] = dict(splits)
-
-    return SplitManager(**proportions)
+    return SplitManager(**splits)

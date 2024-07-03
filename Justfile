@@ -24,7 +24,7 @@ whitepaper:
 
 # run training pipeline
 train:
-  @poetry run python windmark/manifests/bamboo.py
+  @poetry run python windmark
 
 # clear pyflyte cache
 clear:
@@ -34,7 +34,7 @@ clear:
 obfuscate:
   @poetry run pyarmor generate -r windmark
   @mv ./dist/gen/pyarmor_runtime_000000 ./dist/gen/windmark
-  # @cp -r config ./dist/config
+  @cp -r config ./dist/config
   # @cp -r notebooks ./dist/notebooks
   # @cp -r data ./dist/data
   # @cp pyproject.toml ./dist/pyproject.toml

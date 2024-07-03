@@ -26,11 +26,13 @@ def create_task_manager(
     targets: dict[str, int] = dict(counter)
 
     if None in targets.keys():
-        del targets[None]
+        unlabeled: int = targets.pop(None)
+    else:
+        unlabeled: int = 0
 
     labels: list[str] = list(targets.keys())
     counts: list[int] = list(targets.values())
 
-    balancer = BalanceManager(labels=labels, counts=counts, kappa=kappa)
+    balancer = BalanceManager(labels=labels, counts=counts, kappa=kappa, unlabeled=unlabeled)
 
     return SupervisedTaskManager(task="classification", n_targets=len(targets), balancer=balancer)

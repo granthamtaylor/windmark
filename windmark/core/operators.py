@@ -7,7 +7,6 @@ import torch
 from tensordict import TensorDict
 from torchdata import datapipes
 
-
 from windmark.core.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.interface import FieldInterface
@@ -51,7 +50,6 @@ def sample(
             else:
                 target: int = manager.task.balancer.mapping[label]
 
-            # finetuning test data should not be downsampled
             if split != "test":
                 if manager.sample.finetuning[split] < random.random():
                     continue
@@ -128,10 +126,10 @@ def package(
     for field in manager.schema.fields:
         targets[field.name] = fields[field.name].mask(is_event_masked, params=params)
 
-    pruned_fields = []
-    for pruned_field in pruned_fields:
-        assert pruned_field in fields.keys(), f'pruned field "{pruned_field}" not found'
-        fields[pruned_field].prune()
+    # pruned_fields = []
+    # for pruned_field in pruned_fields:
+    #     assert pruned_field in fields.keys(), f'pruned field "{pruned_field}" not found'
+    #     fields[pruned_field].prune()
 
     targets = TensorDict(targets, batch_size=1)
 

@@ -97,12 +97,7 @@ class StaticDiscreteField:
         if values is None:
             tokens = Tokens.UNK
         else:
-            try:
-                tokens = mapping[values]
-            except KeyError:
-                print(field.name)
-                print(values)
-                tokens = Tokens.UNK
+            tokens = mapping[values]
 
         lookup = torch.tensor([tokens])
 

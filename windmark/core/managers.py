@@ -89,6 +89,7 @@ class BalanceManager(DataClassJSONMixin):
     labels: list[str]
     counts: list[int]
     kappa: float
+    unlabeled: int
 
     total: int = dataclasses.field(init=False)
     values: list[float] = dataclasses.field(init=False)
@@ -149,6 +150,10 @@ class BalanceManager(DataClassJSONMixin):
     def mapping(self) -> dict[str, int]:
         return {label: index for index, label in enumerate(self.labels)}
 
+    @property
+    def n_events(self) -> int:
+        return self.total + self.unlabeled
+
 
 @dataclasses.dataclass
 class SupervisedTaskManager(DataClassJSONMixin):
@@ -168,26 +173,20 @@ class SplitManager(DataClassJSONMixin):
     test: int
 
     def __post_init__(self):
-        assert math.isclose(sum([self.train, self.validate, self.test]), 1.0)
-
         for split in [self.train, self.validate, self.test]:
             assert isinstance(split, int)
-            assert split
+            assert split / self.total > 0.05
 
     def __getitem__(self, split: str) -> float:
         assert split in ["train", "validate", "test"]
 
-        total = self.total
+        total: int = self.total
 
-        splits = dict(
-            train=self.train / total,
-            validate=self.validate / total,
-            test=self.test / total,
-        )
+        splits = dict(train=self.train, validate=self.validate, test=self.test)
 
-        return splits[split]
+        return splits[split] / total
 
-    @property
+    @functools.cached_property
     def total(self) -> int:
         return sum([self.train, self.validate, self.test])
 
@@ -201,7 +200,7 @@ class SampleManager(DataClassJSONMixin):
     split: SplitManager
 
     def __post_init__(self):
-        n_events = self.split.total
+        n_events = self.task.balancer.n_events
 
         def warn(mode: str, n_steps: int, split: str):
             return f"There not enough observations to create {n_steps} batches for split '{split}' during {mode}."

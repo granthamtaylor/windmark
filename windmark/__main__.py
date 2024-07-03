@@ -4,11 +4,11 @@ import hydra
 import windmark as wm
 
 
-@hydra.main(version_base=None, config_path="./config", config_name="config")
+@hydra.main(version_base=None, config_path="../config", config_name="config")
 def app(config: DictConfig) -> None:
     schema = wm.Schema.new(**config.data.structure, **config.data.fields)
 
-    params = wm.Hyperparameters(**config.params)
+    params = wm.Hyperparameters(**config.model)
 
     wm.train(datapath=config.data.path, schema=schema, params=params)
 
