@@ -80,7 +80,7 @@ class LevelSet(DataClassJSONMixin):
     @functools.cached_property
     def mapping(self) -> dict[str, int]:
         mapping = {level: index + len(Tokens) for index, level in enumerate(self.levels)}
-        mapping["[UNK]"] = int(Tokens.UNK)
+        mapping[None] = int(Tokens.UNK)
 
         return mapping
 
@@ -145,7 +145,9 @@ class Hyperparameters(DataClassJSONMixin):
     p_mask_event: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
     """Probability of masking any event"""
     p_mask_field: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
-    """Probability of masking any field"""
+    """Probability of masking any dynamic field"""
+    p_mask_static: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.20
+    """Probability of masking any static field"""
     n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)] = 8
     """Number of epochs to freeze encoder while finetuning"""
     interpolation_rate: Annotated[float, pydantic.Field(ge=0.0, le=1.0)] = 0.08
@@ -172,7 +174,7 @@ class Hyperparameters(DataClassJSONMixin):
 
     @pydantic.model_validator(mode="after")
     def check_mask_rates(self):
-        rates = [self.p_mask_event, self.p_mask_field, self.p_mask_field + self.p_mask_event]
-        assert max(rates) >= 0.01, "the masking rates are too low for any meaningful pretraining"
+        rate = self.p_mask_field + self.p_mask_event + self.p_mask_static
+        assert rate >= 0.01, "the masking rates are too low for any meaningful pretraining"
 
         return self

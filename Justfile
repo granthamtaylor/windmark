@@ -20,16 +20,23 @@ doc:
 
 # compile whitepaper with typst
 whitepaper:
-  @typst compile docs/whitepaper/whitepaper.typ docs/whitepaper/build/windmark.pdf  --root=docs
-  @pandoc docs/whitepaper/whitepaper.typ -o docs/whitepaper/build/windmark.md
-  @pandoc docs/whitepaper/whitepaper.typ -o docs/whitepaper/build/windmark.docx
-  @pandoc docs/whitepaper/whitepaper.typ -o docs/whitepaper/build/windmark.html
-  @zip -r whitepaper.zip docs
+  @typst compile docs/whitepaper/whitepaper.typ docs/whitepaper/windmark.pdf  --root=docs
 
 # run training pipeline
 train:
-  @poetry run python windmark/main.py
+  @poetry run python windmark/manifests/bamboo.py
 
 # clear pyflyte cache
 clear:
   @poetry run pyflyte local-cache clear
+
+# obfuscate codebase with pyarmor
+obfuscate:
+  @poetry run pyarmor generate -r windmark
+  @mv ./dist/gen/pyarmor_runtime_000000 ./dist/gen/windmark
+  # @cp -r config ./dist/config
+  # @cp -r notebooks ./dist/notebooks
+  # @cp -r data ./dist/data
+  # @cp pyproject.toml ./dist/pyproject.toml
+  # @cp .python-version ./dist/.python-version
+  # @cp .pre-commit-config.yaml ./dist/.pre-commit-config.yaml

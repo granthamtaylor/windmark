@@ -23,7 +23,7 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
         self,
         trainer: lit.Trainer,
         pl_module: lit.LightningModule,
-        prediction: torch.Tensor,
+        output: tuple[torch.Tensor, torch.Tensor],
         batch_indices: Optional[Sequence[int]],
         batch: SupervisedData,
         batch_idx: int,
@@ -33,19 +33,23 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
         Called when the predict epoch ends.
         """
 
+        predictions, representations = output
+
         table = (
             pl.DataFrame(
                 {
                     "meta": batch.meta,
                     "targets": batch.targets.cpu().detach().numpy(),
-                    "predictions": prediction.float().cpu().detach().numpy(),
+                    "predictions": predictions.float().cpu().detach().numpy(),
+                    "representations": representations.float().cpu().detach().numpy(),
                 }
             )
             .select(
+                pl.col("representations"),
                 pl.col("predictions"),
                 pl.col("targets"),
-                sequence_id=pl.col("meta").list.first(),
-                event_id=pl.col("meta").list.last(),
+                pl.col("meta").list.first().alias(pl_module.manager.schema.sequence_id),
+                pl.col("meta").list.last().alias(pl_module.manager.schema.event_id),
             )
             .to_arrow()
         )

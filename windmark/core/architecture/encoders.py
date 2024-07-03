@@ -142,6 +142,7 @@ class DynamicFieldEncoder(torch.nn.Module):
             nhead=params.n_heads_field_encoder,
             batch_first=True,
             dropout=params.dropout,
+            activation="gelu",
         )
 
         self.encoder = torch.nn.TransformerEncoder(layer, num_layers=params.n_layers_field_encoder)
@@ -193,6 +194,7 @@ class EventEncoder(torch.nn.Module):
             nhead=params.n_heads_event_encoder,
             batch_first=True,
             dropout=params.dropout,
+            activation="gelu",
         )
 
         self.encoder = torch.nn.TransformerEncoder(layer, num_layers=params.n_layers_event_encoder)
@@ -381,7 +383,7 @@ class DecisionHead(torch.nn.Module):
 
         for index, sizes in enumerate(zip(dims[:-1], dims[1:])):
             if index < len(dims) - 2:
-                activation = torch.nn.LeakyReLU()
+                activation = torch.nn.GELU()
             else:
                 activation = torch.nn.Identity()
 
@@ -463,10 +465,11 @@ def pretrain(
 
         labels = tensorfield.postprocess(values=values, targets=targets, params=module.params)
 
-        mask = targets.is_masked.reshape(N * L)
+        # mask = targets.is_masked.reshape(N * L)
         values = values.reshape(N * L, T)
 
-        loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * L
+        loss = cross_entropy(values, labels, reduction="none").mean() * L
+        # loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * L
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
@@ -480,10 +483,11 @@ def pretrain(
 
         labels = tensorfield.postprocess(values=values, targets=targets, params=module.params)
 
-        mask = targets.is_masked.reshape(N)
+        # mask = targets.is_masked.reshape(N)
         values = values.reshape(N, T)
 
-        loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * Fs
+        loss = cross_entropy(values, labels, reduction="none").mean() * Fs
+        # loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * Fs
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
@@ -522,7 +526,7 @@ def step(
     self: "SequenceModule",
     batch: SequenceData,
     strata: str,
-) -> Tensor:
+) -> Tensor | tuple[Tensor, Tensor]:
     """Execute training / inference step
 
     Args:
@@ -544,7 +548,8 @@ def step(
     assert isinstance(batch, SupervisedData)
 
     if strata == "predict":
-        return torch.nn.functional.softmax(output.predictions, dim=1)
+        predictions = torch.nn.functional.softmax(output.predictions, dim=1)
+        return predictions, output.sequence
 
     else:
         return finetune(module=self, batch=batch, output=output, strata=strata)

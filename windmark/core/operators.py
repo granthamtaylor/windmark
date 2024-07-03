@@ -18,12 +18,11 @@ AnnotationType: TypeAlias = tuple[str, str, int]
 FieldType: TypeAlias = dict[str, list[Any] | Any]
 
 
-def read(filename: str) -> list[dict[str, Any]]:
+def read(filename: str) -> list[dict]:
     with open(filename, "rb") as f:
         reader = fastavro.reader(f)
-        records = [record for record in reader]
-
-    return records
+        for sequence in reader:
+            yield sequence
 
 
 def subset(sequence: dict[str, Any], split: str) -> bool:
@@ -37,43 +36,51 @@ def sample(
     split: str,
     mode: str,
 ) -> list[tuple[AnnotationType, FieldType]]:
-    for event in range(sequence["size"]):
+    for event in range(len(sequence[manager.schema.event_id])):
         if mode == "pretrain":
             if manager.sample.pretraining[split] < random.random():
                 continue
 
-            label = -1
+            target = -1
 
         elif mode == "finetune":
-            label: int = sequence["target"][event]
+            label: str | None = sequence[manager.schema.target_id][event]
 
-            if (label is None) or (label == -1):
+            if label is None:
                 continue
+            else:
+                target: int = manager.task.balancer.mapping[label]
 
             # finetuning test data should not be downsampled
             if split != "test":
                 if manager.sample.finetuning[split] < random.random():
                     continue
 
-                if manager.task.balancer.thresholds[label] < random.random():
+                if manager.task.balancer.thresholds[target] < random.random():
                     continue
 
         elif mode == "inference":
-            label: int = sequence["target"][event]
+            label: str | None = sequence[manager.schema.target_id][event]
+
+            if label is None:
+                target: int = -1
+            else:
+                target: int = manager.task.balancer.mapping[label]
 
         else:
             raise ValueError
 
         window = slice(max(0, event - params.n_context), event)
 
-        sequence_id = str(sequence["sequence_id"])
-        event_id = str(sequence["event_ids"][event])
+        sequence_id = str(sequence[manager.schema.sequence_id])
+        event_id = str(sequence[manager.schema.event_id][event])
 
-        annotations: AnnotationType = (sequence_id, event_id, label)
+        annotations: AnnotationType = (sequence_id, event_id, target)
 
         fields = {}
 
         for field in manager.schema.dynamic:
+            assert len(sequence[manager.schema.event_id]) == len(sequence[field.name])
             fields[field.name] = sequence[field.name][window]
 
         for field in manager.schema.static:

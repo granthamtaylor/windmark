@@ -2,6 +2,7 @@ import string
 import random
 from typing import TypeAlias
 import datetime
+from decimal import Decimal
 
 import numpy as np
 import torch
@@ -31,7 +32,7 @@ class DiscreteField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
-        cls, values: list[str], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+        cls, values: list[str | None], field: FieldRequest, params: Hyperparameters, manager: SystemManager
     ) -> "DiscreteField":
         mapping = manager.levelsets[field]
 
@@ -90,10 +91,20 @@ class StaticDiscreteField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
-        cls, values: str, field: FieldRequest, params: Hyperparameters, manager: SystemManager
+        cls, values: str | None, field: FieldRequest, params: Hyperparameters, manager: SystemManager
     ) -> "StaticDiscreteField":
         mapping = manager.levelsets[field]
-        lookup = torch.tensor([mapping[values]])
+        if values is None:
+            tokens = Tokens.UNK
+        else:
+            try:
+                tokens = mapping[values]
+            except KeyError:
+                print(field.name)
+                print(values)
+                tokens = Tokens.UNK
+
+        lookup = torch.tensor([tokens])
 
         return cls(lookup=lookup, batch_size=[1])
 
@@ -105,7 +116,7 @@ class StaticDiscreteField:
 
         mask_token = torch.full((N,), Tokens.MASK)
 
-        is_field_masked = torch.rand(1).lt(params.p_mask_field)
+        is_field_masked = torch.rand(1).lt(params.p_mask_static)
 
         targets = self.lookup.clone()
 
@@ -139,7 +150,7 @@ class EntityField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
-        cls, values: list[str], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+        cls, values: list[str | None], field: FieldRequest, params: Hyperparameters, manager: SystemManager
     ) -> "EntityField":
         unique: set[str] = set(values)
 
@@ -147,7 +158,7 @@ class EntityField:
 
         mapping = dict(zip(unique, integers))
 
-        mapping.update({"[UNK]": Tokens.UNK})
+        mapping.update({None: Tokens.UNK})
 
         tokens = list(map(lambda value: mapping[value], values))
 
@@ -184,7 +195,11 @@ class ContinuousField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
-        cls, values: list[float | None], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+        cls,
+        values: list[Decimal | int | float | None],
+        field: FieldRequest,
+        params: Hyperparameters,
+        manager: SystemManager,
     ) -> "ContinuousField":
         digest: TDigest = manager.centroids.digests[field.name]
         array = np.array(values, dtype=np.float64)
@@ -256,7 +271,7 @@ class StaticContinuousField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
-        cls, values: float | None, field: FieldRequest, params: Hyperparameters, manager: SystemManager
+        cls, values: Decimal | int | float | None, field: FieldRequest, params: Hyperparameters, manager: SystemManager
     ) -> "StaticContinuousField":
         digest: TDigest = manager.centroids.digests[field.name]
 
@@ -285,7 +300,7 @@ class StaticContinuousField:
         mask_token = torch.full((N,), Tokens.MASK)
 
         # fine out what to mask
-        is_field_masked = torch.rand(N).lt(params.p_mask_field)
+        is_field_masked = torch.rand(N).lt(params.p_mask_static)
 
         # creating discrete targets
         quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(Tokens))

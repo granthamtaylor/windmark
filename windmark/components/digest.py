@@ -1,32 +1,30 @@
-import polars as pl
+import os
+
 from pytdigest import TDigest
+import numpy as np
+from flytekit.types import directory
+import fastavro
 
 from windmark.core.constructs.general import Centroid, FieldRequest, FieldType
 from windmark.core.orchestration import task
 
 
 @task
-def create_digest_centroids_from_ledger(ledger: str, field: FieldRequest, slice_size: int = 10_000) -> Centroid:
-    digest = TDigest()
-
-    if field.type not in [FieldType.Number, FieldType.Numbers, FieldType.Timestamps, FieldType.Timestamps]:
+def create_digest_centroids_from_lifestream(lifestreams: directory.FlyteDirectory, field: FieldRequest) -> Centroid:
+    if field.type not in [FieldType.Number, FieldType.Numbers]:
         return Centroid.empty(field.name)
 
-    def format(field: FieldRequest) -> pl.Expr:
-        if field.type in [FieldType.Number, FieldType.Numbers]:
-            return pl.col(field.name)
-        else:
-            return pl.col(field.name).dt.epoch(time_unit="s")
+    print(f"starting to create digests for field {field.name}")
 
-    shards = (
-        pl.scan_parquet(ledger)
-        .select(format(field))
-        .filter(pl.col(field.name).is_not_null())
-        .collect(streaming=True)
-        .iter_slices(slice_size)
-    )
+    digest = TDigest()
 
-    for shard in shards:
-        digest.update(shard.get_column(field.name).to_numpy())
+    for filename in os.listdir(lifestreams.path):
+        if filename.endswith(".avro"):
+            with open(f"{lifestreams.path}/{filename}", "rb") as f:
+                reader = fastavro.reader(f)
+                for sequence in reader:
+                    inputs = sequence[field.name]
+                    if inputs is not None:
+                        digest.update(np.array(inputs))
 
     return Centroid.from_digest(field.name, digest=digest)

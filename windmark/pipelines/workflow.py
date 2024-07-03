@@ -3,13 +3,15 @@ from functools import partial
 import flytekit as fk
 
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.managers import SchemaManager, SplitManager
+from windmark.core.managers import SchemaManager
 import windmark.components as lib
 
 
 @fk.workflow
-def train(datapath: str, schema: SchemaManager, params: Hyperparameters, split: SplitManager):
-    ledger = lib.sanitize(ledger=datapath)
+def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
+    lifestreams = lib.sanitize(datapath=datapath)
+
+    split = lib.split(lifestreams=lifestreams, schema=schema)
 
     kappa = lib.extract.kappa(params=params)
 
@@ -21,20 +23,13 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters, split: 
 
     fields = lib.fan.fields(schema=schema)
 
-    fk.map_task(partial(lib.parse, ledger=ledger))(field=fields)
+    # fk.map_task(partial(lib.parse, lifestreams=lifestreams))(field=fields)
 
-    fanned_centroids = fk.map_task(partial(lib.digest, ledger=ledger, slice_size=10_000))(field=fields)
-
-    centroids = lib.collect.centroids(centroids=fanned_centroids)
-
-    fanned_levelsets = fk.map_task(partial(lib.levels, ledger=ledger))(field=fields)
-
-    levelsets = lib.collect.levelsets(levelsets=fanned_levelsets)
-
-    task = lib.task(ledger=ledger, schema=schema, kappa=kappa)
+    task = lib.task(lifestreams=lifestreams, schema=schema, kappa=kappa)
 
     sample = lib.sample(
-        ledger=ledger,
+        lifestreams=lifestreams,
+        schema=schema,
         batch_size=batch_size,
         n_pretrain_steps=n_pretrain_steps,
         n_finetune_steps=n_finetune_steps,
@@ -42,13 +37,17 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters, split: 
         split=split,
     )
 
+    fanned_centroids = fk.map_task(partial(lib.digest, lifestreams=lifestreams))(field=fields)
+
+    centroids = lib.collect.centroids(centroids=fanned_centroids)
+
+    fanned_levelsets = fk.map_task(partial(lib.levels, lifestreams=lifestreams))(field=fields)
+
+    levelsets = lib.collect.levelsets(levelsets=fanned_levelsets)
+
     system = lib.system(schema=schema, task=task, sample=sample, split=split, centroids=centroids, levelsets=levelsets)
 
-    lifestreams = lib.preprocess(ledger=ledger, manager=system, slice_size=10)
-
     pretrained = lib.pretrain(lifestreams=lifestreams, params=params, manager=system)
-
-    # pretrained = "checkpoints/pretrain/woods-hill:DCQO.ckpt"
 
     finetuned = lib.finetune(checkpoint=pretrained, lifestreams=lifestreams, params=params, manager=system)
 

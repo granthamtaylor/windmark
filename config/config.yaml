@@ -1,0 +1,3 @@
+defaults:
+  - data: plata
+  - model: debug

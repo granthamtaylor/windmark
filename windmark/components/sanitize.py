@@ -1,11 +1,19 @@
+import os
+
 from pathlib import Path
 
-
+from flytekit.types import directory
 from windmark.core.orchestration import task
 
 
 @task
-def sanitize_ledger_path(ledger: str) -> str:
-    assert Path(ledger).exists(), "ledger path does not exist"
+def sanitize_lifestreams_path(datapath: str) -> directory.FlyteDirectory:
+    assert Path(datapath).exists(), "lifestreams path does not exist"
 
-    return ledger
+    files = [file for file in os.listdir(datapath) if file.endswith(".avro")]
+
+    assert len(files) > 0
+
+    print(f"found {len(files)} lifestream files in '{datapath}'")
+
+    return directory.FlyteDirectory(datapath)

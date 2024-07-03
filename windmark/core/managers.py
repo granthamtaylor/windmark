@@ -29,7 +29,7 @@ class ArtifactManager(DataClassJSONMixin):
 class SchemaManager(DataClassJSONMixin):
     sequence_id: str
     event_id: str
-    order_by: str
+    split_id: str
     target_id: str
     fields: list[FieldRequest]
 
@@ -38,7 +38,7 @@ class SchemaManager(DataClassJSONMixin):
         cls,
         sequence_id: str,
         event_id: str,
-        order_by: str,
+        split_id: str,
         target_id: str,
         **fieldinfo: FieldType | str,
     ) -> "SchemaManager":
@@ -52,7 +52,7 @@ class SchemaManager(DataClassJSONMixin):
         return cls(
             sequence_id=sequence_id,
             event_id=event_id,
-            order_by=order_by,
+            split_id=split_id,
             target_id=target_id,
             fields=fields,
         )
@@ -63,7 +63,7 @@ class SchemaManager(DataClassJSONMixin):
         reserved_names: set[str] = {
             self.sequence_id,
             self.event_id,
-            self.order_by,
+            self.split_id,
             self.target_id,
         }
 
@@ -145,6 +145,10 @@ class BalanceManager(DataClassJSONMixin):
 
         console.print(table)
 
+    @functools.cached_property
+    def mapping(self) -> dict[str, int]:
+        return {label: index for index, label in enumerate(self.labels)}
+
 
 @dataclasses.dataclass
 class SupervisedTaskManager(DataClassJSONMixin):
@@ -159,40 +163,37 @@ class SupervisedTaskManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class SplitManager(DataClassJSONMixin):
-    train: float
-    validate: float
-    test: float
+    train: int
+    validate: int
+    test: int
 
     def __post_init__(self):
         assert math.isclose(sum([self.train, self.validate, self.test]), 1.0)
 
         for split in [self.train, self.validate, self.test]:
-            assert isinstance(split, float)
-            assert 0.05 < split < 1.0
+            assert isinstance(split, int)
+            assert split
 
     def __getitem__(self, split: str) -> float:
         assert split in ["train", "validate", "test"]
 
+        total = self.total
+
         splits = dict(
-            train=self.train,
-            validate=self.validate,
-            test=self.test,
+            train=self.train / total,
+            validate=self.validate / total,
+            test=self.test / total,
         )
 
         return splits[split]
 
     @property
-    def ranges(self) -> dict[str, tuple[float, float]]:
-        return dict(
-            train=(0.0, self.train),
-            validate=(self.train, self.train + self.validate),
-            test=(self.train + self.validate, 1.0),
-        )
+    def total(self) -> int:
+        return sum([self.train, self.validate, self.test])
 
 
 @dataclasses.dataclass
 class SampleManager(DataClassJSONMixin):
-    n_events: int
     batch_size: int
     n_pretrain_steps: int
     n_finetune_steps: int
@@ -200,13 +201,15 @@ class SampleManager(DataClassJSONMixin):
     split: SplitManager
 
     def __post_init__(self):
+        n_events = self.split.total
+
         def warn(mode: str, n_steps: int, split: str):
             return f"There not enough observations to create {n_steps} batches for split '{split}' during {mode}."
 
         # expected finetuning steps per epoch
         self.pretraining: dict[str, float] = {}
         for subset in ["train", "validate", "test"]:
-            sample_rate = (self.n_pretrain_steps * self.batch_size) / (self.split[subset] * self.n_events)
+            sample_rate = (self.n_pretrain_steps * self.batch_size) / (self.split[subset] * n_events)
             assert sample_rate < 1.0, warn(mode="pretraining", n_steps=self.n_pretrain_steps, split=subset)
             self.pretraining[subset] = sample_rate
 
@@ -242,7 +245,9 @@ class SampleManager(DataClassJSONMixin):
 
             return table
 
-        n_inference_batches: int = int(self.split["test"] * self.n_events / self.batch_size)
+        n_events = self.split.total
+
+        n_inference_batches: int = int(self.split["test"] * n_events / self.batch_size)
 
         renderables = Group(
             render("pretrain"),
@@ -269,10 +274,8 @@ class CentroidManager(DataClassJSONMixin):
 
         return digests
 
-    def show(self, schema: SchemaManager):
+    def show(self):
         percentiles = [0.0, 0.05, 0.25, 0.50, 0.75, 0.95, 1.0]
-
-        fieldtypes: dict[str, FieldType] = {field.name: field.type for field in schema.fields}
 
         table = Table(title="Centroid Manager")
 
@@ -287,13 +290,7 @@ class CentroidManager(DataClassJSONMixin):
             for percentile in percentiles:
                 value = digest.inverse_cdf(percentile)  # type: ignore
 
-                match fieldtypes[fieldname]:
-                    case FieldType.Numbers | FieldType.Number:
-                        values.append(f"{value:.3f}")
-                    case FieldType.Timestamps | FieldType.Timestamp:
-                        values.append(datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M"))  # type: ignore
-                    case _:
-                        raise NotImplementedError
+                values.append(f"{value:.3f}")
 
             table.add_row(fieldname, *values)
 
@@ -310,9 +307,7 @@ class LevelManager(DataClassJSONMixin):
 
     def get_size(self, field: FieldRequest) -> int:
         assert isinstance(field, FieldRequest)
-
-        # ! need to subtract one because "[UNK]" is hardcoded into enum
-        return len(self.mappings[field.name]) - 1
+        return len(self.mappings[field.name])
 
     def __getitem__(self, field: FieldRequest) -> dict[str, int]:
         assert isinstance(field, FieldRequest)
@@ -328,7 +323,7 @@ class LevelManager(DataClassJSONMixin):
         for field, mapping in self.mappings.items():
             size: int = len(mapping) - 1
 
-            levels: list[str] = [level for level in list(mapping.keys()) if level != "[UNK]"]
+            levels: list[str] = [level for level in list(mapping.keys())]
 
             max_levels = 50
 
@@ -352,10 +347,15 @@ class SystemManager(DataClassJSONMixin):
     levelsets: LevelManager
 
     def show(self):
-        self.task.balancer.show()
-        self.sample.show()
-        self.centroids.show(schema=self.schema)
-        self.levelsets.show()
+        presenters = [
+            self.task.balancer,
+            self.sample,
+            self.centroids,
+            self.levelsets,
+        ]
+
+        for presenter in presenters:
+            presenter.show()
 
 
 class LabelManager:
