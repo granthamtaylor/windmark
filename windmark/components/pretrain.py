@@ -19,6 +19,9 @@ def pretrain_sequence_encoder(
 ) -> file.FlyteFile:
     torch.set_float32_matmul_precision("medium")
 
+    torch.set_printoptions(sci_mode=False)
+    torch.multiprocessing.set_sharing_strategy("file_system")
+
     version: str = LabelManager.version()
 
     module = SequenceModule(

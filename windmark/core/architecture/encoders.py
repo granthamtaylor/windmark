@@ -313,7 +313,7 @@ class StaticFieldDecoder(torch.nn.Module):
             tensorfield = FieldInterface.tensorfield(field)
 
             projections[field.name] = torch.nn.Linear(
-                len(manager.schema.static) * len(manager.schema.dynamic) * params.d_field,
+                len(manager.schema.dynamic) * params.d_field,
                 tensorfield.get_target_size(params=params, manager=manager, field=field),
             )
 
@@ -337,12 +337,14 @@ class StaticFieldDecoder(torch.nn.Module):
         N, Fs, FdC = inputs.shape
 
         # N, FsFdC
-        permuted = inputs.view(N, Fs * FdC)
+        # permuted = inputs.view(N, Fs * FdC)
 
         events = {}
 
-        for field, projection in self.projections.items():
-            events[field] = projection(permuted)
+        split = torch.split(inputs, 1, dim=1)
+
+        for index, (field, projection) in enumerate(self.projections.items()):
+            events[field] = projection(split[index].squeeze(dim=1))
 
         # N, ?
         return TensorDict(events, batch_size=N)
@@ -453,8 +455,6 @@ def pretrain(
 ) -> Tensor:
     losses = []
 
-    Fs = len(module.manager.schema.static)
-
     for field in module.manager.schema.dynamic:
         values: Tensor = output.decoded_events[field.name]
         targets: TargetField = batch.targets[field.name]
@@ -465,13 +465,30 @@ def pretrain(
 
         labels = tensorfield.postprocess(values=values, targets=targets, params=module.params)
 
-        # mask = targets.is_masked.reshape(N * L)
+        mask = targets.is_masked.reshape(N * L)
         values = values.reshape(N * L, T)
 
-        loss = cross_entropy(values, labels, reduction="none").mean() * L
-        # loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * L
+        # loss = cross_entropy(values, labels, reduction="none").mean()
+        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().floor(1))
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
+
+        # if (module.global_step % 500 == 0) & (field.type == FieldType.Numbers):
+        #     print("FIELD NAME")
+        #     print(field.name)
+        #     print("input lookup")
+        #     print(batch.inputs[field.name].lookup[0, 0])
+        #     print("input content")
+        #     print(batch.inputs[field.name].content[0, 0])
+        #     print("predictions")
+        #     predictions = torch.nn.functional.softmax(output.decoded_events[field.name][0, 0, :])
+        #     print(predictions)
+        #     print("p correct")
+        #     print(predictions[targets.lookup[0, 0]])
+        #     print("index")
+        #     print(targets.lookup[0, 0])
+        #     print("post-processed")
+        #     print(labels[0, :])
 
     for field in module.manager.schema.static:
         values: Tensor = output.decoded_static_fields[field.name]
@@ -483,11 +500,11 @@ def pretrain(
 
         labels = tensorfield.postprocess(values=values, targets=targets, params=module.params)
 
-        # mask = targets.is_masked.reshape(N)
+        mask = targets.is_masked.reshape(N)
         values = values.reshape(N, T)
 
-        loss = cross_entropy(values, labels, reduction="none").mean() * Fs
-        # loss = cross_entropy(values, labels, reduction="none").masked_select(mask).mean() * Fs
+        # loss = cross_entropy(values, labels, reduction="none").mean()
+        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().floor(1))
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
@@ -562,7 +579,7 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     self.dataloaders[strata] = loader = DataLoader(
         pipe,
         batch_size=self.params.batch_size,
-        num_workers=28,
+        num_workers=self.params.n_workers,
         collate_fn=collate,
         pin_memory=True,
         drop_last=True,

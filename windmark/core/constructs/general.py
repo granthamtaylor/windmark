@@ -158,6 +158,8 @@ class Hyperparameters(DataClassJSONMixin):
     """Learning Rate Modifier during Finetuning"""
     patience: Annotated[int, pydantic.Field(ge=1, le=256)] = 16
     """Number of Epochs Patience for Early Stopping"""
+    n_workers: Annotated[int, pydantic.Field(ge=1, le=256)] = 24
+    """Number of parallelized data pipes"""
 
     @pydantic.model_validator(mode="after")
     def check_head_shape(self):
@@ -172,9 +174,9 @@ class Hyperparameters(DataClassJSONMixin):
 
         return self
 
-    @pydantic.model_validator(mode="after")
-    def check_mask_rates(self):
-        rate = self.p_mask_field + self.p_mask_event + self.p_mask_static
-        assert rate >= 0.01, "the masking rates are too low for any meaningful pretraining"
+    # @pydantic.model_validator(mode="after")
+    # def check_mask_rates(self):
+    #     rate = self.p_mask_field + self.p_mask_event + self.p_mask_static
+    #     assert rate >= 0.01, "the masking rates are too low for any meaningful pretraining"
 
-        return self
+    #     return self

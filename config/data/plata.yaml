@@ -16,11 +16,11 @@ fields:
   account_tenure: numbers
   acctypecode: categories
 
-  oyb: category
-  irb: category
+  # oyb: category
+  # irb: category
   # ibc: category
-  ubc: category
-  hrb: category
+  # ubc: category
+  # hrb: category
   # nq: category
   # urb: category
   # cbc: category

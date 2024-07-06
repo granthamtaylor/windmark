@@ -226,8 +226,7 @@ class ContinuousField:
 
         # creating discrete targets
         quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(Tokens))
-        is_not_valued = self.lookup != 0
-        targets = quantiles.masked_scatter(is_not_valued, quantiles)
+        targets = self.lookup.masked_scatter(self.lookup == Tokens.VAL, quantiles)
 
         # mask original values
         self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
@@ -299,8 +298,7 @@ class StaticContinuousField:
 
         # creating discrete targets
         quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(Tokens))
-        is_not_valued = self.lookup != 0
-        targets = quantiles.masked_scatter(is_not_valued, quantiles)
+        targets = self.lookup.masked_scatter(self.lookup == Tokens.VAL, quantiles)
 
         # mask original values
         self.lookup = self.lookup.masked_scatter(is_field_masked, mask_token)
@@ -377,8 +375,7 @@ class TemporalField:
         # creating discrete targets
         timespan = self.hour_of_year
 
-        is_not_valued = self.lookup != 0
-        targets = timespan.masked_scatter(is_not_valued, timespan)
+        targets = self.lookup.masked_scatter(self.lookup == Tokens.VAL, timespan)
 
         # mask original values
         self.lookup = self.lookup.masked_scatter(is_masked, mask_token)

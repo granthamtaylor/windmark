@@ -107,7 +107,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         self.field: FieldRequest = field
 
-        offset = 3
+        offset = 4
 
         weights = torch.logspace(start=-params.n_bands, end=offset, steps=params.n_bands + offset + 1, base=2)
 
@@ -142,7 +142,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         N, L = values.shape
 
         # weight inputs with buffers of precision bands
-        weighted = values.sub(indicators).view(N * L).unsqueeze(dim=1).mul(self.weights)
+        weighted = values.add(indicators * 2).view(N * L).unsqueeze(dim=1).mul(self.weights)
 
         # apply sine and cosine functions to weighted inputs
         fourier = torch.sin(weighted), torch.cos(weighted)

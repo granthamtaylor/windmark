@@ -1,3 +1,4 @@
+import torch
 from flytekit.types import file, directory
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import RichProgressBar
@@ -17,6 +18,8 @@ def predict_sequence_encoder(
     params: Hyperparameters,
     manager: SystemManager,
 ):
+    torch.multiprocessing.set_sharing_strategy("file_system")
+
     version: str = LabelManager.from_path(checkpoint.path, add_date=False)
 
     module = SequenceModule.load_from_checkpoint(

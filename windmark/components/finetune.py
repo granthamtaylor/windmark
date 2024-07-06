@@ -21,6 +21,7 @@ def finetune_sequence_encoder(
     manager: SystemManager,
 ) -> file.FlyteFile:
     torch.set_float32_matmul_precision("medium")
+    torch.multiprocessing.set_sharing_strategy("file_system")
 
     version: str = LabelManager.from_path(checkpoint.path)
 
