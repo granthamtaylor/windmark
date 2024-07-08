@@ -158,6 +158,8 @@ checkpoints/*
 
 !.gitkeep
 
-*.zip
+# *.zip
 
+
+_dist/
 outputs

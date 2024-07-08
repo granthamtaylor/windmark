@@ -469,7 +469,7 @@ def pretrain(
         values = values.reshape(N * L, T)
 
         # loss = cross_entropy(values, labels, reduction="none").mean()
-        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().floor(1))
+        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().clamp(min=1))
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
@@ -504,7 +504,7 @@ def pretrain(
         values = values.reshape(N, T)
 
         # loss = cross_entropy(values, labels, reduction="none").mean()
-        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().floor(1))
+        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().clamp(min=1))
         losses.append(loss)
         module.info(f"pretrain-{strata}/{field.name}-loss", loss)
 
