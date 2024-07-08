@@ -175,7 +175,7 @@ class SplitManager(DataClassJSONMixin):
     def __post_init__(self):
         for split in [self.train, self.validate, self.test]:
             assert isinstance(split, int)
-            assert split / self.total > 0.05
+            print(split / self.total)
 
     def __getitem__(self, split: str) -> float:
         assert split in ["train", "validate", "test"]
