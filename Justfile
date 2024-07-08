@@ -33,10 +33,13 @@ clear:
 # obfuscate codebase with pyarmor
 obfuscate:
   @poetry run pyarmor generate -r windmark
-  @mv ./dist/gen/pyarmor_runtime_000000 ./dist/gen/windmark
+  @cp -r ./dist/pyarmor_runtime_000000 ./dist/windmark && rm -R ./dist/pyarmor_runtime_000000
   @cp -r config ./dist/config
   # @cp -r notebooks ./dist/notebooks
   # @cp -r data ./dist/data
   # @cp pyproject.toml ./dist/pyproject.toml
   # @cp .python-version ./dist/.python-version
   # @cp .pre-commit-config.yaml ./dist/.pre-commit-config.yaml
+
+compress: obfuscate
+  @zip -r dist.zip dist
