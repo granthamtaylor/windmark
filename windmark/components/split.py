@@ -1,11 +1,12 @@
-import os
+from pathlib import Path
 from collections import Counter
+from functools import reduce
 
 from flytekit.types import directory
-import fastavro
 
 from windmark.core.managers import SchemaManager, SplitManager
 from windmark.core.orchestration import task
+from windmark.components.processors import multithread, count
 
 
 @task
@@ -13,14 +14,11 @@ def create_split_manager(
     lifestreams: directory.FlyteDirectory,
     schema: SchemaManager,
 ) -> SplitManager:
-    counter = Counter()
+    path = Path(lifestreams.path)
 
-    for filename in os.listdir(lifestreams.path):
-        if filename.endswith(".avro"):
-            with open(f"{lifestreams.path}/{filename}", "rb") as f:
-                reader = fastavro.reader(f)
-                for sequence in reader:
-                    counter.update([sequence[schema.split_id]])
+    results: list[Counter] = multithread(n_workers=16, process=count, key=schema.split_id, path=path)
+
+    counter = reduce(lambda a, b: a.update(b), results)
 
     splits: dict[str, int] = dict(counter)
 

@@ -453,7 +453,8 @@ def pretrain(
     output: OutputData,
     strata: str,
 ) -> Tensor:
-    losses = []
+    dynamic_losses = []
+    static_losses = []
 
     for field in module.manager.schema.dynamic:
         values: Tensor = output.decoded_events[field.name]
@@ -468,27 +469,16 @@ def pretrain(
         mask = targets.is_masked.reshape(N * L)
         values = values.reshape(N * L, T)
 
-        # loss = cross_entropy(values, labels, reduction="none").mean()
         loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().clamp(min=1))
-        losses.append(loss)
-        module.info(f"pretrain-{strata}/{field.name}-loss", loss)
+        dynamic_losses.append(loss)
+        module.info(f"pretrain-{strata}-dynamic/{field.name}", loss)
 
-        # if (module.global_step % 500 == 0) & (field.type == FieldType.Numbers):
-        #     print("FIELD NAME")
-        #     print(field.name)
-        #     print("input lookup")
-        #     print(batch.inputs[field.name].lookup[0, 0])
-        #     print("input content")
-        #     print(batch.inputs[field.name].content[0, 0])
-        #     print("predictions")
-        #     predictions = torch.nn.functional.softmax(output.decoded_events[field.name][0, 0, :])
-        #     print(predictions)
-        #     print("p correct")
-        #     print(predictions[targets.lookup[0, 0]])
-        #     print("index")
-        #     print(targets.lookup[0, 0])
-        #     print("post-processed")
-        #     print(labels[0, :])
+    p_mask_dynamic = (
+        module.params.p_mask_field
+        + module.params.p_mask_event
+        - module.params.p_mask_field * module.params.p_mask_event
+    )
+    scalar = (module.params.d_field * module.params.p_mask_static) / (module.params.n_context * p_mask_dynamic)
 
     for field in module.manager.schema.static:
         values: Tensor = output.decoded_static_fields[field.name]
@@ -503,13 +493,21 @@ def pretrain(
         mask = targets.is_masked.reshape(N)
         values = values.reshape(N, T)
 
-        # loss = cross_entropy(values, labels, reduction="none").mean()
-        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().clamp(min=1))
-        losses.append(loss)
-        module.info(f"pretrain-{strata}/{field.name}-loss", loss)
+        loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().clamp(min=1)).mul(scalar)
+        static_losses.append(loss)
+        module.info(f"pretrain-{strata}-static/{field.name}", loss)
 
-    total_loss = torch.stack(losses).sum()
-    module.info(f"pretrain-{strata}/loss", total_loss, prog_bar=(strata == "validate"))
+    dynamic_loss = torch.stack(dynamic_losses).sum()
+    module.info(f"pretrain-{strata}-total/dynamic", dynamic_loss, prog_bar=(strata == "validate"))
+
+    if len(module.manager.schema.static) > 0:
+        static_loss = torch.stack(static_losses).sum()
+        module.info(f"pretrain-{strata}-total/static", static_loss, prog_bar=(strata == "validate"))
+    else:
+        static_loss = torch.zeros_like(dynamic_loss)
+
+    total_loss = dynamic_loss + static_loss
+
     return total_loss
 
 

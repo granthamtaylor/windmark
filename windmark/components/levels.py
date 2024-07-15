@@ -1,11 +1,13 @@
-import os
+from pathlib import Path
+from collections import Counter
+from functools import reduce
 
 from flytekit.types import directory
-import fastavro
 
 from windmark.core.managers import LevelSet
 from windmark.core.constructs.interface import FieldRequest, FieldType
 from windmark.core.orchestration import task
+from windmark.components.processors import multithread, count
 
 
 @task
@@ -15,18 +17,15 @@ def create_unique_levels_from_lifestream(lifestreams: directory.FlyteDirectory, 
 
     print(f'- creating state manager for field "{field.name}"')
 
-    levels = set()
+    path = Path(lifestreams.path)
 
-    for filename in os.listdir(lifestreams.path):
-        if filename.endswith(".avro"):
-            with open(f"{lifestreams.path}/{filename}", "rb") as f:
-                reader = fastavro.reader(f)
-                for sequence in reader:
-                    inputs = sequence[field.name]
-                    if inputs is not None:
-                        levels.update(inputs)
+    results: list[Counter] = multithread(n_workers=16, process=count, key=field.name, path=path)
 
-    if None in levels:
-        levels.remove(None)
+    counter = reduce(lambda a, b: a.update(b), results)
 
-    return LevelSet.from_levels(name=field.name, levels=list(levels))
+    levels = dict(counter)
+
+    if None in levels.keys():
+        del levels[None]
+
+    return LevelSet.from_levels(name=field.name, levels=(levels.keys()))

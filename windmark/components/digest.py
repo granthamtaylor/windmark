@@ -1,30 +1,33 @@
-import os
+from pathlib import Path
+from functools import reduce
 
 from pytdigest import TDigest
 import numpy as np
 from flytekit.types import directory
-import fastavro
 
 from windmark.core.constructs.general import Centroid, FieldRequest, FieldType
 from windmark.core.orchestration import task
+from windmark.components.processors import multithread, digest
 
 
 @task
-def create_digest_centroids_from_lifestream(lifestreams: directory.FlyteDirectory, field: FieldRequest) -> Centroid:
+def create_digest_centroids_from_lifestream(
+    lifestreams: directory.FlyteDirectory,
+    field: FieldRequest,
+) -> Centroid:
     if field.type not in [FieldType.Number, FieldType.Numbers]:
         return Centroid.empty(field.name)
 
     print(f'- creating state manager for field "{field.name}"')
 
-    digest = TDigest()
+    path = Path(lifestreams.path)
 
-    for filename in os.listdir(lifestreams.path):
-        if filename.endswith(".avro"):
-            with open(f"{lifestreams.path}/{filename}", "rb") as f:
-                reader = fastavro.reader(f)
-                for sequence in reader:
-                    inputs = sequence[field.name]
-                    if inputs is not None:
-                        digest.update(np.array(inputs))
+    results = multithread(n_workers=16, process=digest, key=field.name, path=path)
 
-    return Centroid.from_digest(field.name, digest=digest)
+    digests = [TDigest.of_centroids(np.array(digest)) for digest in results]
+
+    output = reduce(lambda a, b: a + b, digests)
+
+    output.force_merge()
+
+    return Centroid.from_digest(field.name, digest=output)
