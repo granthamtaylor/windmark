@@ -7,13 +7,14 @@ from flytekit.types import directory
 
 from windmark.core.constructs.general import Centroid, FieldRequest, FieldType
 from windmark.core.orchestration import task
-from windmark.components.processors import multithread, digest
+from windmark.core.processors import multithread, digest
 
 
 @task
 def create_digest_centroids_from_lifestream(
     lifestreams: directory.FlyteDirectory,
     field: FieldRequest,
+    n_workers: int,
 ) -> Centroid:
     if field.type not in [FieldType.Number, FieldType.Numbers]:
         return Centroid.empty(field.name)
@@ -22,7 +23,7 @@ def create_digest_centroids_from_lifestream(
 
     path = Path(lifestreams.path)
 
-    results = multithread(n_workers=16, process=digest, key=field.name, path=path)
+    results = multithread(n_workers=n_workers, process=digest, key=field.name, path=path)
 
     digests = [TDigest.of_centroids(np.array(digest)) for digest in results]
 

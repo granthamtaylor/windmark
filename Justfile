@@ -43,3 +43,6 @@ obfuscate:
 
 compress: obfuscate
   @zip -r dist.zip dist
+
+explore:
+  @poetry run python windmark/devtools/explorer.py

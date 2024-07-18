@@ -15,7 +15,7 @@ from torch.nn.functional import pad
 
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest
 
-from windmark.core.architecture.processors import smoothen
+from windmark.core.architecture.custom import smoothen
 from windmark.core.managers import SystemManager
 
 
@@ -191,7 +191,7 @@ class ContinuousField:
     @classmethod
     def new(
         cls,
-        values: list[Decimal | int | float | None],
+        values: list[Decimal | int | float | str | None],
         field: FieldRequest,
         params: Hyperparameters,
         manager: SystemManager,
@@ -265,7 +265,11 @@ class StaticContinuousField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
-        cls, values: Decimal | int | float | None, field: FieldRequest, params: Hyperparameters, manager: SystemManager
+        cls,
+        values: str | Decimal | int | float | None,
+        field: FieldRequest,
+        params: Hyperparameters,
+        manager: SystemManager,
     ) -> "StaticContinuousField":
         digest: TDigest = manager.centroids.digests[field.name]
 
@@ -335,7 +339,11 @@ class TemporalField:
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
-        cls, values: list[datetime.datetime], field: FieldRequest, params: Hyperparameters, manager: SystemManager
+        cls,
+        values: list[datetime.datetime | str | None],
+        field: FieldRequest,
+        params: Hyperparameters,
+        manager: SystemManager,
     ) -> "TemporalField":
         array = np.array(values, dtype="datetime64")
         padding = (params.n_context - len(array), 0)

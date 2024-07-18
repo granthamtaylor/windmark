@@ -11,8 +11,6 @@ import windmark.components as lib
 def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
     lifestreams = lib.sanitize(datapath=datapath)
 
-    split = lib.split(lifestreams=lifestreams, schema=schema)
-
     kappa = lib.extract.kappa(params=params)
 
     batch_size = lib.extract.batch_size(params=params)
@@ -21,11 +19,13 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
 
     n_finetune_steps = lib.extract.n_finetune_steps(params=params)
 
+    n_workers = lib.extract.n_workers(params=params)
+
     fields = lib.fan.fields(schema=schema)
 
-    # fk.map_task(partial(lib.parse, lifestreams=lifestreams))(field=fields)
+    split = lib.split(lifestreams=lifestreams, schema=schema, n_workers=n_workers)
 
-    task = lib.task(lifestreams=lifestreams, schema=schema, kappa=kappa)
+    task = lib.task(lifestreams=lifestreams, schema=schema, kappa=kappa, n_workers=n_workers)
 
     sample = lib.sample(
         lifestreams=lifestreams,
@@ -37,11 +37,11 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
         split=split,
     )
 
-    fanned_centroids = fk.map_task(partial(lib.digest, lifestreams=lifestreams))(field=fields)
+    fanned_centroids = fk.map_task(partial(lib.digest, lifestreams=lifestreams, n_workers=n_workers))(field=fields)
 
     centroids = lib.collect.centroids(centroids=fanned_centroids)
 
-    fanned_levelsets = fk.map_task(partial(lib.levels, lifestreams=lifestreams))(field=fields)
+    fanned_levelsets = fk.map_task(partial(lib.levels, lifestreams=lifestreams, n_workers=n_workers))(field=fields)
 
     levelsets = lib.collect.levelsets(levelsets=fanned_levelsets)
 

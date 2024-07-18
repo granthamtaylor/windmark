@@ -2,7 +2,7 @@ import random
 from functools import partial
 from typing import TypeAlias, Any
 
-import fastavro
+import msgspec
 import torch
 from tensordict import TensorDict
 from torchdata import datapipes
@@ -15,13 +15,6 @@ from windmark.core.constructs.packages import SupervisedData, PretrainingData, S
 
 AnnotationType: TypeAlias = tuple[str, str, int]
 FieldType: TypeAlias = dict[str, list[Any] | Any]
-
-
-def read(filename: str) -> list[dict]:
-    with open(filename, "rb") as f:
-        reader = fastavro.reader(f)
-        for sequence in reader:
-            yield sequence
 
 
 def subset(sequence: dict[str, Any], split: str) -> bool:
@@ -147,10 +140,12 @@ def stream(
     assert split in ["train", "validate", "test"]
 
     return (
-        datapipes.iter.FileLister(datapath, masks="*.avro")
+        datapipes.iter.FileLister(datapath, masks="*.ndjson")
         .shuffle()
         .sharding_filter()
-        .flatmap(read)
+        .open_files()
+        .readlines(return_path=False)
+        .map(msgspec.json.decode)
         .filter(partial(subset, split=split))
         .shuffle()
         .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))

@@ -52,9 +52,15 @@ def extract_n_finetune_steps(params: Hyperparameters) -> int:
     return params.n_finetune_steps
 
 
+@task
+def extract_n_workers(params: Hyperparameters) -> int:
+    return params.n_workers
+
+
 extract = SimpleNamespace(
     kappa=extract_kappa,
     batch_size=extract_batch_size,
     n_pretrain_steps=extract_n_pretrain_steps,
     n_finetune_steps=extract_n_finetune_steps,
+    n_workers=extract_n_workers,
 )

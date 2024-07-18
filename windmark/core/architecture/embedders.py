@@ -243,7 +243,7 @@ class TemporalFieldEmbedder(torch.nn.Module):
 
         weights = torch.logspace(start=-params.n_bands, end=offset, steps=params.n_bands + offset + 1, base=2)
 
-        self.linear = torch.nn.functional.gelu(torch.nn.Linear(2 * len(weights), params.d_field))
+        self.linear = torch.nn.Linear(2 * len(weights), params.d_field)
         self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
 
         self.embeddings = torch.nn.ModuleDict(
@@ -284,7 +284,7 @@ class TemporalFieldEmbedder(torch.nn.Module):
         fourier = torch.sin(weighted), torch.cos(weighted)
 
         # project sinusoidal representations with MLP
-        projections = self.linear(torch.cat(fourier, dim=1)).view(N, L, -1)
+        projections = torch.nn.functional.gelu(self.linear(torch.cat(fourier, dim=1)).view(N, L, -1))
 
         projections += self.embeddings["week_of_year"](inputs.week_of_year)
         projections += self.embeddings["day_of_week"](inputs.day_of_week)

@@ -6,20 +6,18 @@ from flytekit.types import directory
 
 from windmark.core.managers import SchemaManager, SupervisedTaskManager, BalanceManager
 from windmark.core.orchestration import task
-from windmark.components.processors import multithread, count
+from windmark.core.processors import multithread, count
 
 
 @task
 def create_task_manager(
-    lifestreams: directory.FlyteDirectory,
-    schema: SchemaManager,
-    kappa: float,
+    lifestreams: directory.FlyteDirectory, schema: SchemaManager, kappa: float, n_workers: int
 ) -> SupervisedTaskManager:
     path = Path(lifestreams.path)
 
-    results: list[Counter] = multithread(n_workers=16, process=count, key=schema.target_id, path=path)
+    results: list[Counter] = multithread(n_workers=n_workers, process=count, key=schema.target_id, path=path)
 
-    counter = reduce(lambda a, b: a.update(b), results)
+    counter = reduce(lambda a, b: a + b, results)
 
     targets: dict[str, int] = dict(counter)
 

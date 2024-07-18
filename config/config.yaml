@@ -1,3 +1,3 @@
 defaults:
-  - data: plata
-  - model: full
+  - data: trxns-numeric
+  - model: xsmall

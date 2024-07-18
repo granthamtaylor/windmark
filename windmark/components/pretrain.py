@@ -32,9 +32,8 @@ def pretrain_sequence_encoder(
     )
 
     checkpointer = ModelCheckpoint(
-        dirpath="./checkpoints/pretrain",
-        monitor="pretrain-validate/loss",
-        filename=version,
+        dirpath=f"./checkpoints/pretrain/{version}",
+        monitor="pretrain-total-validate/loss",
     )
 
     trainer = Trainer(
@@ -47,7 +46,7 @@ def pretrain_sequence_encoder(
         max_epochs=params.max_pretrain_epochs,
         callbacks=[
             RichProgressBar(),
-            EarlyStopping(monitor="pretrain-validate/loss", patience=params.patience),
+            EarlyStopping(monitor="pretrain-total-validate/loss", patience=params.patience),
             StochasticWeightAveraging(swa_lrs=params.swa_lr),
             checkpointer,
         ],

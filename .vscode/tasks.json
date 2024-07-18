@@ -36,6 +36,15 @@
         "reveal": "always",
         "panel": "new"
       }
+    },
+    {
+      "label": "$(terminal) Explore",
+      "type": "shell",
+      "command": "poetry run just explore",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
     }
   ]
 }

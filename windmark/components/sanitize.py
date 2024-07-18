@@ -10,7 +10,7 @@ from windmark.core.orchestration import task
 def sanitize_lifestreams_path(datapath: str) -> directory.FlyteDirectory:
     assert Path(datapath).exists(), "lifestreams path does not exist"
 
-    files = [file for file in os.listdir(datapath) if file.endswith(".avro")]
+    files = [file for file in os.listdir(datapath) if file.endswith(".ndjson")]
 
     assert len(files) > 0
 

@@ -34,6 +34,8 @@ scikit-learn = "^1.4.2"
 pyarmor = "^8.5.10"
 hydra-core = "^1.3.2"
 mpire = "^2.10.2"
+msgspec = "^0.18.6"
+textual = "^0.72.0"
 
 [tool.poetry.group.dev.dependencies]
 semver = "^3.0.2"

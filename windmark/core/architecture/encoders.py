@@ -471,13 +471,14 @@ def pretrain(
 
         loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().clamp(min=1))
         dynamic_losses.append(loss)
-        module.info(f"pretrain-{strata}-dynamic/{field.name}", loss)
+        module.info(f"pretrain-dynamic-{strata}/{field.name}", loss)
 
     p_mask_dynamic = (
         module.params.p_mask_field
         + module.params.p_mask_event
         - module.params.p_mask_field * module.params.p_mask_event
     )
+
     scalar = (module.params.d_field * module.params.p_mask_static) / (module.params.n_context * p_mask_dynamic)
 
     for field in module.manager.schema.static:
@@ -495,18 +496,20 @@ def pretrain(
 
         loss = cross_entropy(values, labels, reduction="none").mul(mask).sum().div(mask.sum().clamp(min=1)).mul(scalar)
         static_losses.append(loss)
-        module.info(f"pretrain-{strata}-static/{field.name}", loss)
+        module.info(f"pretrain-static-{strata}/{field.name}", loss)
 
     dynamic_loss = torch.stack(dynamic_losses).sum()
-    module.info(f"pretrain-{strata}-total/dynamic", dynamic_loss, prog_bar=(strata == "validate"))
+    module.info(f"pretrain-total-{strata}/dynamic", dynamic_loss)
 
     if len(module.manager.schema.static) > 0:
         static_loss = torch.stack(static_losses).sum()
-        module.info(f"pretrain-{strata}-total/static", static_loss, prog_bar=(strata == "validate"))
+        module.info(f"pretrain-total-{strata}/static", static_loss)
     else:
         static_loss = torch.zeros_like(dynamic_loss)
 
     total_loss = dynamic_loss + static_loss
+
+    module.info(f"pretrain-total-{strata}/loss", total_loss, prog_bar=(strata == "validate"))
 
     return total_loss
 

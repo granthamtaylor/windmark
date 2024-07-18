@@ -1,4 +1,4 @@
-path: /home/grantham/windmark/data/lifestreams/trxns
+path: /home/grantham/windmark/data/lifestreams/trxns_discrete
 
 structure:
   sequence_id: customer_id
@@ -7,12 +7,12 @@ structure:
   target_id: is_fraud
 
 fields:
-  merchant_state: categories
-  merchant_city: entities
+  # merchant_state: categories
+  # merchant_city: entities
   use_chip: categories
-  amount: numbers
-  merchant_name: entities
-  timestamp: timestamps
+  amount: categories
+  # merchant_name: entities
+  # timestamp: timestamps
   card: entities
   mcc: categories
   has_bad_pin: categories
@@ -22,5 +22,5 @@ fields:
   has_bad_expiration: categories
   has_technical_glitch: categories
   has_bad_cvv: categories
-  timedelta: numbers
-  tenure: numbers
+  timedelta: categories
+  tenure: categories

@@ -34,9 +34,8 @@ def finetune_sequence_encoder(
     )
 
     checkpointer = ModelCheckpoint(
-        dirpath="./checkpoints/finetune",
+        dirpath=f"./checkpoints/finetune/{version}",
         monitor="finetune-validate/loss",
-        filename=version,
     )
     trainer = Trainer(
         logger=TensorBoardLogger("logs", name="windmark", version=version),

@@ -7,12 +7,12 @@ structure:
   target_id: is_fraud
 
 fields:
-  merchant_state: categories
-  merchant_city: entities
+  # merchant_state: categories
+  # merchant_city: entities
   use_chip: categories
   amount: numbers
-  merchant_name: entities
-  timestamp: timestamps
+  # merchant_name: entities
+  # timestamp: timestamps
   card: entities
   mcc: categories
   has_bad_pin: categories
