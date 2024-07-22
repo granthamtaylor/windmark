@@ -3,7 +3,7 @@ from flytekit.types import directory, file
 
 import torch
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar, LearningRateMonitor
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture.encoders import SequenceModule
@@ -23,22 +23,24 @@ def finetune_sequence_encoder(
     torch.set_float32_matmul_precision("medium")
     torch.multiprocessing.set_sharing_strategy("file_system")
 
-    version: str = LabelManager.from_path(checkpoint.path)
+    version, date = LabelManager.finetune(checkpoint.path)
 
     module = SequenceModule.load_from_checkpoint(
         checkpoint_path=str(checkpoint.path),
-        datapath=lifestreams.path,
+        datapath=str(lifestreams.path),
         params=params,
         manager=manager,
         mode="finetune",
     )
 
     checkpointer = ModelCheckpoint(
-        dirpath=f"./checkpoints/finetune/{version}",
+        dirpath=f"./checkpoints/{version}",
         monitor="finetune-validate/loss",
+        filename=f"{version}:{date}",
     )
+
     trainer = Trainer(
-        logger=TensorBoardLogger("logs", name="windmark", version=version),
+        logger=TensorBoardLogger("logs", name="windmark", version=f"{version}:{date}"),
         accelerator="auto",
         devices="auto",
         strategy="auto",
@@ -49,13 +51,22 @@ def finetune_sequence_encoder(
         callbacks=[
             RichProgressBar(),
             EarlyStopping(monitor="finetune-validate/loss", patience=params.patience),
-            # StochasticWeightAveraging(swa_lrs=params.swa_lr),
             ThawedFinetuning(transition=params.n_epochs_frozen),
+            LearningRateMonitor(logging_interval="step"),
             checkpointer,
         ],
     )
 
     trainer.fit(module)
+
+    module = SequenceModule.load_from_checkpoint(
+        checkpoint_path=str(checkpointer.best_model_path),
+        datapath=str(lifestreams.path),
+        params=params,
+        manager=manager,
+        mode="finetune",
+    )
+
     trainer.test(module)
 
     return file.FlyteFile(checkpointer.best_model_path)

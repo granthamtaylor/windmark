@@ -15,6 +15,7 @@ from torch import Tensor
 from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
+from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 
 from windmark.core.managers import SystemManager
 from windmark.core.operators import collate, stream, mock
@@ -83,15 +84,15 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
         self.embedders = torch.nn.ModuleDict(embedders)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "N L Fd C"], Float[Tensor, "N Fs FdC"]]:
+    def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "_N L Fd C"], Float[Tensor, "_N Fs FdC"]]:
         """
         Performs the forward pass of the ModularFieldEmbeddingSystem.
 
         Args:
-            inputs (TensorDict[Float[Tensor, "N L"] | Int[Tensor, "N L"]]): The input tensor.
+            inputs (TensorDict[Float[Tensor, "_N L"] | Int[Tensor, "_N L"]]): The input tensor.
 
         Returns:
-            Float[Tensor, "N L F"]: The embedded fields.
+            Float[Tensor, "_N L F"]: The embedded fields.
         """
 
         dynamic = []
@@ -150,15 +151,15 @@ class DynamicFieldEncoder(torch.nn.Module):
         self.positional = LearnedTensor(len(manager.schema.dynamic), params.d_field)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, dynamic: Float[Tensor, "N L Fd C"]) -> Float[Tensor, "N L FdC"]:
+    def forward(self, dynamic: Float[Tensor, "_N L Fd C"]) -> Float[Tensor, "_N L FdC"]:
         """
         Performs the forward pass of the DynamicFieldEncoder.
 
         Args:
-            inputs (Float[Tensor, "N L Fd C"]): The input tensor.
+            inputs (Float[Tensor, "_N L Fd C"]): The input tensor.
 
         Returns:
-            Float[Tensor, "N L Fd C"]: The encoded dynamic fields.
+            Float[Tensor, "_N L Fd C"]: The encoded dynamic fields.
         """
 
         N, L, Fd, C = dynamic.shape
@@ -208,12 +209,12 @@ class EventEncoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        events: Float[Tensor, "N L FdC"],
-        static: Float[Tensor, "N Fs FdC"],
+        events: Float[Tensor, "_N L FdC"],
+        static: Float[Tensor, "_N Fs FdC"],
     ) -> tuple[
-        Float[Tensor, "N FdC"],
-        Float[Tensor, "N L FdC"],
-        Float[Tensor, "N Fs FdC"],
+        Float[Tensor, "_N FdC"],
+        Float[Tensor, "_N L FdC"],
+        Float[Tensor, "_N Fs FdC"],
     ]:
         N, L, FdC = events.shape
         N, Fs, FdC = static.shape
@@ -254,10 +255,9 @@ class EventDecoder(torch.nn.Module):
         for field in manager.schema.dynamic:
             tensorfield = FieldInterface.tensorfield(field)
 
-            projections[field.name] = torch.nn.Conv1d(
-                in_channels=len(manager.schema.dynamic) * params.d_field,
-                out_channels=tensorfield.get_target_size(params=params, manager=manager, field=field),
-                kernel_size=1,
+            projections[field.name] = torch.nn.Linear(
+                len(manager.schema.dynamic) * params.d_field * 2,
+                tensorfield.get_target_size(params=params, manager=manager, field=field),
             )
 
         self.projections = torch.nn.ModuleDict(projections)
@@ -265,27 +265,29 @@ class EventDecoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        inputs: Float[Tensor, "N L FdC"],
-    ) -> Annotated[TensorDict, Float[Tensor, "N L _"]]:
+        fields: Float[Tensor, "_N L FdC"],
+        sequence: Float[Tensor, "_N FdC"],
+    ) -> Annotated[TensorDict, Float[Tensor, "_N L _T"]]:
         """
         Performs the forward pass of the EventDecoder.
 
         Args:
-            inputs (Float[Tensor, "N L FdC"]): The input tensor.
+            inputs (Float[Tensor, "_N L FdC"]): The input tensor.
 
         Returns:
-            TensorDict[Float[Tensor, "N L _"]]: A dictionary of output tensors for each field.
+            TensorDict[Float[Tensor, "_N L _T"]]: A dictionary of output tensors for each field.
         """
 
-        N = inputs.shape[0]
+        N, L, FdC = fields.shape
 
-        # N, FdC, L
-        permuted = inputs.permute(0, 2, 1)
+        batched = fields.reshape(N * L, FdC)
+        expanded = sequence.repeat(L, 1)
+        inputs = torch.cat((batched, expanded), dim=1)
 
         events = {}
 
         for field, projection in self.projections.items():
-            events[field] = projection(permuted).permute(0, 2, 1)
+            events[field] = projection(inputs).reshape(N, L, -1)
 
         # N, L, ?
         return TensorDict(events, batch_size=N)
@@ -313,7 +315,7 @@ class StaticFieldDecoder(torch.nn.Module):
             tensorfield = FieldInterface.tensorfield(field)
 
             projections[field.name] = torch.nn.Linear(
-                len(manager.schema.dynamic) * params.d_field,
+                len(manager.schema.dynamic) * params.d_field * 2,
                 tensorfield.get_target_size(params=params, manager=manager, field=field),
             )
 
@@ -322,29 +324,29 @@ class StaticFieldDecoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        inputs: Float[Tensor, "N Fs FdC"],
-    ) -> Annotated[TensorDict, Float[Tensor, "N _"]]:
+        fields: Float[Tensor, "_N Fs FdC"],
+        sequence: Float[Tensor, "_N FdC"],
+    ) -> Annotated[TensorDict, Float[Tensor, "_N _T"]]:
         """
         Performs the forward pass of the EventDecoder.
 
         Args:
-            inputs (Float[Tensor, "N L FdC"]): The input tensor.
+            inputs (Float[Tensor, "_N L FdC"]): The input tensor.
 
         Returns:
-            TensorDict[Float[Tensor, "N L _"]]: A dictionary of output tensors for each field.
+            TensorDict[Float[Tensor, "_N L _T"]]: A dictionary of output tensors for each field.
         """
 
-        N, Fs, FdC = inputs.shape
-
-        # N, FsFdC
-        # permuted = inputs.view(N, Fs * FdC)
+        N, Fs, FdC = fields.shape
 
         events = {}
 
-        split = torch.split(inputs, 1, dim=1)
+        split = torch.split(fields, 1, dim=1)
 
         for index, (field, projection) in enumerate(self.projections.items()):
-            events[field] = projection(split[index].squeeze(dim=1))
+            inputs = torch.cat((split[index].squeeze(dim=1), sequence), dim=1)
+
+            events[field] = projection(inputs)
 
         # N, ?
         return TensorDict(events, batch_size=N)
@@ -402,7 +404,7 @@ class DecisionHead(torch.nn.Module):
 
         self.mlp = torch.nn.Sequential(*layers)
 
-    def forward(self, inputs: Float[Tensor, "N FC"]) -> Float[Tensor, "N T"]:
+    def forward(self, inputs: Float[Tensor, "_N FdC"]) -> Float[Tensor, "_N T"]:
         """
         Defines the forward pass of the DecisionHead.
 
@@ -583,7 +585,7 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
         num_workers=self.params.n_workers,
         collate_fn=collate,
         pin_memory=True,
-        drop_last=True,
+        drop_last=False,
     )
 
     return loader
@@ -631,8 +633,8 @@ class SequenceModule(lit.LightningModule):
         sequence, encoded_events, encoded_static_fields = self.event_encoder(events, static_fields)
 
         predictions = self.decision_head(sequence)
-        decoded_events = self.event_decoder(encoded_events)
-        decoded_static_fields = self.static_field_decoder(encoded_static_fields)
+        decoded_events = self.event_decoder(encoded_events, sequence)
+        decoded_static_fields = self.static_field_decoder(encoded_static_fields, sequence)
 
         return OutputData.new(
             sequence=sequence,
@@ -644,10 +646,19 @@ class SequenceModule(lit.LightningModule):
     def configure_optimizers(self) -> torch.optim.Optimizer:
         if self.mode == "finetune":
             lr = self.lr * self.params.learning_rate_dampener
+            max_epochs = self.params.max_finetune_epochs
         else:
             lr = self.lr
+            max_epochs = self.params.max_pretrain_epochs
 
-        return torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=lr)
+        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.parameters()), lr=lr)
+        scheduler = LinearWarmupCosineAnnealingLR(
+            optimizer=optimizer,
+            warmup_epochs=self.params.n_epochs_frozen,
+            max_epochs=max_epochs,
+        )
+
+        return [optimizer], [scheduler]
 
     training_step = partialmethod(step, strata="train")  # type: ignore
     validation_step = partialmethod(step, strata="validate")  # type: ignore
@@ -688,7 +699,3 @@ class SequenceModule(lit.LightningModule):
     val_dataloader = partialmethod(dataloader, strata="validate")  # type: ignore
     test_dataloader = partialmethod(dataloader, strata="test")  # type: ignore
     predict_dataloader = partialmethod(dataloader, strata="predict")  # type: ignore
-
-    # def show(self):
-    #     memory = humanize.naturalsize(complexity(self.params))
-    #     flops = humanize.metric(self.flops_per_batch, "Flops")

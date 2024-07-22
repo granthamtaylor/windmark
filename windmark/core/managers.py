@@ -358,7 +358,7 @@ class SystemManager(DataClassJSONMixin):
 
 class LabelManager:
     @classmethod
-    def version(cls) -> str:
+    def new(cls) -> str:
         fake = Faker()
 
         address = fake.street_name().replace(" ", "-").lower()
@@ -368,12 +368,14 @@ class LabelManager:
         return f"{address}:{hashtag}"
 
     @classmethod
-    def from_path(cls, pathname: str, add_date: bool = True) -> str:
-        filename = pathname.split("/")[-1]
-        version = filename.split(".")[0]
+    def finetune(cls, pathname: str) -> tuple[str, str]:
+        version = pathname.split("/")[-1].split(".")[0]
+        date = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        if add_date:
-            date = datetime.now().strftime("%Y-%m-%d %H:%M")
-            return f"{date}:{version}"
-        else:
-            return version
+        return version, date
+
+    @classmethod
+    def inference(cls, pathname: str) -> str:
+        print(pathname)
+
+        return pathname.split("/")[-1].split(".")[0]

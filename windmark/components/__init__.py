@@ -9,7 +9,7 @@ from windmark.components.system import create_system_manager as system
 from windmark.components.task import create_task_manager as task
 from windmark.components.split import create_split_manager as split
 from windmark.components.levels import create_unique_levels_from_lifestream as levels
-from windmark.components.lambdas import fan, collect, extract
+from windmark.components.utilities import fan, collect, extract
 
 
 __all__ = [

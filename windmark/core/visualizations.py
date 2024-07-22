@@ -12,5 +12,4 @@
 
 # Heatmap of target labels over time
 
-# FIXME
 # Class balancing / sample rates visualization

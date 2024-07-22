@@ -53,6 +53,10 @@ def sample(
         elif mode == "inference":
             label: str | None = sequence[manager.schema.target_id][event]
 
+            if params.predict_only_sequence_end:
+                if len(sequence[manager.schema.event_id]) != (event + 1):
+                    continue
+
             if label is None:
                 target: int = -1
             else:

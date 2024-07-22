@@ -25,12 +25,14 @@ class FieldType(namedtuple("Field", ["name", "is_static"]), Enum):
     Numbers = ("Numbers", False)
     Categories = ("Categories", False)
     Timestamps = ("Timestamps", False)
+    Quantiles = ("Quantiles", False)
     Entities = ("Entities", False)
 
     # static
     Number = ("Number", True)
     Category = ("Category", True)
     Timestamp = ("Timestamp", True)
+    Quantile = ("Quantile", True)
 
     def __str__(self) -> str:
         return self.name
@@ -158,8 +160,12 @@ class Hyperparameters(DataClassJSONMixin):
     """Learning Rate Modifier during Finetuning"""
     patience: Annotated[int, pydantic.Field(ge=1, le=256)] = 16
     """Number of Epochs Patience for Early Stopping"""
+    jitter: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.025
+    """Amount of jitter to apply to continuous values"""
     n_workers: Annotated[int, pydantic.Field(ge=1, le=256)] = 24
     """Number of parallelized data pipes"""
+    predict_only_sequence_end: bool = False
+    """Predict only last event in sequence"""
 
     @pydantic.model_validator(mode="after")
     def check_head_shape(self):

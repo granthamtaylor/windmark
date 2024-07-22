@@ -6,7 +6,6 @@
     "AUROC",
     "dtype",
     "embedders",
-    "fastavro",
     "finfo",
     "jaxtyped",
     "jaxtyping",

@@ -23,7 +23,7 @@ class PretrainingData:
 @tensorclass
 class SupervisedData:
     inputs: Annotated[TensorDict, TensorField]
-    targets: Int[Tensor, "N T"]
+    targets: Int[Tensor, "_N T"]
     meta: list[tuple[str, str]] | tuple[str, str]
 
     @jaxtyped(typechecker=beartype)
@@ -39,19 +39,19 @@ SequenceData: TypeAlias = PretrainingData | SupervisedData
 
 @tensorclass
 class OutputData:
-    sequence: Float[Tensor, "N FC"]
+    sequence: Float[Tensor, "_N FdC"]
     decoded_events: TensorDict
     decoded_static_fields: TensorDict
-    predictions: Float[Tensor, "N T"]
+    predictions: Float[Tensor, "_N T"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
         cls,
-        sequence: Float[Tensor, "N FC"],
+        sequence: Float[Tensor, "_N FdC"],
         decoded_events: TensorDict,
         decoded_static_fields: TensorDict,
-        predictions: Float[Tensor, "N T"],
+        predictions: Float[Tensor, "_N T"],
     ):
         assert sequence.shape[0] == decoded_events.shape[0] == decoded_static_fields.shape[0] == predictions.shape[0]
 

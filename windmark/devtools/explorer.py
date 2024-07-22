@@ -15,7 +15,10 @@ from windmark.core.managers import SchemaManager
 
 class LifestreamSampler:
     def __init__(self) -> None:
-        with initialize(version_base=None, config_path="../../config"):
+        config = Path(os.getcwd()) / "config"
+        cwd = Path(os.path.realpath(__file__)).parent
+
+        with initialize(version_base=None, config_path=os.path.relpath(config, cwd)):
             manifest = compose(config_name="config")["data"]
 
         datapath = Path(manifest["path"])
@@ -53,21 +56,22 @@ class LifestreamSampler:
 class TableApp(App):
     BINDINGS = [
         Binding(key="q", action="quit", description="Quit"),
-        Binding(key="r", action="reload", description="Reload"),
+        Binding(key="r", action="resample", description="Resample"),
     ]
 
     def compose(self) -> ComposeResult:
         with TabbedContent():
-            with TabPane("Dynamic Fields"):
-                with HorizontalScroll():
-                    yield DataTable(id="dynamic")
             with TabPane("Static Fields"):
                 with HorizontalScroll():
                     yield DataTable(id="static")
 
+            with TabPane("Dynamic Fields"):
+                with HorizontalScroll():
+                    yield DataTable(id="dynamic")
+
         yield Footer()
 
-    def action_reload(self) -> None:
+    def action_resample(self) -> None:
         sample = LifestreamSampler()
 
         columns, records = sample.dynamic
@@ -83,7 +87,7 @@ class TableApp(App):
         table.add_rows(records)
 
     def on_mount(self) -> None:
-        self.action_reload()
+        self.action_resample()
 
 
 app = TableApp()

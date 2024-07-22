@@ -8,11 +8,13 @@ from jaxtyping import Float, jaxtyped
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest, FieldType
 from windmark.core.constructs.tensorfields import (
     DiscreteField,
+    StaticDiscreteField,
     ContinuousField,
+    StaticContinuousField,
+    QuantileField,
+    StaticQuantileField,
     EntityField,
     TemporalField,
-    StaticDiscreteField,
-    StaticContinuousField,
 )
 from windmark.core.managers import SystemManager
 
@@ -34,7 +36,7 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         self.field: FieldRequest = field
         self.embeddings = torch.nn.Embedding(manager.levelsets.get_size(field) + len(Tokens), params.d_field)
 
-    def forward(self, inputs: DiscreteField) -> Float[torch.Tensor, "N L C"]:
+    def forward(self, inputs: DiscreteField) -> Float[torch.Tensor, "_N L C"]:
         return self.embeddings(inputs.lookup)
 
 
@@ -57,8 +59,127 @@ class StaticDiscreteFieldEmbedder(torch.nn.Module):
             manager.levelsets.get_size(field) + len(Tokens), params.d_field * len(manager.schema.dynamic)
         )
 
-    def forward(self, inputs: StaticDiscreteField) -> Float[torch.Tensor, "N FdC"]:
+    def forward(self, inputs: StaticDiscreteField) -> Float[torch.Tensor, "_N FdC"]:
         return self.embeddings(inputs.lookup)
+
+
+class QuantileFieldEmbedder(torch.nn.Module):
+    type: FieldType = FieldType.Quantiles
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
+        """
+        Initialize quantile field embedder.
+
+        Args:
+            params (Hyperparameters): The hyperparameters for the architecture.
+            manager (SystemManager): The pipeline system manager.
+            field (Field): The field to be embedded
+        """
+        super().__init__()
+
+        self.field: FieldRequest = field
+        self.embeddings = torch.nn.Embedding(params.n_quantiles + len(Tokens), params.d_field)
+
+        self.register_buffer("jitter", torch.tensor(params.jitter))
+        self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
+
+    @jaxtyped(typechecker=beartype)
+    def forward(self, inputs: QuantileField) -> Float[torch.Tensor, "_N L C"]:
+        """
+        Performs the forward pass of the FourierFeatureEncoder.
+
+        Args:
+            inputs (Float[Tensor, "_N L"]): The input tensor.
+
+        Returns:
+            Float[Tensor, "_N L C"]: The Fourier features of the input.
+        """
+
+        values = inputs.content
+        indicators = inputs.lookup
+
+        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
+
+        assert torch.all(
+            values.mul(indicators).eq(0.0), dim=None
+        ), "values should be imputed if not null, padded, or masked"
+
+        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
+
+        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
+
+        N, L = values.shape
+
+        if self.training:
+            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
+        else:
+            jitter = torch.zeros_like(values)
+
+        jittered = values.add(jitter).clamp(min=0.0, max=1.0)
+
+        quantiles = jittered.mul(self.n_quantiles).floor().long().add(len(Tokens))
+        lookup = indicators.masked_scatter(self.lookup == Tokens.VAL, quantiles)
+
+        return self.embeddings(lookup)
+
+
+class StaticQuantileFieldEmbedder(torch.nn.Module):
+    type: FieldType = FieldType.Quantile
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
+        """
+        Initialize static quantile field embedder.
+
+        Args:
+            params (Hyperparameters): The hyperparameters for the architecture.
+            manager (SystemManager): The pipeline system manager.
+            field (Field): The field to be embedded
+        """
+        super().__init__()
+
+        self.field: FieldRequest = field
+        self.embeddings = torch.nn.Embedding(
+            params.n_quantiles + len(Tokens), params.d_field * len(manager.schema.dynamic)
+        )
+
+        self.register_buffer("jitter", torch.tensor(params.jitter))
+        self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
+
+    @jaxtyped(typechecker=beartype)
+    def forward(self, inputs: StaticQuantileField) -> Float[torch.Tensor, "_N FdC"]:
+        """
+        Performs the forward pass of the FourierFeatureEncoder.
+
+        Args:
+            inputs (Float[Tensor, "_N"]): The input tensor.
+
+        Returns:
+            Float[Tensor, "_N F"]: The Fourier features of the input.
+        """
+
+        values = inputs.content
+        indicators = inputs.lookup
+
+        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
+
+        assert torch.all(
+            values.mul(indicators).eq(0.0), dim=None
+        ), "values should be imputed if not null, padded, or masked"
+
+        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
+
+        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
+
+        if self.training:
+            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
+        else:
+            jitter = torch.zeros_like(values)
+
+        jittered = values.add(jitter).clamp(min=0.0, max=1.0)
+        quantiles = jittered.mul(self.n_quantiles).floor().long().add(len(Tokens))
+        lookup = indicators.masked_scatter(self.lookup == Tokens.VAL, quantiles)
+
+        return self.embeddings(lookup)
 
 
 class EntityFieldEmbedder(torch.nn.Module):
@@ -113,17 +234,18 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         self.linear = torch.nn.Linear(2 * len(weights), params.d_field)
         self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
+        self.register_buffer("jitter", torch.tensor(params.jitter))
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: ContinuousField) -> Float[torch.Tensor, "N L C"]:
+    def forward(self, inputs: ContinuousField) -> Float[torch.Tensor, "_N L C"]:
         """
         Performs the forward pass of the FourierFeatureEncoder.
 
         Args:
-            inputs (Float[Tensor, "N L"]): The input tensor.
+            inputs (Float[Tensor, "_N L"]): The input tensor.
 
         Returns:
-            Float[Tensor, "N L C"]: The Fourier features of the input.
+            Float[Tensor, "_N L C"]: The Fourier features of the input.
         """
 
         values = inputs.content
@@ -141,8 +263,20 @@ class ContinuousFieldEmbedder(torch.nn.Module):
 
         N, L = values.shape
 
+        if self.training:
+            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
+        else:
+            jitter = torch.zeros_like(values)
+
         # weight inputs with buffers of precision bands
-        weighted = values.add(indicators * 2).view(N * L).unsqueeze(dim=1).mul(self.weights)
+        weighted = (
+            values.add(jitter)
+            .clamp(min=0.0, max=1.0)
+            .add(indicators * 2)
+            .view(N * L)
+            .unsqueeze(dim=1)
+            .mul(self.weights)
+        )
 
         # apply sine and cosine functions to weighted inputs
         fourier = torch.sin(weighted), torch.cos(weighted)
@@ -186,15 +320,15 @@ class StaticContinuousFieldEmbedder(torch.nn.Module):
         self.register_buffer("weights", weights.mul(math.pi).unsqueeze(dim=0))
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: StaticContinuousField) -> Float[torch.Tensor, "N FdC"]:
+    def forward(self, inputs: StaticContinuousField) -> Float[torch.Tensor, "_N FdC"]:
         """
         Performs the forward pass of the FourierFeatureEncoder.
 
         Args:
-            inputs (Float[Tensor, "N"]): The input tensor.
+            inputs (Float[Tensor, "_N"]): The input tensor.
 
         Returns:
-            Float[Tensor, "N F"]: The Fourier features of the input.
+            Float[Tensor, "_N F"]: The Fourier features of the input.
         """
 
         values = inputs.content
@@ -210,8 +344,13 @@ class StaticContinuousFieldEmbedder(torch.nn.Module):
 
         assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
 
+        if self.training:
+            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
+        else:
+            jitter = torch.zeros_like(values)
+
         # weight inputs with buffers of precision bands
-        weighted = values.sub(indicators).mul(self.weights)
+        weighted = values.add(jitter).clamp(min=0.0, max=1.0).add(indicators * 2).mul(self.weights)
 
         # apply sine and cosine functions to weighted inputs
         fourier = torch.cat((torch.sin(weighted), torch.cos(weighted)), dim=1)
@@ -254,15 +393,15 @@ class TemporalFieldEmbedder(torch.nn.Module):
         )
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TemporalField) -> Float[torch.Tensor, "N L C"]:
+    def forward(self, inputs: TemporalField) -> Float[torch.Tensor, "_N L C"]:
         """
         Performs the forward pass of the FourierFeatureEncoder.
 
         Args:
-            inputs (Float[Tensor, "N L"]): The input tensor.
+            inputs (Float[Tensor, "_N L"]): The input tensor.
 
         Returns:
-            Float[Tensor, "N L F"]: The Fourier features of the input.
+            Float[Tensor, "_N L F"]: The Fourier features of the input.
         """
 
         assert inputs.time_of_day.shape == inputs.lookup.shape, "values and indicators must always have the same shape"

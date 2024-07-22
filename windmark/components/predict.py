@@ -18,13 +18,14 @@ def predict_sequence_encoder(
     params: Hyperparameters,
     manager: SystemManager,
 ):
+    torch.set_float32_matmul_precision("medium")
     torch.multiprocessing.set_sharing_strategy("file_system")
 
-    version: str = LabelManager.from_path(checkpoint.path, add_date=False)
+    version = LabelManager.inference(checkpoint.path)
 
     module = SequenceModule.load_from_checkpoint(
         checkpoint_path=str(checkpoint.path),
-        datapath=lifestreams.path,
+        datapath=str(lifestreams.path),
         params=params,
         manager=manager,
         mode="inference",

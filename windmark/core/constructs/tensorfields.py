@@ -21,13 +21,13 @@ from windmark.core.managers import SystemManager
 
 @tensorclass
 class TargetField:
-    lookup: Int[Tensor, "N L"]
-    is_masked: Bool[Tensor, "N L"]
+    lookup: Int[Tensor, "_N L"]
+    is_masked: Bool[Tensor, "_N L"]
 
 
 @tensorclass
 class DiscreteField:
-    lookup: Int[Tensor, "N L"]
+    lookup: Int[Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -86,7 +86,7 @@ class DiscreteField:
 
 @tensorclass
 class StaticDiscreteField:
-    lookup: Int[Tensor, "N"]  # noqa: F821
+    lookup: Int[Tensor, "_N"]  # noqa: F821
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -140,7 +140,7 @@ class StaticDiscreteField:
 
 @tensorclass
 class EntityField:
-    lookup: Int[Tensor, "N L"]
+    lookup: Int[Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -184,8 +184,8 @@ class EntityField:
 
 @tensorclass
 class ContinuousField:
-    lookup: Int[Tensor, "N L"]
-    content: Float[Tensor, "N L"]
+    lookup: Int[Tensor, "_N L"]
+    content: Float[Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -259,8 +259,8 @@ class ContinuousField:
 
 @tensorclass
 class StaticContinuousField:
-    lookup: Int[Tensor, "N"]  # noqa: F821
-    content: Float[Tensor, "N"]  # noqa: F821
+    lookup: Int[Tensor, "_N"]  # noqa: F821
+    content: Float[Tensor, "_N"]  # noqa: F821
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -318,7 +318,6 @@ class StaticContinuousField:
     def postprocess(cls, values, targets, params) -> torch.Tensor:
         N, T = values.shape
 
-        # FIXME smoothen function will break here
         return smoothen(targets=targets.lookup, size=params.n_quantiles, sigma=params.quantile_smoothing)
 
     @classmethod
@@ -329,12 +328,42 @@ class StaticContinuousField:
 
 
 @tensorclass
+class QuantileField:
+    lookup: Int[Tensor, "_N L"]
+    content: Float[Tensor, "_N L"]
+
+    @classmethod
+    def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
+        return params.n_quantiles + len(Tokens)
+
+    new = ContinuousField.new
+    mask = ContinuousField.mask
+    prune = ContinuousField.prune
+    postprocess = ContinuousField.postprocess
+    mock = ContinuousField.mock
+
+
+@tensorclass
+class StaticQuantileField:
+    lookup: Int[Tensor, "_N"]  # noqa: F821
+    content: Float[Tensor, "_N"]  # noqa: F821
+
+    get_target_size = QuantileField.get_target_size
+
+    new = StaticContinuousField.new
+    mask = StaticContinuousField.prune
+    prune = StaticContinuousField.prune
+    postprocess = StaticContinuousField.postprocess
+    mock = StaticContinuousField.mock
+
+
+@tensorclass
 class TemporalField:
-    lookup: Int[Tensor, "N L"]
-    week_of_year: Int[Tensor, "N L"]
-    day_of_week: Int[Tensor, "N L"]
-    hour_of_year: Int[Tensor, "N L"]
-    time_of_day: Float[Tensor, "N L"]
+    lookup: Int[Tensor, "_N L"]
+    week_of_year: Int[Tensor, "_N L"]
+    day_of_week: Int[Tensor, "_N L"]
+    hour_of_year: Int[Tensor, "_N L"]
+    time_of_day: Float[Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod

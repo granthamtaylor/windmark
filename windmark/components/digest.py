@@ -16,7 +16,7 @@ def create_digest_centroids_from_lifestream(
     field: FieldRequest,
     n_workers: int,
 ) -> Centroid:
-    if field.type not in [FieldType.Number, FieldType.Numbers]:
+    if field.type not in [FieldType.Number, FieldType.Numbers, FieldType.Quantiles, FieldType.Quantile]:
         return Centroid.empty(field.name)
 
     print(f'- creating state manager for field "{field.name}"')

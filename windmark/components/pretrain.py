@@ -2,7 +2,13 @@ import flytekit as fk
 from flytekit.types import file, directory
 import torch
 from lightning.pytorch import Trainer
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar, StochasticWeightAveraging
+from lightning.pytorch.callbacks import (
+    EarlyStopping,
+    ModelCheckpoint,
+    RichProgressBar,
+    StochasticWeightAveraging,
+    LearningRateMonitor,
+)
 from lightning.pytorch.loggers import TensorBoardLogger
 
 from windmark.core.architecture.encoders import SequenceModule
@@ -18,11 +24,9 @@ def pretrain_sequence_encoder(
     manager: SystemManager,
 ) -> file.FlyteFile:
     torch.set_float32_matmul_precision("medium")
-
-    torch.set_printoptions(sci_mode=False)
     torch.multiprocessing.set_sharing_strategy("file_system")
 
-    version: str = LabelManager.version()
+    version: str = LabelManager.new()
 
     module = SequenceModule(
         datapath=str(lifestreams.path),
@@ -32,8 +36,7 @@ def pretrain_sequence_encoder(
     )
 
     checkpointer = ModelCheckpoint(
-        dirpath=f"./checkpoints/pretrain/{version}",
-        monitor="pretrain-total-validate/loss",
+        dirpath=f"./checkpoints/{version}", monitor="pretrain-total-validate/loss", filename=version
     )
 
     trainer = Trainer(
@@ -48,11 +51,21 @@ def pretrain_sequence_encoder(
             RichProgressBar(),
             EarlyStopping(monitor="pretrain-total-validate/loss", patience=params.patience),
             StochasticWeightAveraging(swa_lrs=params.swa_lr),
+            LearningRateMonitor(logging_interval="step"),
             checkpointer,
         ],
     )
 
     trainer.fit(module)
+
+    module = SequenceModule.load_from_checkpoint(
+        checkpoint_path=str(checkpointer.best_model_path),
+        datapath=str(lifestreams.path),
+        params=params,
+        manager=manager,
+        mode="pretrain",
+    )
+
     trainer.test(module)
 
     return file.FlyteFile(checkpointer.best_model_path)

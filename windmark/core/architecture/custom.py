@@ -9,14 +9,14 @@ from windmark.core.constructs.general import Tokens
 
 @jaxtyped(typechecker=beartype)
 def smoothen(
-    targets: Int[torch.Tensor, "N *L"],  # noqa: F821
+    targets: Int[torch.Tensor, "_N *L"],  # noqa: F821
     size: int,
     sigma: float,
 ) -> Float[torch.Tensor, "..."]:  # noqa: F821
     """Apply gaussian smoothing to continuous targets with fixed offset for special tokens
 
     Arguments:
-        targets (Int[torch.Tensor, "N *L"]): Target label indices.
+        targets (Int[torch.Tensor, "_N *L"]): Target label indices.
         size (int): The number of quantiles to smoothen over.
         sigma (float): Gaussian smoothing factor
 
