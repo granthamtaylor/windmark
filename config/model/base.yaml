@@ -19,3 +19,11 @@ p_mask_static: 0.05
 dropout: 0.1
 patience: 64
 jitter: 0.0
+n_bands: 8
+head_shape_log_base: 4
+swa_lr: 0.001
+gradient_clip_val: 0.2
+interpolation_rate: 0.08
+learning_rate_dampener: 0.1
+n_workers: 24
+predict_only_sequence_end: false

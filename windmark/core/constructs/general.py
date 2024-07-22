@@ -106,65 +106,65 @@ class Centroid(DataClassJSONMixin):
 @pydantic.dataclasses.dataclass
 class Hyperparameters(DataClassJSONMixin):
     # architectural
-    batch_size: Annotated[int, pydantic.Field(gt=0, le=2048)] = 128
+    batch_size: Annotated[int, pydantic.Field(gt=0, le=2048)]
     """Batch size for training (how many observations per step)"""
-    n_context: Annotated[int, pydantic.Field(gt=0, le=2048)] = 128
+    n_context: Annotated[int, pydantic.Field(gt=0, le=2048)]
     """Context size (how many events per observation)"""
-    d_field: Annotated[int, pydantic.Field(gt=1, le=256)] = 64
+    d_field: Annotated[int, pydantic.Field(gt=1, le=256)]
     """Hidden dimension per field"""
-    n_heads_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 4
+    n_heads_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)]
     """Number of heads in field encoder"""
-    n_layers_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 1
+    n_layers_field_encoder: Annotated[int, pydantic.Field(gt=0, le=32)]
     """Number of layers in field encoder"""
-    n_heads_event_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 8
+    n_heads_event_encoder: Annotated[int, pydantic.Field(gt=0, le=32)]
     """Number of heads in event encoder"""
-    n_layers_event_encoder: Annotated[int, pydantic.Field(gt=0, le=32)] = 8
+    n_layers_event_encoder: Annotated[int, pydantic.Field(gt=0, le=32)]
     """Number of layers in event encoder"""
-    dropout: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.1
+    dropout: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
     """Dropout rate"""
-    n_bands: Annotated[int, pydantic.Field(gt=1, le=16)] = 8
+    n_bands: Annotated[int, pydantic.Field(gt=1, le=16)]
     """Precision of fourier feature encoders"""
-    head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)] = 4
+    head_shape_log_base: Annotated[int, pydantic.Field(gt=1, le=8)]
     """How quickly to converge sequence representation"""
-    n_quantiles: Annotated[int, pydantic.Field(gt=1, le=512)] = 128
+    n_quantiles: Annotated[int, pydantic.Field(gt=1, le=512)]
     """Number of quantiles for continuous and temporal field"""
 
     # training
-    n_pretrain_steps: Annotated[int, pydantic.Field(gt=0)] = 128
+    n_pretrain_steps: Annotated[int, pydantic.Field(gt=0)]
     """Number of steps to take per epoch during pretraining"""
-    n_finetune_steps: Annotated[int, pydantic.Field(gt=0)] = 128
+    n_finetune_steps: Annotated[int, pydantic.Field(gt=0)]
     """Number of steps to take per epoch during finetuning"""
-    swa_lr: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.1e-2
+    swa_lr: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
     """Stochastic Weight Averaging"""
-    gradient_clip_val: Annotated[float, pydantic.Field(gt=0.0)] = 0.2
+    gradient_clip_val: Annotated[float, pydantic.Field(gt=0.0)]
     """Gradient clipping threshold"""
-    max_pretrain_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)] = 256
+    max_pretrain_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)]
     """Maximum number of epochs for pretraining"""
-    max_finetune_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)] = 256
+    max_finetune_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)]
     """Maximum number of epochs for finetuning"""
-    quantile_smoothing: Annotated[float, pydantic.Field(gt=0.0, lt=33.0)] = 1.0
+    quantile_smoothing: Annotated[float, pydantic.Field(gt=0.0, lt=33.0)]
     """Smoothing factor of continuous fields' quantile labels"""
-    p_mask_event: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
+    p_mask_event: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
     """Probability of masking any event"""
-    p_mask_field: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.075
+    p_mask_field: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
     """Probability of masking any dynamic field"""
-    p_mask_static: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.20
+    p_mask_static: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
     """Probability of masking any static field"""
-    n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)] = 8
+    n_epochs_frozen: Annotated[int, pydantic.Field(gt=0, le=128)]
     """Number of epochs to freeze encoder while finetuning"""
-    interpolation_rate: Annotated[float, pydantic.Field(ge=0.0, le=1.0)] = 0.08
+    interpolation_rate: Annotated[float, pydantic.Field(ge=0.0, le=1.0)]
     """Interpolation rate of imbalanced classification labels"""
-    learning_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.0001
+    learning_rate: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)]
     """Learning Rate during Pretraining"""
-    learning_rate_dampener: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)] = 0.1
+    learning_rate_dampener: Annotated[float, pydantic.Field(gt=0.0, lt=1.0)]
     """Learning Rate Modifier during Finetuning"""
-    patience: Annotated[int, pydantic.Field(ge=1, le=256)] = 16
+    patience: Annotated[int, pydantic.Field(ge=1, le=256)]
     """Number of Epochs Patience for Early Stopping"""
-    jitter: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)] = 0.025
+    jitter: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
     """Amount of jitter to apply to continuous values"""
-    n_workers: Annotated[int, pydantic.Field(ge=1, le=256)] = 24
+    n_workers: Annotated[int, pydantic.Field(ge=1, le=256)]
     """Number of parallelized data pipes"""
-    predict_only_sequence_end: bool = False
+    predict_only_sequence_end: bool
     """Predict only last event in sequence"""
 
     @pydantic.model_validator(mode="after")
