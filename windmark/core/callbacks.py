@@ -1,8 +1,9 @@
 import os
 from typing import Sequence, Optional
 
+from beartype import beartype
+from jaxtyping import jaxtyped
 import pyarrow.parquet as pq
-
 import lightning.pytorch as lit
 from lightning.pytorch import callbacks
 import polars as pl
@@ -19,6 +20,7 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
         self.schema = None
         self.writer = None
 
+    @jaxtyped(typechecker=beartype)
     def write_on_batch_end(
         self,
         trainer: lit.Trainer,

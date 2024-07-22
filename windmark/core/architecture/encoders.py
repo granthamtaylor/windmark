@@ -21,8 +21,8 @@ from windmark.core.managers import SystemManager
 from windmark.core.operators import collate, stream, mock
 from windmark.core.constructs.tensorfields import TargetField
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.constructs.interface import FieldInterface
 from windmark.core.constructs.packages import PretrainingData, SupervisedData, OutputData, SequenceData
+from windmark.core.architecture.embedders import FieldInterface
 
 
 class LearnedTensor(torch.nn.Module):
@@ -404,6 +404,7 @@ class DecisionHead(torch.nn.Module):
 
         self.mlp = torch.nn.Sequential(*layers)
 
+    @jaxtyped(typechecker=beartype)
     def forward(self, inputs: Float[Tensor, "_N FdC"]) -> Float[Tensor, "_N T"]:
         """
         Defines the forward pass of the DecisionHead.
@@ -418,6 +419,7 @@ class DecisionHead(torch.nn.Module):
         return self.mlp(inputs)
 
 
+@beartype
 def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
     """Create supervised module metrics
 
@@ -449,6 +451,7 @@ def create_metrics(manager: SystemManager) -> torch.nn.ModuleDict:
     )
 
 
+@jaxtyped(typechecker=beartype)
 def pretrain(
     module: "SequenceModule",
     batch: PretrainingData,
@@ -516,6 +519,7 @@ def pretrain(
     return total_loss
 
 
+@jaxtyped(typechecker=beartype)
 def finetune(
     module: "SequenceModule",
     batch: SupervisedData,
@@ -536,9 +540,11 @@ def finetune(
     return loss
 
 
+@jaxtyped(typechecker=beartype)
 def step(
     self: "SequenceModule",
     batch: SequenceData,
+    batch_idx: int,
     strata: str,
 ) -> Tensor | tuple[Tensor, Tensor]:
     """Execute training / inference step
@@ -569,6 +575,7 @@ def step(
         return finetune(module=self, batch=batch, output=output, strata=strata)
 
 
+@beartype
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     assert strata in ["train", "validate", "test", "predict"]
 

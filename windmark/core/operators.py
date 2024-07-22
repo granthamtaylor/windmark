@@ -9,7 +9,7 @@ from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.constructs.interface import FieldInterface
+from windmark.core.architecture.embedders import FieldInterface
 from windmark.core.constructs.packages import SupervisedData, PretrainingData, SequenceData
 
 

@@ -6,6 +6,7 @@ from jaxtyping import Float, jaxtyped
 
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest, FieldType
 from windmark.core.constructs.tensorfields import (
+    FieldInterface,
     DiscreteField,
     StaticDiscreteField,
     ContinuousField,
@@ -16,15 +17,11 @@ from windmark.core.constructs.tensorfields import (
     TemporalField,
 )
 from windmark.core.managers import SystemManager
+from windmark.core.constructs.interface import FieldEmbedder
 
 
-class FieldEmbedder(torch.nn.Module):
-    pass
-
-
+@FieldInterface.register(FieldType.Categories)
 class DiscreteFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Categories
-
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
         Initialize discrete field embedder.
@@ -39,13 +36,13 @@ class DiscreteFieldEmbedder(FieldEmbedder):
         self.field: FieldRequest = field
         self.embeddings = torch.nn.Embedding(manager.levelsets.get_size(field) + len(Tokens), params.d_field)
 
+    @jaxtyped(typechecker=beartype)
     def forward(self, inputs: DiscreteField) -> Float[torch.Tensor, "_N L C"]:
         return self.embeddings(inputs.lookup)
 
 
+@FieldInterface.register(FieldType.Category)
 class StaticDiscreteFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Category
-
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
         Initialize discrete field embedder.
@@ -62,13 +59,13 @@ class StaticDiscreteFieldEmbedder(FieldEmbedder):
             manager.levelsets.get_size(field) + len(Tokens), params.d_field * len(manager.schema.dynamic)
         )
 
+    @jaxtyped(typechecker=beartype)
     def forward(self, inputs: StaticDiscreteField) -> Float[torch.Tensor, "_N FdC"]:
         return self.embeddings(inputs.lookup)
 
 
+@FieldInterface.register(FieldType.Quantiles)
 class QuantileFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Quantiles
-
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
         Initialize quantile field embedder.
@@ -126,9 +123,8 @@ class QuantileFieldEmbedder(FieldEmbedder):
         return self.embeddings(lookup)
 
 
+@FieldInterface.register(FieldType.Quantile)
 class StaticQuantileFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Quantile
-
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
         Initialize static quantile field embedder.
@@ -185,9 +181,8 @@ class StaticQuantileFieldEmbedder(FieldEmbedder):
         return self.embeddings(lookup)
 
 
+@FieldInterface.register(FieldType.Entities)
 class EntityFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Entities
-
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
         """
@@ -202,12 +197,13 @@ class EntityFieldEmbedder(FieldEmbedder):
         self.field: FieldRequest = field
         self.embeddings = torch.nn.Embedding(params.n_context + len(Tokens), params.d_field)
 
+    @jaxtyped(typechecker=beartype)
     def forward(self, inputs: EntityField) -> torch.Tensor:
         return self.embeddings(inputs.lookup)
 
 
+@FieldInterface.register(FieldType.Numbers)
 class ContinuousFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Numbers
     """
     ContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
 
@@ -290,8 +286,8 @@ class ContinuousFieldEmbedder(FieldEmbedder):
         return projections
 
 
+@FieldInterface.register(FieldType.Number)
 class StaticContinuousFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Number
     """
     StaticContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
 
@@ -364,9 +360,8 @@ class StaticContinuousFieldEmbedder(FieldEmbedder):
         return projections
 
 
+@FieldInterface.register(FieldType.Timestamps)
 class TemporalFieldEmbedder(FieldEmbedder):
-    type: FieldType = FieldType.Timestamps
-
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         """
         Initialize continuous field embedder.

@@ -3,12 +3,14 @@ from typing import Any, Callable
 import os
 from collections import Counter
 
+from beartype import beartype
 from mpire import WorkerPool
 import msgspec
 import numpy as np
 from pytdigest import TDigest
 
 
+@beartype
 def digest(resources: dict[str, Any], worker_id: int) -> list[list[float]]:
     digest = TDigest()
 
@@ -24,6 +26,7 @@ def digest(resources: dict[str, Any], worker_id: int) -> list[list[float]]:
     return digest.get_centroids().tolist()
 
 
+@beartype
 def count(resources: dict[str, Any], worker_id: int) -> Counter:
     counter = Counter()
 
@@ -42,6 +45,7 @@ def count(resources: dict[str, Any], worker_id: int) -> Counter:
     return counter
 
 
+@beartype
 def multithread(n_workers: int, process: Callable, key: str, path: Path) -> list[list[list[float]] | Counter]:
     filenames = [filename for filename in os.listdir(path) if filename.endswith(".ndjson")]
 

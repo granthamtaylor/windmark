@@ -180,9 +180,9 @@ class Hyperparameters(DataClassJSONMixin):
 
         return self
 
-    # @pydantic.model_validator(mode="after")
-    # def check_mask_rates(self):
-    #     rate = self.p_mask_field + self.p_mask_event + self.p_mask_static
-    #     assert rate >= 0.01, "the masking rates are too low for any meaningful pretraining"
+    @pydantic.model_validator(mode="after")
+    def check_mask_rates(self):
+        rate = self.p_mask_field + self.p_mask_event + self.p_mask_static
+        assert rate >= 0.01, "the masking rates are too low for any meaningful pretraining"
 
-    #     return self
+        return self

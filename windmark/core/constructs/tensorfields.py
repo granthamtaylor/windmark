@@ -1,54 +1,24 @@
 import string
 import random
-from typing import Any
 import datetime
 from decimal import Decimal
 
 import numpy as np
 import torch
 from beartype import beartype
-from jaxtyping import Bool, Float, Int, jaxtyped
+from jaxtyping import Float, Int, jaxtyped
 from tensordict.prototype import tensorclass
 from torch import Tensor
 from pytdigest import TDigest
 from torch.nn.functional import pad
 
-from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest
-
+from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest, FieldType
 from windmark.core.architecture.custom import smoothen
 from windmark.core.managers import SystemManager
+from windmark.core.constructs.interface import TargetField, TensorField, FieldInterface
 
 
-@tensorclass
-class TargetField:
-    lookup: Int[Tensor, "_N L"]
-    is_masked: Bool[Tensor, "_N L"]
-
-
-class TensorField:
-    @classmethod
-    def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-        pass
-
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
-        pass
-
-    def prune(self) -> None:
-        pass
-
-    @classmethod
-    def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-        pass
-
-    @classmethod
-    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
-        pass
-
-    @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-        pass
-
-
+@FieldInterface.register(FieldType.Categories)
 @tensorclass
 class DiscreteField(TensorField):
     lookup: Int[Tensor, "_N L"]
@@ -108,6 +78,7 @@ class DiscreteField(TensorField):
         return cls.new(values=values, field=field, params=params, manager=manager)
 
 
+@FieldInterface.register(FieldType.Category)
 @tensorclass
 class StaticDiscreteField(TensorField):
     lookup: Int[Tensor, "_N"]  # noqa: F821
@@ -162,6 +133,7 @@ class StaticDiscreteField(TensorField):
         return cls.new(values=value, field=field, params=params, manager=manager)
 
 
+@FieldInterface.register(FieldType.Entities)
 @tensorclass
 class EntityField(TensorField):
     lookup: Int[Tensor, "_N L"]
@@ -206,6 +178,7 @@ class EntityField(TensorField):
         return cls.new(values=values, field=field, params=params, manager=manager)
 
 
+@FieldInterface.register(FieldType.Numbers)
 @tensorclass
 class ContinuousField(TensorField):
     lookup: Int[Tensor, "_N L"]
@@ -281,6 +254,7 @@ class ContinuousField(TensorField):
         return cls.new(values=values, field=field, params=params, manager=manager)
 
 
+@FieldInterface.register(FieldType.Number)
 @tensorclass
 class StaticContinuousField(TensorField):
     lookup: Int[Tensor, "_N"]  # noqa: F821
@@ -351,6 +325,7 @@ class StaticContinuousField(TensorField):
         return cls.new(values=value, field=field, params=params, manager=manager)
 
 
+@FieldInterface.register(FieldType.Quantiles)
 @tensorclass
 class QuantileField(TensorField):
     lookup: Int[Tensor, "_N L"]
@@ -367,6 +342,7 @@ class QuantileField(TensorField):
     mock = ContinuousField.mock
 
 
+@FieldInterface.register(FieldType.Quantile)
 @tensorclass
 class StaticQuantileField(TensorField):
     lookup: Int[Tensor, "_N"]  # noqa: F821
@@ -381,6 +357,7 @@ class StaticQuantileField(TensorField):
     mock = StaticContinuousField.mock
 
 
+@FieldInterface.register(FieldType.Timestamps)
 @tensorclass
 class TemporalField(TensorField):
     lookup: Int[Tensor, "_N L"]
