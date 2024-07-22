@@ -1,4 +1,4 @@
-from typing import TypeAlias, Annotated
+from typing import Annotated
 from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
 from tensordict import TensorDict
@@ -8,8 +8,12 @@ from torch import Tensor
 from windmark.core.constructs.tensorfields import TensorField, TargetField
 
 
+class SequenceData:
+    pass
+
+
 @tensorclass
-class PretrainingData:
+class PretrainingData(SequenceData):
     inputs: Annotated[TensorDict, TensorField]
     targets: Annotated[TensorDict, TargetField]
     meta: list[tuple[str, str]] | tuple[str, str]
@@ -21,7 +25,7 @@ class PretrainingData:
 
 
 @tensorclass
-class SupervisedData:
+class SupervisedData(SequenceData):
     inputs: Annotated[TensorDict, TensorField]
     targets: Int[Tensor, "_N T"]
     meta: list[tuple[str, str]] | tuple[str, str]
@@ -32,9 +36,6 @@ class SupervisedData:
         targets = targets.unsqueeze(0)
 
         return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])
-
-
-SequenceData: TypeAlias = PretrainingData | SupervisedData
 
 
 @tensorclass

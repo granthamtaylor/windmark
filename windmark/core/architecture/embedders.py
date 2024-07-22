@@ -1,5 +1,4 @@
 import math
-from typing import TypeAlias
 
 import torch
 from beartype import beartype
@@ -19,7 +18,11 @@ from windmark.core.constructs.tensorfields import (
 from windmark.core.managers import SystemManager
 
 
-class DiscreteFieldEmbedder(torch.nn.Module):
+class FieldEmbedder(torch.nn.Module):
+    pass
+
+
+class DiscreteFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Categories
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -40,7 +43,7 @@ class DiscreteFieldEmbedder(torch.nn.Module):
         return self.embeddings(inputs.lookup)
 
 
-class StaticDiscreteFieldEmbedder(torch.nn.Module):
+class StaticDiscreteFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Category
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -63,7 +66,7 @@ class StaticDiscreteFieldEmbedder(torch.nn.Module):
         return self.embeddings(inputs.lookup)
 
 
-class QuantileFieldEmbedder(torch.nn.Module):
+class QuantileFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Quantiles
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -123,7 +126,7 @@ class QuantileFieldEmbedder(torch.nn.Module):
         return self.embeddings(lookup)
 
 
-class StaticQuantileFieldEmbedder(torch.nn.Module):
+class StaticQuantileFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Quantile
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -182,7 +185,7 @@ class StaticQuantileFieldEmbedder(torch.nn.Module):
         return self.embeddings(lookup)
 
 
-class EntityFieldEmbedder(torch.nn.Module):
+class EntityFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Entities
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -203,7 +206,7 @@ class EntityFieldEmbedder(torch.nn.Module):
         return self.embeddings(inputs.lookup)
 
 
-class ContinuousFieldEmbedder(torch.nn.Module):
+class ContinuousFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Numbers
     """
     ContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
@@ -287,7 +290,7 @@ class ContinuousFieldEmbedder(torch.nn.Module):
         return projections
 
 
-class StaticContinuousFieldEmbedder(torch.nn.Module):
+class StaticContinuousFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Number
     """
     StaticContinuousFieldEmbedder is a PyTorch module that encodes features using Fourier features.
@@ -361,7 +364,7 @@ class StaticContinuousFieldEmbedder(torch.nn.Module):
         return projections
 
 
-class TemporalFieldEmbedder(torch.nn.Module):
+class TemporalFieldEmbedder(FieldEmbedder):
     type: FieldType = FieldType.Timestamps
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -429,6 +432,3 @@ class TemporalFieldEmbedder(torch.nn.Module):
         projections += self.embeddings["day_of_week"](inputs.day_of_week)
 
         return projections
-
-
-FieldEmbedder: TypeAlias = DiscreteFieldEmbedder | EntityFieldEmbedder | ContinuousFieldEmbedder | TemporalFieldEmbedder

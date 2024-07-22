@@ -11,14 +11,14 @@ n_layers_event_encoder: 6
 n_heads_event_encoder: 8
 n_epochs_frozen: 32
 learning_rate: 0.00001
-quantile_smoothing: 0.000001
-n_quantiles: 16
+quantile_smoothing: 1.0
+n_quantiles: 64
 p_mask_event: 0.10
 p_mask_field: 0.10
 p_mask_static: 0.05
 dropout: 0.1
 patience: 64
-jitter: 0.0
+jitter: 0.05
 n_bands: 8
 head_shape_log_base: 4
 swa_lr: 0.001

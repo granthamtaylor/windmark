@@ -1,6 +1,6 @@
 import string
 import random
-from typing import TypeAlias
+from typing import Any
 import datetime
 from decimal import Decimal
 
@@ -25,15 +25,39 @@ class TargetField:
     is_masked: Bool[Tensor, "_N L"]
 
 
+class TensorField:
+    @classmethod
+    def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+        pass
+
+    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+        pass
+
+    def prune(self) -> None:
+        pass
+
+    @classmethod
+    def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
+        pass
+
+    @classmethod
+    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
+        pass
+
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+        pass
+
+
 @tensorclass
-class DiscreteField:
+class DiscreteField(TensorField):
     lookup: Int[Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
         cls, values: list[str | None], field: FieldRequest, params: Hyperparameters, manager: SystemManager
-    ) -> "DiscreteField":
+    ) -> TensorField:
         mapping = manager.levelsets[field]
 
         tokens = list(map(lambda value: mapping[value], values))
@@ -67,12 +91,12 @@ class DiscreteField:
         return manager.levelsets.get_size(field) + len(Tokens)
 
     @classmethod
-    def postprocess(cls, values, targets, params) -> torch.Tensor:
+    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
         N, L, T = values.shape
         return torch.nn.functional.one_hot(targets.lookup.reshape(N * L), num_classes=T).float()
 
     @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "DiscreteField":
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
         mappings = manager.levelsets.mappings[field.name]
 
         levels = list(mappings.keys())
@@ -85,14 +109,14 @@ class DiscreteField:
 
 
 @tensorclass
-class StaticDiscreteField:
+class StaticDiscreteField(TensorField):
     lookup: Int[Tensor, "_N"]  # noqa: F821
 
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
         cls, values: str | None, field: FieldRequest, params: Hyperparameters, manager: SystemManager
-    ) -> "StaticDiscreteField":
+    ) -> TensorField:
         mapping = manager.levelsets[field]
         if values is None:
             tokens = Tokens.UNK
@@ -123,12 +147,12 @@ class StaticDiscreteField:
     get_target_size = DiscreteField.get_target_size
 
     @classmethod
-    def postprocess(cls, values, targets, params) -> torch.Tensor:
+    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
         N, T = values.shape
         return torch.nn.functional.one_hot(targets.lookup.reshape(N), num_classes=T).float()
 
     @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "StaticDiscreteField":
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
         mappings = manager.levelsets.mappings[field.name]
 
         levels = list(mappings.keys())
@@ -139,14 +163,14 @@ class StaticDiscreteField:
 
 
 @tensorclass
-class EntityField:
+class EntityField(TensorField):
     lookup: Int[Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
         cls, values: list[str | None], field: FieldRequest, params: Hyperparameters, manager: SystemManager
-    ) -> "EntityField":
+    ) -> TensorField:
         unique: set[str] = set(values)
 
         integers = random.sample(range(len(Tokens), params.n_context + len(Tokens)), len(unique))
@@ -173,7 +197,7 @@ class EntityField:
         return params.n_context + len(Tokens)
 
     @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "EntityField":
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
         L = params.n_context
 
         letters = string.ascii_letters
@@ -183,7 +207,7 @@ class EntityField:
 
 
 @tensorclass
-class ContinuousField:
+class ContinuousField(TensorField):
     lookup: Int[Tensor, "_N L"]
     content: Float[Tensor, "_N L"]
 
@@ -195,7 +219,7 @@ class ContinuousField:
         field: FieldRequest,
         params: Hyperparameters,
         manager: SystemManager,
-    ) -> "ContinuousField":
+    ) -> TensorField:
         digest: TDigest = manager.centroids.digests[field.name]
         array = np.array(values, dtype=np.float64)
         cdfs = digest.cdf(array)
@@ -244,12 +268,12 @@ class ContinuousField:
         return params.n_quantiles + len(Tokens)
 
     @classmethod
-    def postprocess(cls, values, targets, params) -> torch.Tensor:
+    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
         N, L, T = values.shape
         return smoothen(targets=targets.lookup, size=params.n_quantiles, sigma=params.quantile_smoothing)
 
     @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "ContinuousField":
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
         L = params.n_context
 
         values = [random.uniform(-100, 100) for _ in range(L)]
@@ -258,7 +282,7 @@ class ContinuousField:
 
 
 @tensorclass
-class StaticContinuousField:
+class StaticContinuousField(TensorField):
     lookup: Int[Tensor, "_N"]  # noqa: F821
     content: Float[Tensor, "_N"]  # noqa: F821
 
@@ -270,7 +294,7 @@ class StaticContinuousField:
         field: FieldRequest,
         params: Hyperparameters,
         manager: SystemManager,
-    ) -> "StaticContinuousField":
+    ) -> TensorField:
         digest: TDigest = manager.centroids.digests[field.name]
 
         if values is None:
@@ -315,20 +339,20 @@ class StaticContinuousField:
     get_target_size = ContinuousField.get_target_size
 
     @classmethod
-    def postprocess(cls, values, targets, params) -> torch.Tensor:
+    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
         N, T = values.shape
 
         return smoothen(targets=targets.lookup, size=params.n_quantiles, sigma=params.quantile_smoothing)
 
     @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "StaticContinuousField":
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
         value = random.uniform(-100, 100)
 
         return cls.new(values=value, field=field, params=params, manager=manager)
 
 
 @tensorclass
-class QuantileField:
+class QuantileField(TensorField):
     lookup: Int[Tensor, "_N L"]
     content: Float[Tensor, "_N L"]
 
@@ -344,7 +368,7 @@ class QuantileField:
 
 
 @tensorclass
-class StaticQuantileField:
+class StaticQuantileField(TensorField):
     lookup: Int[Tensor, "_N"]  # noqa: F821
     content: Float[Tensor, "_N"]  # noqa: F821
 
@@ -358,7 +382,7 @@ class StaticQuantileField:
 
 
 @tensorclass
-class TemporalField:
+class TemporalField(TensorField):
     lookup: Int[Tensor, "_N L"]
     week_of_year: Int[Tensor, "_N L"]
     day_of_week: Int[Tensor, "_N L"]
@@ -373,7 +397,7 @@ class TemporalField:
         field: FieldRequest,
         params: Hyperparameters,
         manager: SystemManager,
-    ) -> "TemporalField":
+    ) -> TensorField:
         array = np.array(values, dtype="datetime64")
         padding = (params.n_context - len(array), 0)
 
@@ -434,12 +458,12 @@ class TemporalField:
         return 366 * 24 + len(Tokens)
 
     @classmethod
-    def postprocess(cls, values, targets, params) -> torch.Tensor:
+    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
         N, L, T = values.shape
         return smoothen(targets=targets.lookup, size=(366 * 24), sigma=params.quantile_smoothing)
 
     @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TemporalField":
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
         start_date = datetime.datetime(2000, 1, 1)
         end_date = datetime.datetime(2020, 12, 31)
 
@@ -451,6 +475,3 @@ class TemporalField:
         values = [start_date + datetime.timedelta(seconds=random.randint(0, delta_seconds)) for _ in range(L)]
 
         return cls.new(values=values, field=field, params=params, manager=manager)
-
-
-TensorField: TypeAlias = ContinuousField | DiscreteField | EntityField | TemporalField

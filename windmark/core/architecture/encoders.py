@@ -533,12 +533,6 @@ def finetune(
         metric.update(probabilities, batch.targets)
         module.info(name=f"finetune-{strata}/{name}", value=metric)
 
-    # if (module.global_step % 100 == 0) and (isinstance(module.logger, TensorBoardLogger)):
-    #     for index, values in enumerate(probabilities.unbind(dim=1)):
-    #         label = module.manager.task.balancer.labels[index]
-    #         tag = f'finetune-distribution/{module.manager.schema.target_id}="{label}"'
-    #         module.logger.experiment.add_histogram(tag=tag, values=values, global_step=module.global_step)
-
     return loss
 
 
