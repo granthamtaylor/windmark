@@ -6,7 +6,6 @@ from lightning.pytorch.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
     RichProgressBar,
-    StochasticWeightAveraging,
     LearningRateMonitor,
 )
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -50,7 +49,6 @@ def pretrain_sequence_encoder(
         callbacks=[
             RichProgressBar(),
             EarlyStopping(monitor="pretrain-total-validate/loss", patience=params.patience),
-            StochasticWeightAveraging(swa_lrs=params.swa_lr),
             LearningRateMonitor(logging_interval="step"),
             checkpointer,
         ],

@@ -1,7 +1,8 @@
 from functools import cache
-from typing import Callable, Type, Any
+from typing import Type, Any, TypeAlias
 
 import torch
+from beartype.typing import Callable
 from jaxtyping import Bool, Int
 from tensordict.prototype import tensorclass
 
@@ -16,6 +17,8 @@ class TargetField:
 
 
 class TensorField:
+    """Abstract template for a TensorField implementation"""
+
     @classmethod
     def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
         pass
@@ -40,7 +43,17 @@ class TensorField:
 
 
 class FieldEmbedder(torch.nn.Module):
-    pass
+    """Abstract template for a field embedder module"""
+
+    # def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
+    #     pass
+
+    # @jaxtyped(typechecker=beartype)
+    # def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
+    #     pass
+
+
+Registrant: TypeAlias = Type[TensorField] | Type[FieldEmbedder]
 
 
 class FieldInterface:
@@ -48,11 +61,11 @@ class FieldInterface:
     embedders: dict[FieldType, Type[FieldEmbedder]] = {}
 
     @classmethod
-    def register(cls, field: FieldType) -> Callable:
+    def register(cls, field: FieldType) -> Callable[[Registrant], Registrant]:
         if not isinstance(field, FieldType):
             raise KeyError("field key is not a registered field type")
 
-        def decorator(registrant: Type[TensorField] | Type[FieldEmbedder]) -> Type[TensorField] | Type[FieldEmbedder]:
+        def decorator(registrant: Registrant) -> Registrant:
             registrant.type = field
 
             if issubclass(registrant, TensorField):

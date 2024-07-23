@@ -8,7 +8,6 @@ import torch
 from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
 from tensordict.prototype import tensorclass
-from torch import Tensor
 from pytdigest import TDigest
 from torch.nn.functional import pad
 
@@ -20,8 +19,8 @@ from windmark.core.constructs.interface import TargetField, TensorField, FieldIn
 
 @FieldInterface.register(FieldType.Categories)
 @tensorclass
-class DiscreteField(TensorField):
-    lookup: Int[Tensor, "_N L"]
+class DynamicCategoryField(TensorField):
+    lookup: Int[torch.Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -40,7 +39,7 @@ class DiscreteField(TensorField):
         return cls(lookup=lookup, batch_size=[1])
 
     @jaxtyped(typechecker=beartype)
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+    def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
         N, L = (1, params.n_context)
         mask_token = torch.full((N, L), Tokens.MASK)
 
@@ -80,8 +79,8 @@ class DiscreteField(TensorField):
 
 @FieldInterface.register(FieldType.Category)
 @tensorclass
-class StaticDiscreteField(TensorField):
-    lookup: Int[Tensor, "_N"]  # noqa: F821
+class StaticCategoryField(TensorField):
+    lookup: Int[torch.Tensor, "_N"]  # noqa: F821
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -99,7 +98,7 @@ class StaticDiscreteField(TensorField):
         return cls(lookup=lookup, batch_size=[1])
 
     @jaxtyped(typechecker=beartype)
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+    def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
         _ = is_event_masked
 
         N = 1
@@ -114,8 +113,8 @@ class StaticDiscreteField(TensorField):
 
         return TargetField(lookup=targets, is_masked=is_field_masked, batch_size=self.batch_size)  # type: ignore
 
-    prune = DiscreteField.prune
-    get_target_size = DiscreteField.get_target_size
+    prune = DynamicCategoryField.prune
+    get_target_size = DynamicCategoryField.get_target_size
 
     @classmethod
     def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
@@ -135,8 +134,8 @@ class StaticDiscreteField(TensorField):
 
 @FieldInterface.register(FieldType.Entities)
 @tensorclass
-class EntityField(TensorField):
-    lookup: Int[Tensor, "_N L"]
+class DynamicEntityField(TensorField):
+    lookup: Int[torch.Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -160,9 +159,9 @@ class EntityField(TensorField):
 
         return cls(lookup=lookup, batch_size=[1])
 
-    mask = DiscreteField.mask
-    prune = DiscreteField.prune
-    postprocess = DiscreteField.postprocess
+    mask = DynamicCategoryField.mask
+    prune = DynamicCategoryField.prune
+    postprocess = DynamicCategoryField.postprocess
 
     @classmethod
     def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
@@ -180,9 +179,9 @@ class EntityField(TensorField):
 
 @FieldInterface.register(FieldType.Numbers)
 @tensorclass
-class ContinuousField(TensorField):
-    lookup: Int[Tensor, "_N L"]
-    content: Float[Tensor, "_N L"]
+class DynamicNumberField(TensorField):
+    lookup: Int[torch.Tensor, "_N L"]
+    content: Float[torch.Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -213,7 +212,7 @@ class ContinuousField(TensorField):
         )
 
     @jaxtyped(typechecker=beartype)
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+    def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
         N, L = (1, params.n_context)
         mask_token = torch.full((N, L), Tokens.MASK)
 
@@ -256,9 +255,9 @@ class ContinuousField(TensorField):
 
 @FieldInterface.register(FieldType.Number)
 @tensorclass
-class StaticContinuousField(TensorField):
-    lookup: Int[Tensor, "_N"]  # noqa: F821
-    content: Float[Tensor, "_N"]  # noqa: F821
+class StaticNumberField(TensorField):
+    lookup: Int[torch.Tensor, "_N"]  # noqa: F821
+    content: Float[torch.Tensor, "_N"]  # noqa: F821
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -290,7 +289,7 @@ class StaticContinuousField(TensorField):
         )
 
     @jaxtyped(typechecker=beartype)
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+    def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
         _ = is_event_masked
         N = 1
         mask_token = torch.full((N,), Tokens.MASK)
@@ -309,8 +308,8 @@ class StaticContinuousField(TensorField):
         # return SSL target
         return TargetField(lookup=targets, is_masked=is_field_masked, batch_size=self.batch_size)  # type: ignore
 
-    prune = ContinuousField.prune
-    get_target_size = ContinuousField.get_target_size
+    prune = DynamicNumberField.prune
+    get_target_size = DynamicNumberField.get_target_size
 
     @classmethod
     def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
@@ -327,44 +326,44 @@ class StaticContinuousField(TensorField):
 
 @FieldInterface.register(FieldType.Quantiles)
 @tensorclass
-class QuantileField(TensorField):
-    lookup: Int[Tensor, "_N L"]
-    content: Float[Tensor, "_N L"]
+class DynamicQuantileField(TensorField):
+    lookup: Int[torch.Tensor, "_N L"]
+    content: Float[torch.Tensor, "_N L"]
 
     @classmethod
     def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
         return params.n_quantiles + len(Tokens)
 
-    new = ContinuousField.new
-    mask = ContinuousField.mask
-    prune = ContinuousField.prune
-    postprocess = ContinuousField.postprocess
-    mock = ContinuousField.mock
+    new = DynamicNumberField.new
+    mask = DynamicNumberField.mask
+    prune = DynamicNumberField.prune
+    postprocess = DynamicNumberField.postprocess
+    mock = DynamicNumberField.mock
 
 
 @FieldInterface.register(FieldType.Quantile)
 @tensorclass
 class StaticQuantileField(TensorField):
-    lookup: Int[Tensor, "_N"]  # noqa: F821
-    content: Float[Tensor, "_N"]  # noqa: F821
+    lookup: Int[torch.Tensor, "_N"]  # noqa: F821
+    content: Float[torch.Tensor, "_N"]  # noqa: F821
 
-    get_target_size = QuantileField.get_target_size
+    get_target_size = DynamicQuantileField.get_target_size
 
-    new = StaticContinuousField.new
-    mask = StaticContinuousField.prune
-    prune = StaticContinuousField.prune
-    postprocess = StaticContinuousField.postprocess
-    mock = StaticContinuousField.mock
+    new = StaticNumberField.new
+    mask = StaticNumberField.prune
+    prune = StaticNumberField.prune
+    postprocess = StaticNumberField.postprocess
+    mock = StaticNumberField.mock
 
 
 @FieldInterface.register(FieldType.Timestamps)
 @tensorclass
-class TemporalField(TensorField):
-    lookup: Int[Tensor, "_N L"]
-    week_of_year: Int[Tensor, "_N L"]
-    day_of_week: Int[Tensor, "_N L"]
-    hour_of_year: Int[Tensor, "_N L"]
-    time_of_day: Float[Tensor, "_N L"]
+class DynamicTemporalField(TensorField):
+    lookup: Int[torch.Tensor, "_N L"]
+    week_of_year: Int[torch.Tensor, "_N L"]
+    day_of_week: Int[torch.Tensor, "_N L"]
+    hour_of_year: Int[torch.Tensor, "_N L"]
+    time_of_day: Float[torch.Tensor, "_N L"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
@@ -378,30 +377,47 @@ class TemporalField(TensorField):
         array = np.array(values, dtype="datetime64")
         padding = (params.n_context - len(array), 0)
 
-        lookup = np.where(np.isnan(array), Tokens.UNK, Tokens.VAL)
-        week_of_year = np.nan_to_num(
-            ((array.astype("datetime64[D]") - array.astype("datetime64[Y]")) / 7) + len(Tokens), nan=Tokens.UNK
-        )
-        day_of_week = np.nan_to_num((((array.view("int64") - 4) % 7) + len(Tokens)), nan=Tokens.UNK)
-        time_of_day = np.nan_to_num(
-            (array.astype("datetime64[s]") - array.astype("datetime64[D]")).astype(np.int64)
-        ) * (1 / (1440 * 60))
+        is_nan = np.isnan(array)
 
-        hour_of_year = np.nan_to_num(
-            (array.astype("datetime64[h]") - array.astype("datetime64[D]")) + len(Tokens), nan=Tokens.UNK
+        lookup = np.where(is_nan, Tokens.UNK, Tokens.VAL)
+        week_of_year = ((array.astype("datetime64[D]") - array.astype("datetime64[Y]")) / 7) + len(Tokens)
+        day_of_week = ((array.view("int64") - 4) % 7) + len(Tokens)
+        time_of_day = (array.astype("datetime64[s]") - array.astype("datetime64[D]")).astype(np.int64) * (
+            1 / (1440 * 60)
         )
+        hour_of_year = (array.astype("datetime64[h]") - array.astype("datetime64[D]")) + len(Tokens)
+
+        np.putmask(week_of_year, is_nan, Tokens.UNK)
+        np.putmask(day_of_week, is_nan, Tokens.UNK)
+        np.putmask(time_of_day, is_nan, 0.0)
+        np.putmask(hour_of_year, is_nan, Tokens.UNK)
+
+        lookup = pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0)
+        week_of_year = pad(torch.tensor(week_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0)
+        day_of_week = pad(torch.tensor(day_of_week.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0)
+        time_of_day = pad(torch.tensor(time_of_day.astype(np.float32)), pad=padding, value=0.0).unsqueeze(0)
+        hour_of_year = pad(torch.tensor(hour_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0)
+
+        # print(lookup.numpy())
+        # print(time_of_day.numpy())
+
+        # print(time_of_day.mul(lookup).eq(0.0).float().sum())
+
+        # if not torch.all(time_of_day.mul(lookup).eq(0.0)):
+        #     print(lookup)
+        #     print(time_of_day)
 
         return cls(
-            lookup=pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
-            week_of_year=pad(torch.tensor(week_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0),
-            day_of_week=pad(torch.tensor(day_of_week.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0),
-            time_of_day=pad(torch.tensor(time_of_day.astype(np.float32)), pad=padding, value=0.0).unsqueeze(0),
-            hour_of_year=pad(torch.tensor(hour_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            lookup=lookup,
+            week_of_year=week_of_year,
+            day_of_week=day_of_week,
+            time_of_day=time_of_day,
+            hour_of_year=hour_of_year,
             batch_size=[1],
         )
 
     @jaxtyped(typechecker=beartype)
-    def mask(self, is_event_masked: Tensor, params: Hyperparameters) -> TargetField:
+    def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
         N, L = (1, params.n_context)
 
         mask_token = torch.full((N, L), Tokens.MASK)

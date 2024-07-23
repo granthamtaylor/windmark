@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 import os
 from collections import Counter
 
 from beartype import beartype
+from beartype.typing import Callable
 from mpire import WorkerPool
 import msgspec
 import numpy as np
@@ -12,7 +13,7 @@ from pytdigest import TDigest
 
 @beartype
 def digest(resources: dict[str, Any], worker_id: int) -> list[list[float]]:
-    digest = TDigest()
+    tdigest = TDigest()
 
     decoder = msgspec.json.Decoder(dict[str, Any])
 
@@ -21,9 +22,9 @@ def digest(resources: dict[str, Any], worker_id: int) -> list[list[float]]:
             with open(resources["path"] / filename, "rb") as file:
                 for line in file:
                     inputs = decoder.decode(line)[resources["key"]]
-                    digest.update(np.array(inputs, dtype=float))
+                    tdigest.update(np.array(inputs, dtype=float))
 
-    return digest.get_centroids().tolist()
+    return tdigest.get_centroids().tolist()
 
 
 @beartype
@@ -46,15 +47,10 @@ def count(resources: dict[str, Any], worker_id: int) -> Counter:
 
 
 @beartype
-def multithread(n_workers: int, process: Callable, key: str, path: Path) -> list[list[list[float]] | Counter]:
+def multithread(n_workers: int, process: Callable, key: str, path: Path) -> list[Any]:
     filenames = [filename for filename in os.listdir(path) if filename.endswith(".ndjson")]
 
-    resources: dict[str, Any] = dict(
-        n_workers=n_workers,
-        key=key,
-        path=path,
-        filenames=filenames,
-    )
+    resources: dict[str, Any] = dict(n_workers=n_workers, key=key, path=path, filenames=filenames)
 
     with WorkerPool(n_jobs=n_workers, shared_objects=resources) as pool:
         results = pool.map(process, range(n_workers))

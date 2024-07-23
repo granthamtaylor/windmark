@@ -10,7 +10,7 @@ fields:
   merchant_state: categories
   merchant_city: entities
   use_chip: categories
-  amount: numbers
+  amount: quantiles
   merchant_name: entities
   timestamp: timestamps
   card: entities
@@ -22,5 +22,5 @@ fields:
   has_bad_expiration: categories
   has_technical_glitch: categories
   has_bad_cvv: categories
-  timedelta: numbers
-  tenure: numbers
+  timedelta: quantiles
+  tenure: quantiles

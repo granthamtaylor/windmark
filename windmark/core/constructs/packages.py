@@ -3,7 +3,7 @@ from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
 from tensordict import TensorDict
 from tensordict.prototype import tensorclass
-from torch import Tensor
+import torch
 
 from windmark.core.constructs.tensorfields import TensorField, TargetField
 
@@ -27,12 +27,12 @@ class PretrainingData(SequenceData):
 @tensorclass
 class SupervisedData(SequenceData):
     inputs: Annotated[TensorDict, TensorField]
-    targets: Int[Tensor, "_N T"]
+    targets: Int[torch.Tensor, "_N T"]
     meta: list[tuple[str, str]] | tuple[str, str]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
-    def new(cls, inputs: TensorDict, targets: Tensor, meta: tuple[str, ...]):
+    def new(cls, inputs: TensorDict, targets: torch.Tensor, meta: tuple[str, ...]):
         targets = targets.unsqueeze(0)
 
         return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])
@@ -40,19 +40,19 @@ class SupervisedData(SequenceData):
 
 @tensorclass
 class OutputData:
-    sequence: Float[Tensor, "_N FdC"]
+    sequence: Float[torch.Tensor, "_N FdC"]
     decoded_events: TensorDict
     decoded_static_fields: TensorDict
-    predictions: Float[Tensor, "_N T"]
+    predictions: Float[torch.Tensor, "_N T"]
 
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(
         cls,
-        sequence: Float[Tensor, "_N FdC"],
+        sequence: Float[torch.Tensor, "_N FdC"],
         decoded_events: TensorDict,
         decoded_static_fields: TensorDict,
-        predictions: Float[Tensor, "_N T"],
+        predictions: Float[torch.Tensor, "_N T"],
     ):
         assert sequence.shape[0] == decoded_events.shape[0] == decoded_static_fields.shape[0] == predictions.shape[0]
 

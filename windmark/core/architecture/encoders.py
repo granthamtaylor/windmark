@@ -11,11 +11,9 @@ from beartype import beartype
 from jaxtyping import Float, jaxtyped
 from lightning.fabric.utilities.throughput import measure_flops
 from tensordict import TensorDict
-from torch import Tensor
 from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
 from torchdata import datapipes
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 
 from windmark.core.managers import SystemManager
 from windmark.core.operators import collate, stream, mock
@@ -23,6 +21,7 @@ from windmark.core.constructs.tensorfields import TargetField
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.packages import PretrainingData, SupervisedData, OutputData, SequenceData
 from windmark.core.architecture.embedders import FieldInterface
+from windmark.core.architecture.custom import LinearWarmupCosineAnnealingLR
 
 
 class LearnedTensor(torch.nn.Module):
@@ -49,7 +48,7 @@ class LearnedTensor(torch.nn.Module):
         self.tensor = torch.nn.Parameter(tensor)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self) -> Float[Tensor, "..."]:
+    def forward(self) -> Float[torch.Tensor, "..."]:
         """
         Returns the learned tensor.
 
@@ -84,7 +83,7 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
         self.embedders = torch.nn.ModuleDict(embedders)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorDict) -> tuple[Float[Tensor, "_N L Fd C"], Float[Tensor, "_N Fs FdC"]]:
+    def forward(self, inputs: TensorDict) -> tuple[Float[torch.Tensor, "_N L Fd C"], Float[torch.Tensor, "_N Fs FdC"]]:
         """
         Performs the forward pass of the ModularFieldEmbeddingSystem.
 
@@ -151,7 +150,7 @@ class DynamicFieldEncoder(torch.nn.Module):
         self.positional = LearnedTensor(len(manager.schema.dynamic), params.d_field)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, dynamic: Float[Tensor, "_N L Fd C"]) -> Float[Tensor, "_N L FdC"]:
+    def forward(self, dynamic: Float[torch.Tensor, "_N L Fd C"]) -> Float[torch.Tensor, "_N L FdC"]:
         """
         Performs the forward pass of the DynamicFieldEncoder.
 
@@ -209,12 +208,12 @@ class EventEncoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        events: Float[Tensor, "_N L FdC"],
-        static: Float[Tensor, "_N Fs FdC"],
+        events: Float[torch.Tensor, "_N L FdC"],
+        static: Float[torch.Tensor, "_N Fs FdC"],
     ) -> tuple[
-        Float[Tensor, "_N FdC"],
-        Float[Tensor, "_N L FdC"],
-        Float[Tensor, "_N Fs FdC"],
+        Float[torch.Tensor, "_N FdC"],
+        Float[torch.Tensor, "_N L FdC"],
+        Float[torch.Tensor, "_N Fs FdC"],
     ]:
         N, L, FdC = events.shape
         N, Fs, FdC = static.shape
@@ -265,9 +264,9 @@ class EventDecoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        fields: Float[Tensor, "_N L FdC"],
-        sequence: Float[Tensor, "_N FdC"],
-    ) -> Annotated[TensorDict, Float[Tensor, "_N L _T"]]:
+        fields: Float[torch.Tensor, "_N L FdC"],
+        sequence: Float[torch.Tensor, "_N FdC"],
+    ) -> Annotated[TensorDict, Float[torch.Tensor, "_N L _T"]]:
         """
         Performs the forward pass of the EventDecoder.
 
@@ -324,9 +323,9 @@ class StaticFieldDecoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self,
-        fields: Float[Tensor, "_N Fs FdC"],
-        sequence: Float[Tensor, "_N FdC"],
-    ) -> Annotated[TensorDict, Float[Tensor, "_N _T"]]:
+        fields: Float[torch.Tensor, "_N Fs FdC"],
+        sequence: Float[torch.Tensor, "_N FdC"],
+    ) -> Annotated[TensorDict, Float[torch.Tensor, "_N _T"]]:
         """
         Performs the forward pass of the EventDecoder.
 
@@ -405,7 +404,7 @@ class DecisionHead(torch.nn.Module):
         self.mlp = torch.nn.Sequential(*layers)
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: Float[Tensor, "_N FdC"]) -> Float[Tensor, "_N T"]:
+    def forward(self, inputs: Float[torch.Tensor, "_N FdC"]) -> Float[torch.Tensor, "_N T"]:
         """
         Defines the forward pass of the DecisionHead.
 
@@ -457,12 +456,12 @@ def pretrain(
     batch: PretrainingData,
     output: OutputData,
     strata: str,
-) -> Tensor:
+) -> torch.Tensor:
     dynamic_losses = []
     static_losses = []
 
     for field in module.manager.schema.dynamic:
-        values: Tensor = output.decoded_events[field.name]
+        values: torch.Tensor = output.decoded_events[field.name]
         targets: TargetField = batch.targets[field.name]
 
         N, L, T = values.shape
@@ -487,7 +486,7 @@ def pretrain(
     scalar = (module.params.d_field * module.params.p_mask_static) / (module.params.n_context * p_mask_dynamic)
 
     for field in module.manager.schema.static:
-        values: Tensor = output.decoded_static_fields[field.name]
+        values: torch.Tensor = output.decoded_static_fields[field.name]
         targets: TargetField = batch.targets[field.name]
 
         N, T = values.shape
@@ -525,7 +524,7 @@ def finetune(
     batch: SupervisedData,
     output: OutputData,
     strata: str,
-) -> Tensor:
+) -> torch.Tensor:
     loss = cross_entropy(output.predictions, batch.targets, weight=module.weights)
     module.info(name=f"finetune-{strata}/loss", value=loss, prog_bar=(strata == "validate"))
 
@@ -546,7 +545,7 @@ def step(
     batch: SequenceData,
     batch_idx: int,
     strata: str,
-) -> Tensor | tuple[Tensor, Tensor]:
+) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
     """Execute training / inference step
 
     Args:
@@ -624,8 +623,8 @@ class SequenceModule(lit.LightningModule):
 
         self.info = partial(self.log, on_step=False, on_epoch=True, batch_size=self.params.batch_size)
 
-        self.example_input_array = sample = mock(params=params, manager=manager)  # type: ignore
-        self.flops_per_batch = measure_flops(self, lambda: self(sample))
+        self.example_input_array = mock(params=params, manager=manager)
+        self.flops_per_batch = measure_flops(self, lambda: self.forward(self.example_input_array))
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> OutputData:  # type: ignore

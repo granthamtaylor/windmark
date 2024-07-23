@@ -134,8 +134,6 @@ class Hyperparameters(DataClassJSONMixin):
     """Number of steps to take per epoch during pretraining"""
     n_finetune_steps: Annotated[int, pydantic.Field(gt=0)]
     """Number of steps to take per epoch during finetuning"""
-    swa_lr: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
-    """Stochastic Weight Averaging"""
     gradient_clip_val: Annotated[float, pydantic.Field(gt=0.0)]
     """Gradient clipping threshold"""
     max_pretrain_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)]
