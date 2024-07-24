@@ -3,7 +3,6 @@ from windmark.components.digest import create_digest_centroids_from_lifestream a
 from windmark.components.pretrain import pretrain_sequence_encoder as pretrain
 from windmark.components.finetune import finetune_sequence_encoder as finetune
 from windmark.components.sample import create_sample_manager as sample
-from windmark.components.parse import parse_field_from_ledger as parse
 from windmark.components.predict import predict_sequence_encoder as predict
 from windmark.components.system import create_system_manager as system
 from windmark.components.task import create_task_manager as task
@@ -17,7 +16,6 @@ __all__ = [
     finetune,
     sanitize,
     levels,
-    parse,
     digest,
     sample,
     predict,

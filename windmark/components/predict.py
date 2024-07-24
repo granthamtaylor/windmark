@@ -17,7 +17,19 @@ def predict_sequence_encoder(
     lifestreams: directory.FlyteDirectory,
     params: Hyperparameters,
     manager: SystemManager,
-):
+) -> file.FlyteFile:
+    """
+    Predicts the sequence using an encoder model.
+
+    Args:
+        checkpoint (file.FlyteFile): The checkpoint file containing the finetuned model.
+        lifestreams (directory.FlyteDirectory): The directory containing the input data.
+        params (Hyperparameters): The hyperparameters for the model.
+        manager (SystemManager): The system state manager.
+
+    Returns:
+        file.FlyteFile: Model score predictions
+    """
     torch.set_float32_matmul_precision("medium")
     torch.multiprocessing.set_sharing_strategy("file_system")
 
@@ -31,6 +43,8 @@ def predict_sequence_encoder(
         mode="inference",
     )
 
+    outpath = f"data/predictions/{version}.parquet"
+
     trainer = Trainer(
         logger=TensorBoardLogger("logs", name="windmark", version=version),
         accelerator="auto",
@@ -39,8 +53,10 @@ def predict_sequence_encoder(
         precision="bf16-mixed",
         callbacks=[
             RichProgressBar(),
-            ParquetBatchWriter(f"data/predictions/{version}.parquet"),
+            ParquetBatchWriter(outpath),
         ],
     )
 
     trainer.predict(module, return_predictions=False)
+
+    return file.FlyteFile(outpath)

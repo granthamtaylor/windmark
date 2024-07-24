@@ -398,15 +398,6 @@ class DynamicTemporalField(TensorField):
         time_of_day = pad(torch.tensor(time_of_day.astype(np.float32)), pad=padding, value=0.0).unsqueeze(0)
         hour_of_year = pad(torch.tensor(hour_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0)
 
-        # print(lookup.numpy())
-        # print(time_of_day.numpy())
-
-        # print(time_of_day.mul(lookup).eq(0.0).float().sum())
-
-        # if not torch.all(time_of_day.mul(lookup).eq(0.0)):
-        #     print(lookup)
-        #     print(time_of_day)
-
         return cls(
             lookup=lookup,
             week_of_year=week_of_year,

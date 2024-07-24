@@ -28,8 +28,6 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
     task = lib.task(lifestreams=lifestreams, schema=schema, kappa=kappa, n_workers=n_workers)
 
     sample = lib.sample(
-        lifestreams=lifestreams,
-        schema=schema,
         batch_size=batch_size,
         n_pretrain_steps=n_pretrain_steps,
         n_finetune_steps=n_finetune_steps,

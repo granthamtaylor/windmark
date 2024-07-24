@@ -26,8 +26,9 @@ def smoothen(
         sigma (float): Gaussian smoothing factor
 
     Returns:
-        Float[torch.Tensor]: Smoothened quantile targets.
+        Float[torch.Tensor, "..."]: Smoothened quantile targets.
     """
+
     device = targets.device
 
     dim: int = reduce(lambda x, y: x * y, list(targets.shape))

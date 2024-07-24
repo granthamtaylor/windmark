@@ -12,12 +12,45 @@ from windmark.core.managers import SystemManager
 
 @tensorclass
 class TargetField:
+    """
+    Represents a target field in the windmark system.
+
+    Attributes:
+        lookup (Int[torch.Tensor, "_N L"]): The lookup value for the target field.
+        is_masked (Bool[torch.Tensor, "_N L"]): Indicates whether the target field is masked or not.
+    """
+
     lookup: Int[torch.Tensor, "_N L"]
     is_masked: Bool[torch.Tensor, "_N L"]
 
 
 class TensorField:
-    """Abstract template for a TensorField implementation"""
+    """
+    Represents an abstract tensor field.
+
+    Attributes:
+        None
+
+    Methods:
+        new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+            Creates a new TensorField instance.
+
+        mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> "TargetField":
+            Masks the tensor field based on the given mask tensor.
+
+        prune(self) -> None:
+            Prunes the tensor field.
+
+        get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
+            Returns the target size of the tensor field.
+
+        postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
+            Performs post-processing on the tensor field.
+
+        mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+            Creates a mock TensorField instance.
+
+    """
 
     @classmethod
     def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
@@ -57,11 +90,24 @@ Registrant: TypeAlias = Type[TensorField] | Type[FieldEmbedder]
 
 
 class FieldInterface:
+    """
+    A class representing the interface for registering and accessing field types in the Windmark system.
+    """
+
     tensorfields: dict[FieldType, Type[TensorField]] = {}
     embedders: dict[FieldType, Type[FieldEmbedder]] = {}
 
     @classmethod
     def register(cls, field: FieldType) -> Callable[[Registrant], Registrant]:
+        """
+        Decorator method for registering a field type.
+
+        Args:
+            field (FieldType): The field type to register.
+
+        Returns:
+            Callable[[Registrant], Registrant]: The decorator function.
+        """
         if not isinstance(field, FieldType):
             raise KeyError("field key is not a registered field type")
 
@@ -90,6 +136,10 @@ class FieldInterface:
     @classmethod
     @cache
     def _validate(cls) -> None:
+        """
+        Internal method to validate the consistency between registered tensorfields and embedders.
+        Raises an AttributeError if there are any inconsistencies.
+        """
         tensorfields = set([tensorfield.name for tensorfield in cls.tensorfields.keys()])
         embedders = set([embedder.name for embedder in cls.embedders.keys()])
 
@@ -100,12 +150,30 @@ class FieldInterface:
 
     @classmethod
     def tensorfield(cls, field: FieldRequest) -> Type[TensorField]:
+        """
+        Retrieves the tensorfield type associated with the given field request.
+
+        Args:
+            field (FieldRequest): The field request.
+
+        Returns:
+            Type[TensorField]: The tensorfield type.
+        """
         cls._validate()
 
         return cls.tensorfields[field.type]
 
     @classmethod
     def embedder(cls, field: FieldRequest) -> Type[FieldEmbedder]:
+        """
+        Retrieves the field embedder type associated with the given field request.
+
+        Args:
+            field (FieldRequest): The field request.
+
+        Returns:
+            Type[FieldEmbedder]: The field embedder type.
+        """
         cls._validate()
 
         return cls.embedders[field.type]

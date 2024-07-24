@@ -1,6 +1,6 @@
 import random
 from functools import partial
-from typing import TypeAlias, Any
+from typing import TypeAlias, Any, Generator
 
 import msgspec
 import torch
@@ -18,6 +18,16 @@ FieldType: TypeAlias = dict[str, list[Any] | Any]
 
 
 def subset(sequence: dict[str, Any], split: str) -> bool:
+    """
+    Check if the given sequence has a specific split value.
+
+    Args:
+        sequence (dict[str, Any]): The sequence to check.
+        split (str): The split value to compare against.
+
+    Returns:
+        bool: True if the sequence has the specified split value, False otherwise.
+    """
     return sequence["split"] == split
 
 
@@ -27,7 +37,24 @@ def sample(
     manager: SystemManager,
     split: str,
     mode: str,
-) -> list[tuple[AnnotationType, FieldType]]:
+) -> Generator[tuple[AnnotationType, FieldType], None, None]:
+    """
+    Generate samples from a sequence based on the specified mode.
+
+    Args:
+        sequence (dict): The sequence of data.
+        params (Hyperparameters): The hyperparameters for sampling.
+        manager (SystemManager): The system manager.
+        split (str): The split of the data (e.g., train, validation, test).
+        mode (str): The mode of sampling (e.g., pretrain, finetune, inference).
+
+    Yields:
+        tuple[AnnotationType, FieldType]: A tuple containing the annotations and fields for each sample.
+
+    Raises:
+        ValueError: If an invalid mode is provided.
+    """
+
     for event in range(len(sequence[manager.schema.event_id])):
         if mode == "pretrain":
             if manager.sample.pretraining[split] < random.random():
@@ -89,6 +116,18 @@ def tensorfield(
     params: Hyperparameters,
     manager: SystemManager,
 ) -> tuple[AnnotationType, TensorDict]:
+    """
+    Convert the fields in the observation into tensors using the specified parameters and manager.
+
+    Args:
+        observation (tuple[AnnotationType, FieldType]): The observation containing annotations and fields.
+        params (Hyperparameters): The hyperparameters to be used for tensor conversion.
+        manager (SystemManager): The system manager for accessing the schema.
+
+    Returns:
+        tuple[AnnotationType, TensorDict]: The converted annotations and tensor dictionary.
+
+    """
     annotations, fields = observation
 
     output = {}
@@ -107,6 +146,22 @@ def package(
     manager: SystemManager,
     mode: str,
 ) -> SequenceData:
+    """
+    Packages the observation data into a SequenceData object based on the specified mode.
+
+    Args:
+        observation (tuple[AnnotationType, TensorDict]): The observation data to be packaged.
+        params (Hyperparameters): The hyperparameters for packaging.
+        manager (SystemManager): The system manager.
+        mode (str): The packaging mode. Must be one of "pretrain", "finetune", or "inference".
+
+    Returns:
+        SequenceData: The packaged data.
+
+    Raises:
+        AssertionError: If the mode is not one of "pretrain", "finetune", or "inference".
+    """
+
     (*meta, label), fields = observation
 
     assert mode in ("pretrain", "finetune", "inference")
@@ -140,6 +195,22 @@ def stream(
     manager: SystemManager,
     split: str,
 ) -> datapipes.iter.IterDataPipe:
+    """
+    Create a data stream for a specific mode and split.
+
+    Args:
+        datapath (str): The path to the data.
+        mode (str): The mode of operation. Can be one of "pretrain", "finetune", or "inference".
+        params (Hyperparameters): The hyperparameters for the model.
+        manager (SystemManager): The system manager.
+        split (str): The data split. Can be one of "train", "validate", or "test".
+
+    Returns:
+        datapipes.iter.IterDataPipe: The data stream.
+
+    Raises:
+        AssertionError: If the mode or split is not valid.
+    """
     assert mode in ["pretrain", "finetune", "inference"]
     assert split in ["train", "validate", "test"]
 
@@ -160,6 +231,17 @@ def stream(
 
 
 def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
+    """
+    Generate mock observations based on the given hyperparameters and system manager.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for generating the mock observations.
+        manager (SystemManager): The system manager containing the schema and other necessary information.
+
+    Returns:
+        TensorDict: A dictionary of mock observations, where each observation is represented as a tensor.
+
+    """
     observations = []
 
     for _ in range(params.batch_size):
@@ -175,6 +257,16 @@ def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
 
 
 def collate(batch: list[SequenceData]) -> SequenceData:
+    """
+    Collates a batch of SequenceData objects into a single SequenceData object.
+
+    Args:
+        batch (list[SequenceData]): A list of SequenceData objects to be collated.
+
+    Returns:
+        SequenceData: The collated SequenceData object.
+
+    """
     stacked = torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)  # type: ignore
     stacked.meta = [observation.meta for observation in batch]
 

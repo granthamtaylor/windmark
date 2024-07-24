@@ -13,6 +13,16 @@ from pytdigest import TDigest
 
 @beartype
 def digest(resources: dict[str, Any], worker_id: int) -> list[list[float]]:
+    """
+    Process the given resources and calculate the centroids using TDigest.
+
+    Args:
+        resources (dict[str, Any]): A dictionary containing the necessary resources.
+        worker_id (int): The ID of the worker processing the resources.
+
+    Returns:
+        list[list[float]]: A list of centroids calculated using TDigest.
+    """
     tdigest = TDigest()
 
     decoder = msgspec.json.Decoder(dict[str, Any])
@@ -29,6 +39,17 @@ def digest(resources: dict[str, Any], worker_id: int) -> list[list[float]]:
 
 @beartype
 def count(resources: dict[str, Any], worker_id: int) -> Counter:
+    """
+    Counts the occurrences of items in the input resources.
+
+    Args:
+        resources (dict[str, Any]): A dictionary containing the necessary resources.
+        worker_id (int): The ID of the worker processing the resources.
+
+    Returns:
+        Counter: A Counter object containing the counts of the items.
+
+    """
     counter = Counter()
 
     decoder = msgspec.json.Decoder(dict[str, Any])
@@ -48,6 +69,19 @@ def count(resources: dict[str, Any], worker_id: int) -> Counter:
 
 @beartype
 def multithread(n_workers: int, process: Callable, key: str, path: Path) -> list[Any]:
+    """
+    Execute a given process function in parallel using multiple threads.
+
+    Args:
+        n_workers (int): The number of worker threads to use.
+        process (Callable): The function to be executed in parallel.
+        key (str): A key parameter for the process function.
+        path (Path): The path to the directory containing the files to be processed.
+
+    Returns:
+        list[Any]: A list of results returned by the process function for each worker thread.
+    """
+
     filenames = [filename for filename in os.listdir(path) if filename.endswith(".ndjson")]
 
     resources: dict[str, Any] = dict(n_workers=n_workers, key=key, path=path, filenames=filenames)

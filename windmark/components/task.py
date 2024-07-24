@@ -13,6 +13,19 @@ from windmark.core.processors import multithread, count
 def create_task_manager(
     lifestreams: directory.FlyteDirectory, schema: SchemaManager, kappa: float, n_workers: int
 ) -> SupervisedTaskManager:
+    """
+    Creates a task manager for supervised machine learning tasks.
+
+    Args:
+        lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
+        schema (SchemaManager): The schema manager for the task.
+        kappa (float): The kappa value for balancing classification targets.
+        n_workers (int): The number of workers for multithreading.
+
+    Returns:
+        SupervisedTaskManager: The created task manager.
+    """
+
     path = Path(lifestreams.path)
 
     results: list[Counter] = multithread(n_workers=n_workers, process=count, key=schema.target_id, path=path)

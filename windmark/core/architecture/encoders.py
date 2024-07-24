@@ -26,17 +26,27 @@ from windmark.core.architecture.custom import LinearWarmupCosineAnnealingLR
 
 class LearnedTensor(torch.nn.Module):
     """
-    LearnedTensor is a PyTorch module that initializes a tensor with normal distribution and learns its values during training.
+    A class representing a learned tensor.
+
+    Args:
+        *sizes (int): The sizes of each dimension of the tensor.
+
+    Attributes:
+        tensor (torch.Tensor): The learned tensor.
+
     """
 
     def __init__(self, *sizes: int):
         """
-        Initializes the LearnedTensor.
+        Initializes a LearnedTensor object.
 
         Args:
-            sizes (int): The sizes of the dimensions of the tensor.
-        """
+            *sizes (int): The sizes of each dimension of the tensor.
 
+        Raises:
+            AssertionError: If any dimension is not an integer or is less than 1.
+
+        """
         super().__init__()
 
         for dim in sizes:
@@ -50,28 +60,29 @@ class LearnedTensor(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(self) -> Float[torch.Tensor, "..."]:
         """
-        Returns the learned tensor.
+        Performs a forward pass through the learned tensor.
 
         Returns:
-            Float[Tensor, '...']: The learned tensor.
-        """
+            torch.Tensor: The learned tensor.
 
+        """
         return self.tensor
 
 
 class ModularFieldEmbeddingSystem(torch.nn.Module):
     """
-    ModularFieldEmbeddingSystem is a PyTorch module for embedding fields.
+    A module for performing field embedding in a modular manner.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedding system.
+        manager (SystemManager): The system manager for accessing the schema and field information.
+
+    Attributes:
+        embedders (torch.nn.ModuleDict): A dictionary of field embedders.
+
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
-        """
-        Initialize modular field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-        """
         super().__init__()
 
         embedders: dict[str, torch.nn.Module] = {}
@@ -85,13 +96,14 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> tuple[Float[torch.Tensor, "_N L Fd C"], Float[torch.Tensor, "_N Fs FdC"]]:
         """
-        Performs the forward pass of the ModularFieldEmbeddingSystem.
+        Forward pass of the embedding system.
 
         Args:
-            inputs (TensorDict[Float[Tensor, "_N L"] | Int[Tensor, "_N L"]]): The input tensor.
+            inputs (TensorDict): The input tensor dictionary.
 
         Returns:
-            Float[Tensor, "_N L F"]: The embedded fields.
+            tuple[Float[torch.Tensor, "_N L Fd C"], Float[torch.Tensor, "_N Fs FdC"]]: The dynamic and static field embeddings.
+
         """
 
         dynamic = []
@@ -123,18 +135,19 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
 
 class DynamicFieldEncoder(torch.nn.Module):
     """
-    DynamicFieldEncoder is a PyTorch module for encoding dynamic fields.
+    Encoder module for dynamic fields in the windmark architecture.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the encoder.
+        manager (SystemManager): The system manager for the windmark architecture.
+
+    Attributes:
+        encoder (torch.nn.TransformerEncoder): The transformer encoder layer.
+        positional (LearnedTensor): The learned positional tensor.
+
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
-        """
-        Initialize field transformer encoder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-        """
-
         super().__init__()
 
         layer = torch.nn.TransformerEncoderLayer(
@@ -152,13 +165,14 @@ class DynamicFieldEncoder(torch.nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(self, dynamic: Float[torch.Tensor, "_N L Fd C"]) -> Float[torch.Tensor, "_N L FdC"]:
         """
-        Performs the forward pass of the DynamicFieldEncoder.
+        Forward pass of the dynamic field encoder.
 
         Args:
-            inputs (Float[Tensor, "_N L Fd C"]): The input tensor.
+            dynamic (Float[torch.Tensor, "_N L Fd C"]): The input dynamic field tensor.
 
         Returns:
-            Float[Tensor, "_N L Fd C"]: The encoded dynamic fields.
+            Float[torch.Tensor, "_N L FdC"]: The encoded dynamic field tensor.
+
         """
 
         N, L, Fd, C = dynamic.shape
@@ -175,18 +189,20 @@ class DynamicFieldEncoder(torch.nn.Module):
 
 class EventEncoder(torch.nn.Module):
     """
-    EventEncoder is a PyTorch module for encoding events.
+    EventEncoder is a module that encodes events and static features using a TransformerEncoder.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the encoder.
+        manager (SystemManager): The system manager for accessing the schema.
+
+    Attributes:
+        encoder (torch.nn.TransformerEncoder): The TransformerEncoder layer.
+        positional (LearnedTensor): The learned positional tensor.
+        class_token (LearnedTensor): The learned class token tensor.
+
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
-        """
-        Initialize the event transformer encoder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-        """
-
         super().__init__()
 
         layer = torch.nn.TransformerEncoderLayer(
@@ -215,6 +231,19 @@ class EventEncoder(torch.nn.Module):
         Float[torch.Tensor, "_N L FdC"],
         Float[torch.Tensor, "_N Fs FdC"],
     ]:
+        """
+        Forward pass of the encoder module.
+
+        Args:
+            events (Float[torch.Tensor, "_N L FdC"]): Input events tensor of shape (N, L, FdC).
+            static (Float[torch.Tensor, "_N Fs FdC"]): Input static tensor of shape (N, Fs, FdC).
+
+        Returns:
+            tuple[Float[torch.Tensor, "_N FdC"], Float[torch.Tensor, "_N L FdC"], Float[torch.Tensor, "_N Fs FdC"]]:
+                - sequence: Encoded sequence tensor of shape (N, FdC).
+                - encoded_events: Encoded events tensor of shape (N, L, FdC).
+                - encoded_static: Encoded static tensor of shape (N, Fs, FdC).
+        """
         N, L, FdC = events.shape
         N, Fs, FdC = static.shape
 
@@ -235,18 +264,17 @@ class EventEncoder(torch.nn.Module):
 
 class EventDecoder(torch.nn.Module):
     """
-    EventDecoder is a PyTorch module for decoding masked events from their contextualized representations.
+    EventDecoder module for decoding events based on input fields and sequences.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
         """
-        Initialize the event decoder.
+        Initialize the EventDecoder module.
 
         Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
+            params (Hyperparameters): The hyperparameters for the module.
+            manager (SystemManager): The system manager for accessing schema and fields.
         """
-
         super().__init__()
 
         projections = {}
@@ -268,15 +296,15 @@ class EventDecoder(torch.nn.Module):
         sequence: Float[torch.Tensor, "_N FdC"],
     ) -> Annotated[TensorDict, Float[torch.Tensor, "_N L _T"]]:
         """
-        Performs the forward pass of the EventDecoder.
+        Forward pass of the EventDecoder module.
 
         Args:
-            inputs (Float[Tensor, "_N L FdC"]): The input tensor.
+            fields (Float[torch.Tensor, "_N L FdC"]): Input fields tensor.
+            sequence (Float[torch.Tensor, "_N FdC"]): Input sequence tensor.
 
         Returns:
-            TensorDict[Float[Tensor, "_N L _T"]]: A dictionary of output tensors for each field.
+            Annotated[TensorDict, Float[torch.Tensor, "_N L _T"]]: Decoded events tensor.
         """
-
         N, L, FdC = fields.shape
 
         batched = fields.reshape(N * L, FdC)
@@ -294,18 +322,18 @@ class EventDecoder(torch.nn.Module):
 
 class StaticFieldDecoder(torch.nn.Module):
     """
-    StaticFieldDecoder is a PyTorch module for decoding masked static fields from their contextualized representations.
+    Decoder module for static fields in the windmark architecture.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the model.
+        manager (SystemManager): The system manager for the windmark architecture.
+
+    Attributes:
+        projections (torch.nn.ModuleDict): A dictionary of linear projections for each static field.
+
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
-        """
-        Initialize the static field decoder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-        """
-
         super().__init__()
 
         projections = {}
@@ -327,13 +355,15 @@ class StaticFieldDecoder(torch.nn.Module):
         sequence: Float[torch.Tensor, "_N FdC"],
     ) -> Annotated[TensorDict, Float[torch.Tensor, "_N _T"]]:
         """
-        Performs the forward pass of the EventDecoder.
+        Performs the forward pass of the StaticFieldDecoder.
 
         Args:
-            inputs (Float[Tensor, "_N L FdC"]): The input tensor.
+            fields (Float[torch.Tensor, "_N Fs FdC"]): The input tensor representing the static fields.
+            sequence (Float[torch.Tensor, "_N FdC"]): The input tensor representing the sequence.
 
         Returns:
-            TensorDict[Float[Tensor, "_N L _T"]]: A dictionary of output tensors for each field.
+            TensorDict[Float[torch.Tensor, "_N _T"]]: A dictionary of output tensors for each field.
+
         """
 
         N, Fs, FdC = fields.shape
@@ -353,17 +383,17 @@ class StaticFieldDecoder(torch.nn.Module):
 
 class DecisionHead(torch.nn.Module):
     """
-    A PyTorch module representing a decision head. This module is used to map the encoded fields to the target classes.
+    A class representing the decision head of a neural network model.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the model.
+        manager (SystemManager): The system manager for the model.
+
+    Attributes:
+        mlp (torch.nn.Sequential): The multi-layer perceptron for the decision head.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
-        """
-        Initialize classification decision head.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-        """
         super().__init__()
 
         hidden = list(
@@ -409,10 +439,10 @@ class DecisionHead(torch.nn.Module):
         Defines the forward pass of the DecisionHead.
 
         Args:
-            inputs (torch.Tensor): The input tensor.
+            inputs (Float[torch.Tensor, "_N FdC"]): The input tensor.
 
         Returns:
-            torch.Tensor: The output of the MLP.
+            Float[torch.Tensor, "_N T"]: The output of the MLP.
         """
 
         return self.mlp(inputs)
@@ -457,6 +487,19 @@ def pretrain(
     output: OutputData,
     strata: str,
 ) -> torch.Tensor:
+    """
+    Pretrains the sequence module using the given batch of pretraining data and output data.
+
+    Args:
+        module (SequenceModule): The sequence module to be pretrained.
+        batch (PretrainingData): The batch of pretraining data.
+        output (OutputData): The output data generated by the module.
+        strata (str): The strata identifier for logging purposes.
+
+    Returns:
+        torch.Tensor: The total loss incurred during pretraining.
+    """
+
     dynamic_losses = []
     static_losses = []
 
@@ -525,6 +568,19 @@ def finetune(
     output: OutputData,
     strata: str,
 ) -> torch.Tensor:
+    """
+    Fine-tunes the given module using the provided batch data and output predictions.
+
+    Args:
+        module (SequenceModule): The module to be fine-tuned.
+        batch (SupervisedData): The batch data containing inputs and targets.
+        output (OutputData): The output predictions from the module.
+        strata (str): The strata identifier for tracking metrics.
+
+    Returns:
+        torch.Tensor: The loss value after fine-tuning.
+
+    """
     loss = cross_entropy(output.predictions, batch.targets, weight=module.weights)
     module.info(name=f"finetune-{strata}/loss", value=loss, prog_bar=(strata == "validate"))
 
@@ -551,6 +607,7 @@ def step(
     Args:
         self (SequenceModule): Sequence module
         batch (SequenceData): Training or inference batch
+        batch_idx (int): Batch index
         strata (str): Data strata (one of "train", "validate", "test", "predict")
 
     Returns:

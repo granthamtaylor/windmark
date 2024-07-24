@@ -20,6 +20,15 @@ console = Console()
 
 @dataclasses.dataclass
 class ArtifactManager(DataClassJSONMixin):
+    """
+    A class that manages artifacts.
+
+    Attributes:
+        ledger (str): The ledger associated with the artifacts.
+        model (str): The model associated with the artifacts.
+        predictions (str): The predictions associated with the artifacts.
+    """
+
     ledger: str
     model: str
     predictions: str
@@ -27,6 +36,24 @@ class ArtifactManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class SchemaManager(DataClassJSONMixin):
+    """
+    Manages the schema for Windmark data.
+
+    Attributes:
+        sequence_id (str): The sequence ID.
+        event_id (str): The event ID.
+        split_id (str): The split ID.
+        target_id (str): The target ID.
+        fields (list[FieldRequest]): The list of field requests.
+
+    Methods:
+        new: Creates a new SchemaManager instance.
+        __post_init__: Performs post-initialization checks.
+        __len__: Returns the number of fields in the schema.
+        static: Returns a list of static fields in the schema.
+        dynamic: Returns a list of dynamic fields in the schema.
+    """
+
     sequence_id: str
     event_id: str
     split_id: str
@@ -79,6 +106,29 @@ class SchemaManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class BalanceManager(DataClassJSONMixin):
+    """
+    A class that manages the balance of class labels in a dataset.
+
+    Attributes:
+        labels (list[str]): The list of class labels.
+        counts (list[int]): The list of counts for each class label.
+        kappa (float): The kappa value for interpolation.
+        unlabeled (int): The number of unlabeled instances.
+
+    Properties:
+        total (int): The total number of instances.
+        values (list[float]): The distribution of class labels.
+        interpolation (list[float]): The interpolated distribution of class labels.
+        thresholds (list[float]): The thresholds for each class label.
+        weights (list[float]): The loss weights for each class label.
+
+    Methods:
+        __post_init__(): Initializes the class and calculates the necessary attributes.
+        show(): Displays the balance manager information in a table.
+        mapping() -> dict[str, int]: Returns a mapping of class labels to their indices.
+        n_events() -> int: Returns the total number of events, including unlabeled instances.
+    """
+
     labels: list[str]
     counts: list[int]
     kappa: float
@@ -91,6 +141,9 @@ class BalanceManager(DataClassJSONMixin):
     weights: list[float] = dataclasses.field(init=False)
 
     def __post_init__(self):
+        """
+        Initializes the class and calculates the necessary attributes.
+        """
         for count in self.counts:
             assert count > 0
 
@@ -118,6 +171,9 @@ class BalanceManager(DataClassJSONMixin):
         self.weights = list(map(lambda x: x / min(weights), weights))
 
     def show(self):
+        """
+        Displays the balance manager information in a table.
+        """
         table = Table(title=f"Balance Manager (kappa={self.kappa:.2%})")
 
         table.add_column("Class Labels", justify="right", style="cyan", no_wrap=True)
@@ -141,15 +197,34 @@ class BalanceManager(DataClassJSONMixin):
 
     @functools.cached_property
     def mapping(self) -> dict[str, int]:
+        """
+        Returns a mapping of class labels to their indices.
+        """
         return {label: index for index, label in enumerate(self.labels)}
 
     @property
     def n_events(self) -> int:
+        """
+        Returns the total number of events, including unlabeled instances.
+        """
         return self.total + self.unlabeled
 
 
 @dataclasses.dataclass
 class SupervisedTaskManager(DataClassJSONMixin):
+    """
+    A manager class for supervised learning tasks.
+
+    Attributes:
+        task (str): The type of supervised learning task. Must be either "classification" or "regression".
+        n_targets (int): The number of target variables.
+        balancer (BalanceManager): An instance of the BalanceManager class.
+
+    Raises:
+        AssertionError: If the task is not "classification" or "regression".
+        AssertionError: If the number of targets is less than or equal to 1.
+    """
+
     task: str
     n_targets: int
     balancer: BalanceManager
@@ -161,6 +236,15 @@ class SupervisedTaskManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class SplitManager(DataClassJSONMixin):
+    """
+    A class that manages the splits for a dataset.
+
+    Attributes:
+        train (int): The size of the training split.
+        validate (int): The size of the validation split.
+        test (int): The size of the test split.
+    """
+
     train: int
     validate: int
     test: int
@@ -170,6 +254,15 @@ class SplitManager(DataClassJSONMixin):
             assert isinstance(split, int)
 
     def __getitem__(self, split: str) -> float:
+        """
+        Get the proportion of a specific split.
+
+        Args:
+            split (str): The name of the split ("train", "validate", or "test").
+
+        Returns:
+            float: The proportion of the specified split.
+        """
         assert split in ["train", "validate", "test"]
 
         total: int = self.total
@@ -180,11 +273,32 @@ class SplitManager(DataClassJSONMixin):
 
     @functools.cached_property
     def total(self) -> int:
+        """
+        Calculate the total size of all splits.
+
+        Returns:
+            int: The total size of all splits.
+        """
         return sum([self.train, self.validate, self.test])
 
 
 @dataclasses.dataclass
 class SampleManager(DataClassJSONMixin):
+    """
+    A class that manages the sampling rates for pretraining and finetuning in a machine learning task.
+
+    Attributes:
+        batch_size (int): The batch size used for training.
+        n_pretrain_steps (int): The number of pretraining steps.
+        n_finetune_steps (int): The number of finetuning steps.
+        task (SupervisedTaskManager): The task manager for the supervised learning task.
+        split (SplitManager): The split manager for the dataset.
+
+    Methods:
+        __post_init__(): Initializes the SampleManager and calculates the sample rates for pretraining and finetuning.
+        show(): Displays the sample rates for pretraining and finetuning in a table format.
+    """
+
     batch_size: int
     n_pretrain_steps: int
     n_finetune_steps: int
@@ -192,6 +306,12 @@ class SampleManager(DataClassJSONMixin):
     split: SplitManager
 
     def __post_init__(self):
+        """
+        Initializes the SampleManager and calculates the sample rates for pretraining and finetuning.
+
+        Raises:
+            AssertionError: If the sample rate exceeds 1.0 for any subset during pretraining or finetuning.
+        """
         n_events = self.task.balancer.n_events
 
         def warn(mode: str, n_steps: int, split: str):
@@ -216,6 +336,10 @@ class SampleManager(DataClassJSONMixin):
             self.finetuning[subset] = sample_rate
 
     def show(self) -> None:
+        """
+        Displays the sample rates for pretraining and finetuning in a table format.
+        """
+
         def render(mode: str) -> Table:
             assert mode in ["finetune", "pretrain"]
 
@@ -251,6 +375,18 @@ class SampleManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class CentroidManager(DataClassJSONMixin):
+    """
+    A class that manages centroids and provides methods to calculate digests and display information.
+
+    Attributes:
+        centroids (list[Centroid]): The list of centroids to be managed.
+
+    Methods:
+        __post_init__(): Initializes the CentroidManager object and filters out invalid centroids.
+        digests() -> dict[str, TDigest]: Calculates the digests for each centroid.
+        show(): Displays the centroid information in a table format.
+    """
+
     centroids: list[Centroid]
 
     def __post_init__(self):
@@ -290,6 +426,10 @@ class CentroidManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class LevelManager(DataClassJSONMixin):
+    """
+    A class that manages levels and mappings for different fields.
+    """
+
     levelsets: list[LevelSet]
     mappings: dict[str, dict[str, int]] = dataclasses.field(init=False)
 
@@ -297,14 +437,35 @@ class LevelManager(DataClassJSONMixin):
         self.mappings = {levelset.name: levelset.mapping for levelset in self.levelsets if levelset.is_valid}
 
     def get_size(self, field: FieldRequest) -> int:
+        """
+        Get the size of the mapping for a specific field.
+
+        Args:
+            field (FieldRequest): The field for which to get the size.
+
+        Returns:
+            int: The size of the mapping for the specified field.
+        """
         assert isinstance(field, FieldRequest)
         return len(self.mappings[field.name])
 
     def __getitem__(self, field: FieldRequest) -> dict[str, int]:
+        """
+        Get the mapping for a specific field.
+
+        Args:
+            field (FieldRequest): The field for which to get the mapping.
+
+        Returns:
+            dict[str, int]: The mapping for the specified field.
+        """
         assert isinstance(field, FieldRequest)
         return self.mappings[field.name]
 
     def show(self):
+        """
+        Display the level manager information in a table format.
+        """
         table = Table(title="Level Manager")
 
         table.add_column("Field Names", justify="right", style="cyan", no_wrap=True)
@@ -330,6 +491,18 @@ class LevelManager(DataClassJSONMixin):
 
 @dataclasses.dataclass
 class SystemManager(DataClassJSONMixin):
+    """
+    The SystemManager class manages various components of the system.
+
+    Attributes:
+        schema (SchemaManager): The schema manager for managing schemas.
+        task (SupervisedTaskManager): The task manager for managing supervised tasks.
+        sample (SampleManager): The sample manager for managing samples.
+        split (SplitManager): The split manager for managing splits.
+        centroids (CentroidManager): The centroid manager for managing centroids.
+        levelsets (LevelManager): The level manager for managing level sets.
+    """
+
     schema: SchemaManager
     task: SupervisedTaskManager
     sample: SampleManager
@@ -338,6 +511,9 @@ class SystemManager(DataClassJSONMixin):
     levelsets: LevelManager
 
     def show(self):
+        """
+        Displays information for each presenter in the system.
+        """
         presenters = [
             self.task.balancer,
             self.sample,
@@ -350,8 +526,18 @@ class SystemManager(DataClassJSONMixin):
 
 
 class LabelManager:
+    """
+    A class that provides methods for managing labels.
+    """
+
     @classmethod
     def new(cls) -> str:
+        """
+        Generates a new label.
+
+        Returns:
+            str: The generated label in the format "address:hashtag".
+        """
         fake = Faker()
 
         address = fake.street_name().replace(" ", "-").lower()
@@ -362,6 +548,15 @@ class LabelManager:
 
     @classmethod
     def finetune(cls, pathname: str) -> tuple[str, str]:
+        """
+        Performs finetuning on a given pathname.
+
+        Args:
+            pathname (str): The pathname to be finetuned.
+
+        Returns:
+            tuple[str, str]: A tuple containing the version and date of the finetuned pathname.
+        """
         version = pathname.split("/")[-1].split(".")[0]
         date = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -369,6 +564,15 @@ class LabelManager:
 
     @classmethod
     def inference(cls, pathname: str) -> str:
+        """
+        Performs inference on a given pathname.
+
+        Args:
+            pathname (str): The pathname to perform inference on.
+
+        Returns:
+            str: The result of the inference, which is the filename without the extension.
+        """
         print(pathname)
 
         return pathname.split("/")[-1].split(".")[0]

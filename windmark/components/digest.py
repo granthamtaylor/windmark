@@ -16,6 +16,18 @@ def create_digest_centroids_from_lifestream(
     field: FieldRequest,
     n_workers: int,
 ) -> Centroid:
+    """
+    Creates digest centroids from the given lifestreams.
+
+    Args:
+        lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
+        field (FieldRequest): The field to create digest centroids for.
+        n_workers (int): The number of workers to use for parallel processing.
+
+    Returns:
+        Centroid: The digest created for numeric field.
+    """
+
     if field.type not in [FieldType.Number, FieldType.Numbers, FieldType.Quantiles, FieldType.Quantile]:
         return Centroid.empty(field.name)
 

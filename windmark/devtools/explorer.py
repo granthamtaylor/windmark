@@ -14,6 +14,16 @@ from windmark.core.managers import SchemaManager
 
 
 class LifestreamSampler:
+    """
+    A class representing a sampler for a lifestream dataset.
+
+    This class provides methods to sample and retrieve dynamic and static data from a lifestream dataset.
+
+    Attributes:
+        schema (SchemaManager): The schema manager for the lifestream dataset.
+        df (pl.DataFrame): The DataFrame containing the sampled data from the lifestream dataset.
+    """
+
     def __init__(self) -> None:
         config = Path(os.getcwd()) / "config"
         cwd = Path(os.path.realpath(__file__)).parent
@@ -32,6 +42,12 @@ class LifestreamSampler:
 
     @property
     def dynamic(self) -> tuple[list[str], list[tuple[str, ...]]]:
+        """
+        Retrieve the dynamic data from the lifestream dataset.
+
+        Returns:
+            tuple[list[str], list[tuple[str, ...]]]: A tuple containing the column names and rows of the dynamic data.
+        """
         dynamic = (
             self.df.select(self.schema.event_id, self.schema.target_id, *[field.name for field in self.schema.dynamic])
             .explode(pl.all())
@@ -42,6 +58,12 @@ class LifestreamSampler:
 
     @property
     def static(self) -> tuple[list[str], list[tuple[str, ...]]]:
+        """
+        Retrieve the static data from the lifestream dataset.
+
+        Returns:
+            tuple[list[str], list[tuple[str, ...]]]: A tuple containing the column names and rows of the static data.
+        """
         static = self.df.select(
             pl.col(self.schema.event_id).list.len().alias("_n_events"),
             cs.string(),
@@ -54,12 +76,25 @@ class LifestreamSampler:
 
 
 class TableApp(App):
+    """
+    Represents an application for displaying tables.
+
+    This class provides functionality for composing and displaying tables with static and dynamic fields.
+    It also includes an action to resample the data and update the tables accordingly.
+    """
+
     BINDINGS = [
         Binding(key="q", action="quit", description="Quit"),
         Binding(key="r", action="resample", description="Resample"),
     ]
 
     def compose(self) -> ComposeResult:
+        """
+        Composes the UI elements for the application.
+
+        Returns:
+            A ComposeResult object representing the composed UI elements.
+        """
         with TabbedContent():
             with TabPane("Static Fields"):
                 with HorizontalScroll():
@@ -72,6 +107,12 @@ class TableApp(App):
         yield Footer()
 
     def action_resample(self) -> None:
+        """
+        Resamples the data and updates the tables.
+
+        This method retrieves the resampled data from a LifestreamSampler object and updates the
+        corresponding DataTable objects with the new data.
+        """
         sample = LifestreamSampler()
 
         columns, records = sample.dynamic
@@ -87,6 +128,12 @@ class TableApp(App):
         table.add_rows(records)
 
     def on_mount(self) -> None:
+        """
+        Event handler called when the application is mounted.
+
+        This method is responsible for initializing the application and calling the action_resample method
+        to populate the tables with initial data.
+        """
         self.action_resample()
 
 

@@ -12,15 +12,22 @@ from windmark.core.constructs.interface import FieldEmbedder
 
 @FieldInterface.register(FieldType.Categories)
 class DynamicCategoryFieldEmbedder(FieldEmbedder):
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        """
-        Initialize discrete field embedder.
+    """
+    Embedder for dynamic categorical fields.
 
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
+    This class represents an embedder for dynamic categorical fields. It inherits from the `FieldEmbedder` base class.
+
+    Attributes:
+        field (FieldRequest): The field to be embedded.
+        embeddings (torch.nn.Embedding): The embedding layer for the field.
+
+    Methods:
+        __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest): Initializes the embedder.
+        forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]: Performs the forward pass of the embedder.
+
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
 
         self.field: FieldRequest = field
@@ -28,20 +35,36 @@ class DynamicCategoryFieldEmbedder(FieldEmbedder):
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
+        """
+        Perform the forward pass of the embedder.
+
+        Args:
+            inputs (TensorField): The input tensor field.
+
+        Returns:
+            Float[torch.Tensor, "_N L C"]: The embedded tensor.
+
+        """
         return self.embeddings(inputs.lookup)
 
 
 @FieldInterface.register(FieldType.Category)
 class StaticCategoryFieldEmbedder(FieldEmbedder):
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        """
-        Initialize discrete field embedder.
+    """
+    Embedder for static categorical fields.
 
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field to embed.
+
+    Attributes:
+        field (FieldRequest): The field to embed.
+        embeddings (torch.nn.Embedding): The embedding layer.
+
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
 
         self.field: FieldRequest = field
@@ -51,20 +74,38 @@ class StaticCategoryFieldEmbedder(FieldEmbedder):
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N FdC"]:
+        """
+        Forward pass of the embedder.
+
+        Args:
+            inputs (TensorField): The input tensor field.
+
+        Returns:
+            Float[torch.Tensor, "_N FdC"]: The embedded tensor.
+
+        """
         return self.embeddings(inputs.lookup)
 
 
 @FieldInterface.register(FieldType.Quantiles)
 class DynamicQuantileFieldEmbedder(FieldEmbedder):
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        """
-        Initialize quantile field embedder.
+    """
+    Embedder that maps field values to continuous embeddings using dynamic quantization.
 
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field request.
+
+    Attributes:
+        field (FieldRequest): The field request.
+        embeddings (torch.nn.Embedding): The embedding layer.
+        jitter (torch.Tensor): The jitter value.
+        n_quantiles (torch.Tensor): The number of quantiles.
+        dampener (torch.Tensor): The dampener value.
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
 
         self.field: FieldRequest = field
@@ -77,13 +118,19 @@ class DynamicQuantileFieldEmbedder(FieldEmbedder):
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
         """
-        Performs the forward pass of the FourierFeatureEncoder.
+        Forward pass of the embedder.
 
         Args:
-            inputs (Float[Tensor, "_N L"]): The input tensor.
+            inputs (TensorField): The input tensor field.
 
         Returns:
-            Float[Tensor, "_N L C"]: The Fourier features of the input.
+            Float[torch.Tensor, "_N L C"]: The embedded tensor.
+
+        Raises:
+            AssertionError: If the shape of values and indicators does not match.
+            AssertionError: If values are not imputed, padded, or masked.
+            AssertionError: If values are not less than 1.0.
+            AssertionError: If values are not greater than or equal to 0.0.
         """
 
         values = inputs.content
@@ -116,15 +163,23 @@ class DynamicQuantileFieldEmbedder(FieldEmbedder):
 
 @FieldInterface.register(FieldType.Quantile)
 class StaticQuantileFieldEmbedder(FieldEmbedder):
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        """
-        Initialize static quantile field embedder.
+    """
+    Embedder that maps field values to embeddings using static quantiles.
 
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field request.
+
+    Attributes:
+        field (FieldRequest): The field request.
+        embeddings (torch.nn.Embedding): The embedding layer.
+        jitter (torch.Tensor): The jitter tensor.
+        n_quantiles (torch.Tensor): The number of quantiles tensor.
+        dampener (torch.Tensor): The dampener tensor.
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
 
         self.field: FieldRequest = field
@@ -139,13 +194,19 @@ class StaticQuantileFieldEmbedder(FieldEmbedder):
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N FdC"]:
         """
-        Performs the forward pass of the FourierFeatureEncoder.
+        Forward pass of the embedder.
 
         Args:
-            inputs (Float[Tensor, "_N"]): The input tensor.
+            inputs (TensorField): The input tensor field.
 
         Returns:
-            Float[Tensor, "_N F"]: The Fourier features of the input.
+            Float[torch.Tensor, "_N FdC"]: The embedded tensor.
+
+        Raises:
+            AssertionError: If the shape of values and indicators does not match.
+            AssertionError: If values are not imputed, padded, or masked.
+            AssertionError: If values are not less than 1.0.
+            AssertionError: If values are not greater than or equal to 0.0.
         """
 
         values = inputs.content
@@ -175,46 +236,64 @@ class StaticQuantileFieldEmbedder(FieldEmbedder):
 
 @FieldInterface.register(FieldType.Entities)
 class DynamicEntityFieldEmbedder(FieldEmbedder):
+    """
+    Embedder for dynamic entity fields.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field request.
+
+    Attributes:
+        field (FieldRequest): The field request.
+        embeddings (torch.nn.Embedding): The embedding layer.
+
+    """
+
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
-        """
-        Initialize entity field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
 
         self.field: FieldRequest = field
         self.embeddings = torch.nn.Embedding(params.n_context + len(Tokens), params.d_field)
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> torch.Tensor:
+        """
+        Forward pass of the embedder.
+
+        Args:
+            inputs (TensorField): The input tensor field.
+
+        Returns:
+            torch.Tensor: The embedded tensor.
+
+        """
         return self.embeddings(inputs.lookup)
 
 
 @FieldInterface.register(FieldType.Numbers)
 class DynamicNumberFieldEmbedder(FieldEmbedder):
     """
-    DynamicNumberFieldEmbedder is a PyTorch module that encodes features using Fourier features.
+    Embedder for dynamic number fields.
+
+    This class implements the embedding logic for dynamic number fields. It takes a set of hyperparameters,
+    a system manager, and a field request as input. It performs embedding operations on the input data and
+    returns the embedded representations.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedding.
+        manager (SystemManager): The system manager for the embedding.
+        field (FieldRequest): The field request for the embedding.
 
     Attributes:
-        linear (torch.nn.Linear): A linear layer for transforming the input.
-        positional (torch.nn.Embedding): An embedding layer for positional encoding.
-        weights (Tensor): The weights for the Fourier features.
+        field (FieldRequest): The field request for the embedding.
+        linear (torch.nn.Linear): The linear layer for projection.
+        weights (torch.Tensor): The weights for input weighting.
+        jitter (torch.Tensor): The jitter for input perturbation.
+
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        """
-        Initialize continuous field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
-
         super().__init__()
 
         self.field: FieldRequest = field
@@ -230,13 +309,23 @@ class DynamicNumberFieldEmbedder(FieldEmbedder):
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
         """
-        Performs the forward pass of the FourierFeatureEncoder.
+        Forward pass of the embedding.
+
+        This method performs the forward pass of the embedding. It takes an input tensor field and returns
+        the embedded representations.
 
         Args:
-            inputs (Float[Tensor, "_N L"]): The input tensor.
+            inputs (TensorField): The input tensor field.
 
         Returns:
-            Float[Tensor, "_N L C"]: The Fourier features of the input.
+            Float[torch.Tensor, "_N L C"]: The embedded representations.
+
+        Raises:
+            AssertionError: If the shape of values and indicators does not match.
+            AssertionError: If values are not imputed, padded, or masked.
+            AssertionError: If values are not less than 1.0.
+            AssertionError: If values are not greater than or equal to 0.0.
+
         """
 
         values = inputs.content
@@ -281,24 +370,25 @@ class DynamicNumberFieldEmbedder(FieldEmbedder):
 @FieldInterface.register(FieldType.Number)
 class StaticNumberFieldEmbedder(FieldEmbedder):
     """
-    StaticNumberFieldEmbedder is a PyTorch module that encodes features using Fourier features.
+    Embedder for static number fields.
+
+    This class represents an embedder for static number fields. It takes in a set of hyperparameters,
+    a system manager, and a field request as input. It performs embedding operations on the input data
+    and returns the projections.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field request.
 
     Attributes:
-        linear (torch.nn.Linear): A linear layer for transforming the input.
-        positional (torch.nn.Embedding): An embedding layer for positional encoding.
-        weights (Tensor): The weights for the Fourier features.
+        field (FieldRequest): The field request.
+        linear (torch.nn.Linear): The linear layer for projection.
+        weights (torch.Tensor): The weights for input weighting.
+
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        """
-        Initialize continuous field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
-
         super().__init__()
 
         self.field: FieldRequest = field
@@ -313,15 +403,24 @@ class StaticNumberFieldEmbedder(FieldEmbedder):
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N FdC"]:
         """
-        Performs the forward pass of the FourierFeatureEncoder.
+        Forward pass of the embedder.
+
+        This method performs the forward pass of the embedder. It takes in the input tensor field,
+        performs embedding operations, and returns the projections.
 
         Args:
-            inputs (Float[Tensor, "_N"]): The input tensor.
+            inputs (TensorField): The input tensor field.
 
         Returns:
-            Float[Tensor, "_N F"]: The Fourier features of the input.
-        """
+            torch.Tensor: The projections.
 
+        Raises:
+            AssertionError: If the shape of values and indicators is not the same.
+            AssertionError: If values are not imputed if not null, padded, or masked.
+            AssertionError: If values are not less than 1.0.
+            AssertionError: If values are not greater than or equal to 0.0.
+
+        """
         values = inputs.content
         indicators = inputs.lookup
 
@@ -354,16 +453,23 @@ class StaticNumberFieldEmbedder(FieldEmbedder):
 
 @FieldInterface.register(FieldType.Timestamps)
 class DynamicTemporalFieldEmbedder(FieldEmbedder):
+    """
+    Embedder for dynamic temporal fields.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field request.
+
+    Attributes:
+        field (FieldRequest): The field request.
+        linear (torch.nn.Linear): Linear layer for projection.
+        weights (torch.Tensor): Buffer of precision bands.
+        embeddings (torch.nn.ModuleDict): Module dictionary for embeddings.
+
+    """
+
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        """
-        Initialize continuous field embedder.
-
-        Args:
-            params (Hyperparameters): The hyperparameters for the architecture.
-            manager (SystemManager): The pipeline system manager.
-            field (FieldRequest): The field to be embedded
-        """
-
         super().__init__()
 
         self.field: FieldRequest = field
@@ -385,13 +491,20 @@ class DynamicTemporalFieldEmbedder(FieldEmbedder):
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
         """
-        Performs the forward pass of the FourierFeatureEncoder.
+        Forward pass of the embedder.
 
         Args:
-            inputs (Float[Tensor, "_N L"]): The input tensor.
+            inputs (TensorField): The input tensor field.
 
         Returns:
-            Float[Tensor, "_N L F"]: The Fourier features of the input.
+            torch.Tensor: The projected embeddings.
+
+        Raises:
+            AssertionError: If the shape of time_of_day and lookup tensors are not the same.
+            AssertionError: If any value in time_of_day and lookup tensors is not 0.0.
+            AssertionError: If any value in time_of_day tensor is not less than 1.0.
+            AssertionError: If any value in time_of_day tensor is not greater than or equal to 0.0.
+
         """
 
         assert inputs.time_of_day.shape == inputs.lookup.shape, "values and indicators must always have the same shape"

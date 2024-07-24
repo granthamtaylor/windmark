@@ -20,6 +20,19 @@ def finetune_sequence_encoder(
     params: Hyperparameters,
     manager: SystemManager,
 ) -> file.FlyteFile:
+    """
+    Finetunes a pretrained sequence encoder model using the provided lifestreams data, checkpoint, hyperparameters, and system manager.
+
+    Args:
+        lifestreams (directory.FlyteDirectory): The directory containing the lifestreams data.
+        checkpoint (file.FlyteFile): The pretrained checkpoint file to load the initial model weights from.
+        params (Hyperparameters): The hyperparameters for the finetuning process.
+        manager (SystemManager): The system state manager.
+
+    Returns:
+        file.FlyteFile: The file object representing the best model checkpoint after finetuning.
+    """
+
     torch.set_float32_matmul_precision("medium")
     torch.multiprocessing.set_sharing_strategy("file_system")
 

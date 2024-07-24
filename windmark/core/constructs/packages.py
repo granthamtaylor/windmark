@@ -9,11 +9,24 @@ from windmark.core.constructs.tensorfields import TensorField, TargetField
 
 
 class SequenceData:
+    """
+    Represents a sequential data package.
+    """
+
     pass
 
 
 @tensorclass
 class PretrainingData(SequenceData):
+    """
+    A class representing pretraining data for a machine learning model.
+
+    Attributes:
+        inputs (Annotated[TensorDict, TensorField]): The input data for pretraining.
+        targets (Annotated[TensorDict, TargetField]): The target data for pretraining.
+        meta (list[tuple[str, str]] | tuple[str, str]): Additional metadata for the pretraining data.
+    """
+
     inputs: Annotated[TensorDict, TensorField]
     targets: Annotated[TensorDict, TargetField]
     meta: list[tuple[str, str]] | tuple[str, str]
@@ -21,11 +34,31 @@ class PretrainingData(SequenceData):
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, inputs: TensorDict, targets: TensorDict, meta: tuple[str, ...]):
+        """
+        Create a new instance of the PretrainingData class.
+
+        Args:
+            inputs (TensorDict): The input data for pretraining.
+            targets (TensorDict): The target data for pretraining.
+            meta (tuple[str, ...]): Additional metadata for the pretraining data.
+
+        Returns:
+            PretrainingData: A new instance of the PretrainingData class.
+        """
         return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])
 
 
 @tensorclass
 class SupervisedData(SequenceData):
+    """
+    A class representing supervised data for machine learning tasks.
+
+    Attributes:
+        inputs (TensorDict): The input data for the model.
+        targets (torch.Tensor): The target data for the model.
+        meta (list[tuple[str, str]] | tuple[str, str]): Additional metadata for the data.
+    """
+
     inputs: Annotated[TensorDict, TensorField]
     targets: Int[torch.Tensor, "_N T"]
     meta: list[tuple[str, str]] | tuple[str, str]
@@ -40,6 +73,16 @@ class SupervisedData(SequenceData):
 
 @tensorclass
 class OutputData:
+    """
+    Represents the output data of a model.
+
+    Attributes:
+        sequence (Float[torch.Tensor, "_N FdC"]): The sequence data.
+        decoded_events (TensorDict): The decoded events.
+        decoded_static_fields (TensorDict): The decoded static fields.
+        predictions (Float[torch.Tensor, "_N T"]): The predictions.
+    """
+
     sequence: Float[torch.Tensor, "_N FdC"]
     decoded_events: TensorDict
     decoded_static_fields: TensorDict

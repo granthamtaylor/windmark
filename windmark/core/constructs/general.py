@@ -11,7 +11,16 @@ from mashumaro.mixins.json import DataClassJSONMixin
 
 
 class Tokens(IntEnum):
-    """Special token representations"""
+    """
+    Enum class representing different types of tokens.
+
+    Attributes:
+        VAL (int): Value token.
+        UNK (int): Unknown token.
+        PAD (int): Padding token.
+        MASK (int): Mask token.
+        PRUNE (int): Prune token.
+    """
 
     VAL = 0
     UNK = 1
@@ -21,6 +30,13 @@ class Tokens(IntEnum):
 
 
 class FieldType(namedtuple("Field", ["name", "is_static"]), Enum):
+    """
+    Represents the type of a field in a data structure.
+
+    Each field type has a name and a flag indicating whether it is static or dynamic.
+    Static fields have a fixed type, while dynamic fields can have different types depending on the data.
+    """
+
     # dynamic
     Numbers = ("Numbers", False)
     Categories = ("Categories", False)
@@ -40,11 +56,38 @@ class FieldType(namedtuple("Field", ["name", "is_static"]), Enum):
 
 @dataclass
 class FieldRequest(DataClassJSONMixin):
+    """
+    Represents a field request object.
+
+    Attributes:
+        name (str): The name of the field.
+        fieldtype (str): The type of the field.
+
+    Methods:
+        new(cls, name: str, fieldtype: FieldType | str) -> "FieldRequest": Creates a new FieldRequest object.
+        type(self) -> FieldType: Returns the FieldType of the field.
+        is_static(self) -> bool: Returns True if the field is static, False otherwise.
+    """
+
     name: str
     fieldtype: str
 
     @classmethod
     def new(cls, name: str, fieldtype: FieldType | str) -> "FieldRequest":
+        """
+        Creates a new FieldRequest object.
+
+        Args:
+            name (str): The name of the field.
+            fieldtype (FieldType | str): The type of the field.
+
+        Returns:
+            FieldRequest: The created FieldRequest object.
+
+        Raises:
+            KeyError: If the fieldtype is not a valid field type.
+            AssertionError: If the field name is invalid.
+        """
         if isinstance(fieldtype, str):
             # check if valid field type
             if fieldtype.capitalize() in FieldType._member_names_:
@@ -58,29 +101,75 @@ class FieldRequest(DataClassJSONMixin):
 
     @functools.cached_property
     def type(self) -> FieldType:
+        """
+        Returns the FieldType of the field.
+
+        Returns:
+            FieldType: The FieldType of the field.
+        """
         return FieldType[self.fieldtype]
 
     @functools.cached_property
     def is_static(self) -> bool:
+        """
+        Returns True if the field is static, False otherwise.
+
+        Returns:
+            bool: True if the field is static, False otherwise.
+        """
         return FieldType[self.fieldtype].is_static
 
 
 @dataclass
 class LevelSet(DataClassJSONMixin):
+    """
+    Represents a set of levels.
+
+    Attributes:
+        name (str): The name of the level set.
+        levels (list[str]): The list of levels in the set.
+        is_valid (bool): Indicates whether the level set is valid or not.
+    """
+
     name: str
     levels: list[str]
     is_valid: bool
 
     @classmethod
     def empty(cls, name: str) -> "LevelSet":
+        """
+        Creates an empty LevelSet instance.
+
+        Args:
+            name (str): The name of the level set.
+
+        Returns:
+            LevelSet: An empty LevelSet instance.
+        """
         return cls(name=name, levels=[], is_valid=False)
 
     @classmethod
     def from_levels(cls, name: str, levels: list[str]) -> "LevelSet":
+        """
+        Creates a LevelSet instance from a list of levels.
+
+        Args:
+            name (str): The name of the level set.
+            levels (list[str]): The list of levels.
+
+        Returns:
+            LevelSet: A LevelSet instance with the specified levels.
+        """
         return cls(name=name, levels=levels, is_valid=True)
 
     @functools.cached_property
     def mapping(self) -> dict[str, int]:
+        """
+        Generates a mapping of levels to their corresponding indices.
+
+        Returns:
+            dict[str, int]: A dictionary mapping levels to their indices.
+        """
         mapping = {level: index + len(Tokens) for index, level in enumerate(self.levels)}
         mapping[None] = int(Tokens.UNK)
 
@@ -89,22 +178,59 @@ class LevelSet(DataClassJSONMixin):
 
 @dataclass
 class Centroid(DataClassJSONMixin):
+    """
+    Represents a centroid with a name, an array of floats, and a validity flag.
+
+    Attributes:
+        name (str): The name of the centroid.
+        array (list[list[float]]): The array of floats representing the centroid.
+        is_valid (bool): A flag indicating the validity of the centroid.
+
+    Methods:
+        empty(name: str) -> Centroid: Creates an empty centroid with the given name.
+        from_digest(name: str, digest: TDigest) -> Centroid: Creates a centroid from a TDigest object.
+
+    """
+
     name: str
     array: list[list[float]]
     is_valid: bool
 
     @classmethod
     def empty(cls, name: str) -> "Centroid":
+        """
+        Creates an empty centroid with the given name.
+
+        Args:
+            name (str): The name of the centroid.
+
+        Returns:
+            Centroid: An empty centroid object.
+
+        """
         return cls(name=name, array=[], is_valid=False)
 
     @classmethod
     def from_digest(cls, name: str, digest: TDigest) -> "Centroid":
+        """
+        Creates a centroid from a TDigest object.
+
+        Args:
+            name (str): The name of the centroid.
+            digest (TDigest): The TDigest object containing the centroid data.
+
+        Returns:
+            Centroid: A centroid object created from the TDigest.
+
+        """
         array = digest.get_centroids().tolist()
         return cls(name=name, array=array, is_valid=True)
 
 
 @pydantic.dataclasses.dataclass
 class Hyperparameters(DataClassJSONMixin):
+    """Hyperparameters class for defining the model's configuration."""
+
     # architectural
     batch_size: Annotated[int, pydantic.Field(gt=0, le=2048)]
     """Batch size for training (how many observations per step)"""

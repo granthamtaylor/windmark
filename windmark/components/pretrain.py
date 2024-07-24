@@ -22,6 +22,18 @@ def pretrain_sequence_encoder(
     params: Hyperparameters,
     manager: SystemManager,
 ) -> file.FlyteFile:
+    """
+    Pretrains a sequence encoder model using the provided lifestreams, hyperparameters, and system manager.
+
+    Args:
+        lifestreams (directory.FlyteDirectory): The directory containing the lifestreams data.
+        params (Hyperparameters): The hyperparameters for pretraining.
+        manager (SystemManager): The system state manager.
+
+    Returns:
+        file.FlyteFile: The path to the best model checkpoint file.
+    """
+
     torch.set_float32_matmul_precision("medium")
     torch.multiprocessing.set_sharing_strategy("file_system")
 

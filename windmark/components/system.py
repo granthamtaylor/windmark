@@ -19,6 +19,20 @@ def create_system_manager(
     centroids: CentroidManager,
     levelsets: LevelManager,
 ) -> SystemManager:
+    """
+    Creates a system state manager to contain multiple child state managers.
+
+    Args:
+        schema (SchemaManager): The schema manager object.
+        task (SupervisedTaskManager): The supervised task manager object.
+        sample (SampleManager): The sample manager object.
+        split (SplitManager): The split manager object.
+        centroids (CentroidManager): The centroid manager object.
+        levelsets (LevelManager): The level manager object.
+
+    Returns:
+        SystemManager: The created system state manager.
+    """
     manager = SystemManager(
         schema=schema,
         task=task,
