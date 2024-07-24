@@ -18,6 +18,14 @@ Windmark is a Python module designed for modeling complex, heterogeneous sequent
 - Automatically generated report of model performance
 - Model deployment pipeline
 
+## Chores
+
+- replace assertions with proper errors
+- fix docstrings
+- add docstring linter
+- add unit tests
+- add logo
+
 ## Documentation
 
 For more detailed documentation on Windmark, including advanced configurations, API details, and custom usage scenarios, please refer to the Windmark Documentation.

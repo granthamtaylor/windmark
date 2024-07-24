@@ -23,4 +23,4 @@ fields:
   has_technical_glitch: categories
   has_bad_cvv: categories
   timedelta: quantiles
-  tenure: quantiles
+  # tenure: quantiles

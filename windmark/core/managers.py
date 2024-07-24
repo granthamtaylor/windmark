@@ -40,14 +40,12 @@ class SchemaManager(DataClassJSONMixin):
         event_id: str,
         split_id: str,
         target_id: str,
-        **fieldinfo: FieldType | str,
+        **fields: FieldType | str,
     ) -> "SchemaManager":
-        fields: list[FieldRequest] = []
+        fields: list[FieldRequest] = [FieldRequest.new(*field) for field in fields.items()]
 
-        for field in fieldinfo.items():
-            fields.append(FieldRequest.new(*field))
-
-        assert len([field for field in fields if not field.type.is_static]) > 0, "include at least one dynamic field"
+        if len([field for field in fields if not field.type.is_static]) < 1:
+            raise ValueError("include at least one dynamic field")
 
         return cls(
             sequence_id=sequence_id,
@@ -60,12 +58,7 @@ class SchemaManager(DataClassJSONMixin):
     def __post_init__(self):
         assert len(self.fields) > 1, "must pass in at least two fields"
 
-        reserved_names: set[str] = {
-            self.sequence_id,
-            self.event_id,
-            self.split_id,
-            self.target_id,
-        }
+        reserved_names: set[str] = {self.sequence_id, self.event_id, self.split_id, self.target_id}
 
         assert len(reserved_names) == 4
 

@@ -76,7 +76,7 @@ class FieldInterface:
 
             elif issubclass(registrant, FieldEmbedder):
                 if field in cls.embedders.keys():
-                    raise KeyError("embedder is already registered")
+                    raise KeyError("field embedder is already registered")
 
                 cls.embedders[field] = registrant
 

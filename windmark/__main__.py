@@ -2,7 +2,10 @@ import os
 from pathlib import Path
 
 from hydra import compose, initialize
-import windmark as wm
+
+from windmark.core.constructs.general import Hyperparameters
+from windmark.pipelines.workflow import train
+from windmark.core.managers import SchemaManager
 
 if __name__ == "__main__":
     path = os.path.relpath(Path(os.getcwd()) / "config", Path(os.path.realpath(__file__)).parent)
@@ -10,8 +13,8 @@ if __name__ == "__main__":
     with initialize(version_base=None, config_path=path):
         config = compose(config_name="config")
 
-    schema = wm.Schema.new(**config.data.structure, **config.data.fields)
+    schema = SchemaManager.new(**config.data.structure, **config.data.fields)
 
-    params = wm.Hyperparameters(**config.model)
+    params = Hyperparameters(**config.model)
 
-    wm.train(datapath=config.data.path, schema=schema, params=params)
+    train(datapath=config.data.path, schema=schema, params=params)

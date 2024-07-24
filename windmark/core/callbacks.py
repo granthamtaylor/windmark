@@ -13,10 +13,10 @@ from windmark.core.constructs.packages import SupervisedData
 
 
 class ParquetBatchWriter(callbacks.BasePredictionWriter):
-    def __init__(self, outpath: str | os.PathLike):
+    def __init__(self, path: str | os.PathLike):
         super().__init__("batch")
 
-        self.outpath = outpath
+        self.path: str = str(path)
         self.schema = None
         self.writer = None
 
@@ -58,11 +58,11 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
 
         if self.writer is None:
             self.schema = table.schema
-            self.writer = pq.ParquetWriter(self.outpath, self.schema)
+            self.writer = pq.ParquetWriter(self.path, self.schema)
 
         self.writer.write_table(table)
 
-    def on_predict_end(self, trainer: lit.Trainer, pl_module: lit.LightningModule):
+    def on_predict_end(self, trainer: lit.Trainer, pl_module: lit.LightningModule) -> None:
         """
         Called at the end of the prediction loop to close the Parquet writer.
         """

@@ -72,6 +72,7 @@ class DynamicQuantileFieldEmbedder(FieldEmbedder):
 
         self.register_buffer("jitter", torch.tensor(params.jitter))
         self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
+        self.register_buffer("dampener", torch.tensor(1 - torch.finfo(torch.half).tiny))
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
@@ -133,7 +134,7 @@ class StaticQuantileFieldEmbedder(FieldEmbedder):
 
         self.register_buffer("jitter", torch.tensor(params.jitter))
         self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
-        self.register_buffer("dampener", 1 - torch.finfo(torch.half).tiny)
+        self.register_buffer("dampener", torch.tensor(1 - torch.finfo(torch.half).tiny))
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N FdC"]:

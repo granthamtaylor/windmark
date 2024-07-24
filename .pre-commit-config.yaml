@@ -29,7 +29,7 @@ repos:
       - id: poetry-check
       - id: poetry-lock
       - id: poetry-install
-# FIXME add arg linter!
+# FIXME add doc linter!
 
 # - repo: local
 #   hooks:
