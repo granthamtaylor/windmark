@@ -9,6 +9,18 @@ import windmark.components as lib
 
 @fk.workflow
 def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
+    """
+    Trains a model using the provided data and hyperparameters.
+
+    Args:
+        datapath (str): The path to the data.
+        schema (SchemaManager): The schema manager object.
+        params (Hyperparameters): The hyperparameters object.
+
+    Returns:
+        None
+    """
+
     lifestreams = lib.sanitize(datapath=datapath)
 
     kappa = lib.extract.kappa(params=params)

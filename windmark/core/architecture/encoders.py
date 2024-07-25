@@ -633,6 +633,16 @@ def step(
 
 @beartype
 def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
+    """
+    Create and return a DataLoader object for the specified strata.
+
+    Args:
+        self (SequenceModule): The SequenceModule instance.
+        strata (str): The strata for which to create the DataLoader. Must be one of ["train", "validate", "test", "predict"].
+
+    Returns:
+        DataLoader: The DataLoader object for the specified strata.
+    """
     assert strata in ["train", "validate", "test", "predict"]
 
     pipe = self.pipes[strata]
@@ -649,6 +659,46 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
 
 
 class SequenceModule(lit.LightningModule):
+    """
+    SequenceModule is a PyTorch Lightning module that represents a sequence model for encoding and decoding sequences of events and fields.
+
+    Args:
+        datapath (str): The path to the data.
+        params (Hyperparameters): The hyperparameters for the model.
+        manager (SystemManager): The system manager for the model.
+        mode (str): The mode of operation for the model. Can be one of "pretrain", "finetune", or "inference".
+
+    Attributes:
+        datapath (str): The path to the data.
+        params (Hyperparameters): The hyperparameters for the model.
+        lr (float): The learning rate for the model.
+        mode (str): The mode of operation for the model.
+        manager (SystemManager): The system manager for the model.
+        modular_field_embedder (ModularFieldEmbeddingSystem): The modular field embedder for the model.
+        dynamic_field_encoder (DynamicFieldEncoder): The dynamic field encoder for the model.
+        event_encoder (EventEncoder): The event encoder for the model.
+        static_field_decoder (StaticFieldDecoder): The static field decoder for the model.
+        event_decoder (EventDecoder): The event decoder for the model.
+        decision_head (DecisionHead): The decision head for the model.
+        metrics (Metrics): The metrics for the model.
+        weights (torch.Tensor): The weights for the model.
+        dataloaders (dict[str, DataLoader]): The dataloaders for the model.
+        pipes (dict[str, datapipes.iter.IterDataPipe]): The data pipes for the model.
+        info (Callable): A partial function for logging information.
+        example_input_array (torch.Tensor): An example input array for the model.
+        flops_per_batch (float): The number of floating point operations per batch for the model.
+
+    Methods:
+        forward(inputs: TensorDict) -> OutputData: Performs a forward pass of the model.
+        configure_optimizers() -> torch.optim.Optimizer: Configures the optimizers for the model.
+        setup(stage: str): Sets up the data pipes for the specified stage.
+        teardown(stage: str): Tears down the data pipes for the specified stage.
+        train_dataloader() -> DataLoader: Returns the dataloader for the training stage.
+        val_dataloader() -> DataLoader: Returns the dataloader for the validation stage.
+        test_dataloader() -> DataLoader: Returns the dataloader for the testing stage.
+        predict_dataloader() -> DataLoader: Returns the dataloader for the prediction stage.
+    """
+
     def __init__(self, datapath: str, params: Hyperparameters, manager: SystemManager, mode: str):
         super().__init__()
 
@@ -685,6 +735,16 @@ class SequenceModule(lit.LightningModule):
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorDict) -> OutputData:  # type: ignore
+        """
+        Forward pass of the encoder module.
+
+        Args:
+            inputs (TensorDict): Input tensor dictionary containing the input data.
+
+        Returns:
+            OutputData: Output data containing the encoded sequence, decoded events,
+                        decoded static fields, and predictions.
+        """
         dynamic_fields, static_fields = self.modular_field_embedder(inputs)
         events = self.dynamic_field_encoder(dynamic_fields)
         sequence, encoded_events, encoded_static_fields = self.event_encoder(events, static_fields)
@@ -701,6 +761,13 @@ class SequenceModule(lit.LightningModule):
         )
 
     def configure_optimizers(self) -> torch.optim.Optimizer:
+        """
+        Configures the optimizer and scheduler for training the model.
+
+        Returns:
+            Tuple[List[torch.optim.Optimizer], List[torch.optim.lr_scheduler._LRScheduler]]:
+            A tuple containing the optimizer and scheduler objects.
+        """
         if self.mode == "finetune":
             lr = self.lr * self.params.learning_rate_dampener
             max_epochs = self.params.max_finetune_epochs
@@ -723,6 +790,16 @@ class SequenceModule(lit.LightningModule):
     predict_step = partialmethod(step, strata="predict")  # type: ignore
 
     def setup(self, stage: str):
+        """
+        Set up the encoder for a specific stage.
+
+        Args:
+            stage (str): The stage for which to set up the encoder. Must be one of ["fit", "validate", "test", "predict"].
+
+        Raises:
+            AssertionError: If the stage is not one of the allowed values.
+
+        """
         pipe = partial(stream, datapath=self.datapath, mode=self.mode, params=self.params, manager=self.manager)
 
         assert stage in ["fit", "validate", "test", "predict"]
@@ -739,6 +816,16 @@ class SequenceModule(lit.LightningModule):
             self.pipes[strata] = pipe(split=split)
 
     def teardown(self, stage: str):
+        """
+        Teardown method for cleaning up resources after a specific stage.
+
+        Args:
+            stage (str): The stage for which resources need to be cleaned up. Must be one of ["fit", "validate", "test", "predict"].
+
+        Raises:
+            AssertionError: If an invalid stage is provided.
+
+        """
         assert stage in ["fit", "validate", "test", "predict"]
 
         mapping = dict(

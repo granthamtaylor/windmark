@@ -52,6 +52,13 @@ interrogate = "^1.7.0"
 lint.extend-ignore = ["F722"]
 line-length = 120
 
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-property-decorators = true
+ignore-module = true
+ignore-setters = true
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

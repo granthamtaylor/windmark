@@ -293,6 +293,15 @@ class Hyperparameters(DataClassJSONMixin):
 
     @pydantic.model_validator(mode="after")
     def check_head_shape(self):
+        """
+        Checks if the head shape is valid.
+
+        Raises:
+            AssertionError: If the head shape is not valid.
+
+        Returns:
+            self: The current instance.
+        """
         assert self.d_field % self.n_heads_field_encoder == 0, "d_field must be divisible by n_heads_field_encoder"
         assert self.d_field % self.n_heads_event_encoder == 0, "d_field must be divisible by n_heads_event_encoder"
 
@@ -300,12 +309,27 @@ class Hyperparameters(DataClassJSONMixin):
 
     @pydantic.model_validator(mode="after")
     def check_finetuning_unfreeze(self):
+        """
+        Checks if the number of frozen epochs is less than the maximum finetune epochs.
+
+        Returns:
+            self: The current instance of the class.
+        """
         assert self.n_epochs_frozen < self.max_finetune_epochs, "n_epochs_frozen must be less than max_finetune_epochs"
 
         return self
 
     @pydantic.model_validator(mode="after")
     def check_mask_rates(self):
+        """
+        Checks the masking rates and ensures they are above a minimum threshold.
+
+        Returns:
+            self: The current instance of the class.
+
+        Raises:
+            AssertionError: If the masking rates are below the minimum threshold.
+        """
         rate = self.p_mask_field + self.p_mask_event + self.p_mask_static
         assert rate >= 0.01, "the masking rates are too low for any meaningful pretraining"
 

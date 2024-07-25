@@ -66,6 +66,17 @@ class SupervisedData(SequenceData):
     @jaxtyped(typechecker=beartype)
     @classmethod
     def new(cls, inputs: TensorDict, targets: torch.Tensor, meta: tuple[str, ...]):
+        """
+        Create a new instance of the class.
+
+        Args:
+            inputs (TensorDict): The input tensors.
+            targets (torch.Tensor): The target tensor.
+            meta (tuple[str, ...]): The metadata.
+
+        Returns:
+            cls: The new instance of the class.
+        """
         targets = targets.unsqueeze(0)
 
         return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])
@@ -97,6 +108,19 @@ class OutputData:
         decoded_static_fields: TensorDict,
         predictions: Float[torch.Tensor, "_N T"],
     ):
+        """
+        Create a new instance of the class.
+
+        Args:
+            cls: The class itself.
+            sequence: The sequence of floats.
+            decoded_events: A dictionary of decoded events.
+            decoded_static_fields: A dictionary of decoded static fields.
+            predictions: The predictions.
+
+        Returns:
+            An instance of the class with the given arguments.
+        """
         assert sequence.shape[0] == decoded_events.shape[0] == decoded_static_fields.shape[0] == predictions.shape[0]
 
         L = sequence.shape[0]

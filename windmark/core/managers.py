@@ -69,6 +69,24 @@ class SchemaManager(DataClassJSONMixin):
         target_id: str,
         **fields: FieldType | str,
     ) -> "SchemaManager":
+        """
+        Create a new instance of SchemaManager.
+
+        Args:
+            cls: The class object.
+            sequence_id: The sequence ID.
+            event_id: The event ID.
+            split_id: The split ID.
+            target_id: The target ID.
+            **fields: The fields of the schema.
+
+        Returns:
+            An instance of SchemaManager.
+
+        Raises:
+            ValueError: If no dynamic fields are included.
+
+        """
         fields: list[FieldRequest] = [FieldRequest.new(*field) for field in fields.items()]
 
         if len([field for field in fields if not field.type.is_static]) < 1:
@@ -83,6 +101,9 @@ class SchemaManager(DataClassJSONMixin):
         )
 
     def __post_init__(self):
+        """
+        Perform additional initialization after the object has been created.
+        """
         assert len(self.fields) > 1, "must pass in at least two fields"
 
         reserved_names: set[str] = {self.sequence_id, self.event_id, self.split_id, self.target_id}
@@ -93,14 +114,34 @@ class SchemaManager(DataClassJSONMixin):
             assert field.name not in reserved_names, f"field name {field.name} is invalid (already reserved)"
 
     def __len__(self) -> int:
+        """
+        Returns the number of fields in the manager.
+
+        Returns:
+            int: The number of fields in the manager.
+        """
         return len(self.fields)
 
     @functools.cached_property
     def static(self) -> list[FieldRequest]:
+        """
+        Returns a list of FieldRequest objects that are marked as static.
+
+        Returns:
+            list[FieldRequest]: A list of FieldRequest objects that are marked as static.
+        """
         return [field for field in self.fields if field.is_static]
 
     @functools.cached_property
     def dynamic(self) -> list[FieldRequest]:
+        """
+        Returns a list of dynamic FieldRequest objects.
+
+        This method filters the list of fields and returns only the ones that are not static.
+
+        Returns:
+            list[FieldRequest]: A list of dynamic FieldRequest objects.
+        """
         return [field for field in self.fields if not field.is_static]
 
 
@@ -250,6 +291,13 @@ class SplitManager(DataClassJSONMixin):
     test: int
 
     def __post_init__(self):
+        """
+        Perform additional initialization after the object is created.
+
+        This method is automatically called by the `dataclasses` module after the object is created.
+        It can be used to perform any additional initialization steps that are required.
+        """
+
         for split in [self.train, self.validate, self.test]:
             assert isinstance(split, int)
 
@@ -394,6 +442,12 @@ class CentroidManager(DataClassJSONMixin):
 
     @functools.cached_property
     def digests(self) -> dict[str, TDigest]:
+        """
+        Returns a dictionary of TDigest objects.
+
+        Returns:
+            dict[str, TDigest]: A dictionary where the keys are centroid names and the values are TDigest objects.
+        """
         digests: dict[str, TDigest] = {}
 
         for centroid in self.centroids:
@@ -402,6 +456,20 @@ class CentroidManager(DataClassJSONMixin):
         return digests
 
     def show(self):
+        """
+        Display the centroid manager's digest information in a table format.
+
+        This method prints a table that shows the field names and their corresponding
+        values at different percentiles. The percentiles are defined by the `percentiles`
+        list.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         percentiles = [0.0, 0.05, 0.25, 0.50, 0.75, 0.95, 1.0]
 
         table = Table(title="Centroid Manager")

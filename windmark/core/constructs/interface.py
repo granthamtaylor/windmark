@@ -1,13 +1,12 @@
 from functools import cache
-from typing import Type, Any, TypeAlias
+from typing import Type, TypeAlias
 
 import torch
 from beartype.typing import Callable
 from jaxtyping import Bool, Int
 from tensordict.prototype import tensorclass
 
-from windmark.core.constructs.general import FieldRequest, FieldType, Hyperparameters
-from windmark.core.managers import SystemManager
+from windmark.core.constructs.general import FieldRequest, FieldType
 
 
 @tensorclass
@@ -52,27 +51,27 @@ class TensorField:
 
     """
 
-    @classmethod
-    def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-        pass
+    # @classmethod
+    # def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+    #     pass
 
-    def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> "TargetField":
-        pass
+    # def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> "TargetField":
+    #     pass
 
-    def prune(self) -> None:
-        pass
+    # def prune(self) -> None:
+    #     pass
 
-    @classmethod
-    def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-        pass
+    # @classmethod
+    # def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
+    #     pass
 
-    @classmethod
-    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
-        pass
+    # @classmethod
+    # def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
+    #     pass
 
-    @classmethod
-    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-        pass
+    # @classmethod
+    # def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+    #     pass
 
 
 class FieldEmbedder(torch.nn.Module):
@@ -112,6 +111,19 @@ class FieldInterface:
             raise KeyError("field key is not a registered field type")
 
         def decorator(registrant: Registrant) -> Registrant:
+            """
+            Decorator function used for registering a registrant object.
+
+            Args:
+                registrant (Registrant): The object to be registered.
+
+            Returns:
+                Registrant: The registered object.
+
+            Raises:
+                KeyError: If the registrant is already registered as a tensorfield or field embedder.
+                ValueError: If the registrant is neither a tensorfield nor a field embedder.
+            """
             registrant.type = field
 
             if issubclass(registrant, TensorField):
