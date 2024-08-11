@@ -262,9 +262,9 @@ class Hyperparameters(DataClassJSONMixin):
     """Number of steps to take per epoch during finetuning"""
     gradient_clip_val: Annotated[float, pydantic.Field(gt=0.0)]
     """Gradient clipping threshold"""
-    max_pretrain_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)]
+    max_pretrain_epochs: Annotated[int, pydantic.Field(gt=0, le=4096)]
     """Maximum number of epochs for pretraining"""
-    max_finetune_epochs: Annotated[int, pydantic.Field(gt=0, le=1028)]
+    max_finetune_epochs: Annotated[int, pydantic.Field(gt=0, le=4096)]
     """Maximum number of epochs for finetuning"""
     quantile_smoothing: Annotated[float, pydantic.Field(gt=0.0, lt=33.0)]
     """Smoothing factor of continuous fields' quantile labels"""

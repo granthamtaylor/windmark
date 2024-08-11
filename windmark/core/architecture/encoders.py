@@ -114,7 +114,7 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
             embedding = embedder(inputs[field])
             if embedder.type.is_static:
                 static.append(embedding)
-            elif not embedder.type.is_static:
+            else:
                 dynamic.append(embedding)
 
         # N L Fd C

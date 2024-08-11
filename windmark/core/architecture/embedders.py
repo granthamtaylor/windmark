@@ -5,9 +5,10 @@ from beartype import beartype
 from jaxtyping import Float, jaxtyped
 
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest, FieldType
-from windmark.core.constructs.tensorfields import FieldInterface, TensorField
+from windmark.core.constructs.tensorfields import FieldInterface
 from windmark.core.managers import SystemManager
-from windmark.core.constructs.interface import FieldEmbedder
+from windmark.core.constructs.interface import FieldEmbedder, TensorField
+from windmark.core.architecture.custom import validate, jitter
 
 
 @FieldInterface.register(FieldType.Categories)
@@ -87,153 +88,6 @@ class StaticCategoryFieldEmbedder(FieldEmbedder):
         return self.embeddings(inputs.lookup)
 
 
-@FieldInterface.register(FieldType.Quantiles)
-class DynamicQuantileFieldEmbedder(FieldEmbedder):
-    """
-    Embedder that maps field values to continuous embeddings using dynamic quantization.
-
-    Args:
-        params (Hyperparameters): The hyperparameters for the embedder.
-        manager (SystemManager): The system manager.
-        field (FieldRequest): The field request.
-
-    Attributes:
-        field (FieldRequest): The field request.
-        embeddings (torch.nn.Embedding): The embedding layer.
-        jitter (torch.Tensor): The jitter value.
-        n_quantiles (torch.Tensor): The number of quantiles.
-        dampener (torch.Tensor): The dampener value.
-    """
-
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        super().__init__()
-
-        self.field: FieldRequest = field
-        self.embeddings = torch.nn.Embedding(params.n_quantiles + len(Tokens), params.d_field)
-
-        self.register_buffer("jitter", torch.tensor(params.jitter))
-        self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
-        self.register_buffer("dampener", torch.tensor(1 - torch.finfo(torch.half).tiny))
-
-    @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
-        """
-        Forward pass of the embedder.
-
-        Args:
-            inputs (TensorField): The input tensor field.
-
-        Returns:
-            Float[torch.Tensor, "_N L C"]: The embedded tensor.
-
-        Raises:
-            AssertionError: If the shape of values and indicators does not match.
-            AssertionError: If values are not imputed, padded, or masked.
-            AssertionError: If values are not less than 1.0.
-            AssertionError: If values are not greater than or equal to 0.0.
-        """
-
-        values = inputs.content
-        indicators = inputs.lookup
-
-        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
-
-        assert torch.all(
-            values.mul(indicators).eq(0.0), dim=None
-        ), "values should be imputed if not null, padded, or masked"
-
-        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
-
-        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
-
-        N, L = values.shape
-
-        if self.training:
-            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
-        else:
-            jitter = torch.zeros_like(values)
-
-        jittered = values.add(jitter).clamp(min=0.0, max=self.dampener)
-
-        quantiles = jittered.mul(self.n_quantiles).floor().long().add(len(Tokens))
-        lookup = indicators.masked_scatter(indicators == Tokens.VAL, quantiles)
-
-        return self.embeddings(lookup)
-
-
-@FieldInterface.register(FieldType.Quantile)
-class StaticQuantileFieldEmbedder(FieldEmbedder):
-    """
-    Embedder that maps field values to embeddings using static quantiles.
-
-    Args:
-        params (Hyperparameters): The hyperparameters for the embedder.
-        manager (SystemManager): The system manager.
-        field (FieldRequest): The field request.
-
-    Attributes:
-        field (FieldRequest): The field request.
-        embeddings (torch.nn.Embedding): The embedding layer.
-        jitter (torch.Tensor): The jitter tensor.
-        n_quantiles (torch.Tensor): The number of quantiles tensor.
-        dampener (torch.Tensor): The dampener tensor.
-    """
-
-    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-        super().__init__()
-
-        self.field: FieldRequest = field
-        self.embeddings = torch.nn.Embedding(
-            params.n_quantiles + len(Tokens), params.d_field * len(manager.schema.dynamic)
-        )
-
-        self.register_buffer("jitter", torch.tensor(params.jitter))
-        self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
-        self.register_buffer("dampener", torch.tensor(1 - torch.finfo(torch.half).tiny))
-
-    @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N FdC"]:
-        """
-        Forward pass of the embedder.
-
-        Args:
-            inputs (TensorField): The input tensor field.
-
-        Returns:
-            Float[torch.Tensor, "_N FdC"]: The embedded tensor.
-
-        Raises:
-            AssertionError: If the shape of values and indicators does not match.
-            AssertionError: If values are not imputed, padded, or masked.
-            AssertionError: If values are not less than 1.0.
-            AssertionError: If values are not greater than or equal to 0.0.
-        """
-
-        values = inputs.content
-        indicators = inputs.lookup
-
-        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
-
-        assert torch.all(
-            values.mul(indicators).eq(0.0), dim=None
-        ), "values should be imputed if not null, padded, or masked"
-
-        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
-
-        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
-
-        if self.training:
-            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
-        else:
-            jitter = torch.zeros_like(values)
-
-        jittered = values.add(jitter).clamp(min=0.0, max=self.dampener)
-        quantiles = jittered.mul(self.n_quantiles).floor().long().add(len(Tokens))
-        lookup = indicators.masked_scatter(indicators == Tokens.VAL, quantiles)
-
-        return self.embeddings(lookup)
-
-
 @FieldInterface.register(FieldType.Entities)
 class DynamicEntityFieldEmbedder(FieldEmbedder):
     """
@@ -269,6 +123,110 @@ class DynamicEntityFieldEmbedder(FieldEmbedder):
 
         """
         return self.embeddings(inputs.lookup)
+
+
+@FieldInterface.register(FieldType.Quantiles)
+class DynamicQuantileFieldEmbedder(FieldEmbedder):
+    """
+    Embedder that maps field values to continuous embeddings using dynamic quantization.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field request.
+
+    Attributes:
+        field (FieldRequest): The field request.
+        embeddings (torch.nn.Embedding): The embedding layer.
+        jitter (torch.Tensor): The jitter value.
+        n_quantiles (torch.Tensor): The number of quantiles.
+        dampener (torch.Tensor): The dampener value.
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
+        super().__init__()
+
+        self.field: FieldRequest = field
+        self.embeddings = torch.nn.Embedding(params.n_quantiles + len(Tokens), params.d_field)
+
+        self.register_buffer("jitter", torch.tensor(params.jitter))
+        self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
+
+    @jaxtyped(typechecker=beartype)
+    def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
+        """
+        Forward pass of the embedder.
+
+        Args:
+            inputs (TensorField): The input tensor field.
+
+        Returns:
+            Float[torch.Tensor, "_N L C"]: The embedded tensor.
+        """
+
+        indicators = inputs.lookup
+
+        validate(inputs)
+
+        jittered = jitter(inputs, jitter=self.jitter, is_training=self.training)
+
+        quantiles = jittered.mul(self.n_quantiles).floor().long().add(len(Tokens))
+        lookup = indicators.masked_scatter(indicators == Tokens.VAL, quantiles)
+
+        return self.embeddings(lookup)
+
+
+@FieldInterface.register(FieldType.Quantile)
+class StaticQuantileFieldEmbedder(FieldEmbedder):
+    """
+    Embedder that maps field values to embeddings using static quantiles.
+
+    Args:
+        params (Hyperparameters): The hyperparameters for the embedder.
+        manager (SystemManager): The system manager.
+        field (FieldRequest): The field request.
+
+    Attributes:
+        field (FieldRequest): The field request.
+        embeddings (torch.nn.Embedding): The embedding layer.
+        jitter (torch.Tensor): The jitter tensor.
+        n_quantiles (torch.Tensor): The number of quantiles tensor.
+        dampener (torch.Tensor): The dampener tensor.
+    """
+
+    def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
+        super().__init__()
+
+        self.field: FieldRequest = field
+        self.embeddings = torch.nn.Embedding(
+            params.n_quantiles + len(Tokens), params.d_field * len(manager.schema.dynamic)
+        )
+
+        self.register_buffer("jitter", torch.tensor(params.jitter))
+        self.register_buffer("n_quantiles", torch.tensor(params.n_quantiles))
+
+    @jaxtyped(typechecker=beartype)
+    def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N FdC"]:
+        """
+        Forward pass of the embedder.
+
+        Args:
+            inputs (TensorField): The input tensor field.
+
+        Returns:
+            Float[torch.Tensor, "_N FdC"]: The embedded tensor.
+        """
+
+        indicators = inputs.lookup
+
+        validate(inputs)
+
+        jittered = jitter(inputs, jitter=self.jitter, is_training=self.training)
+
+        quantiles = jittered.mul(self.n_quantiles).floor().long().add(len(Tokens))
+        lookup = indicators.masked_scatter(indicators == Tokens.VAL, quantiles)
+
+        return self.embeddings(lookup)
 
 
 @FieldInterface.register(FieldType.Numbers)
@@ -320,43 +278,19 @@ class DynamicNumberFieldEmbedder(FieldEmbedder):
         Returns:
             Float[torch.Tensor, "_N L C"]: The embedded representations.
 
-        Raises:
-            AssertionError: If the shape of values and indicators does not match.
-            AssertionError: If values are not imputed, padded, or masked.
-            AssertionError: If values are not less than 1.0.
-            AssertionError: If values are not greater than or equal to 0.0.
-
         """
 
         values = inputs.content
         indicators = inputs.lookup
 
-        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
-
-        assert torch.all(
-            values.mul(indicators).eq(0.0), dim=None
-        ), "values should be imputed if not null, padded, or masked"
-
-        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
-
-        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
+        validate(inputs)
 
         N, L = values.shape
 
-        if self.training:
-            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
-        else:
-            jitter = torch.zeros_like(values)
+        jittered = jitter(inputs, jitter=self.jitter, is_training=self.training)
 
         # weight inputs with buffers of precision bands
-        weighted = (
-            values.add(jitter)
-            .clamp(min=0.0, max=1.0)
-            .add(indicators * 2)
-            .view(N * L)
-            .unsqueeze(dim=1)
-            .mul(self.weights)
-        )
+        weighted = jittered.add(indicators * 2).view(N * L).unsqueeze(dim=1).mul(self.weights)
 
         # apply sine and cosine functions to weighted inputs
         fourier = torch.sin(weighted), torch.cos(weighted)
@@ -413,34 +347,16 @@ class StaticNumberFieldEmbedder(FieldEmbedder):
 
         Returns:
             torch.Tensor: The projections.
-
-        Raises:
-            AssertionError: If the shape of values and indicators is not the same.
-            AssertionError: If values are not imputed if not null, padded, or masked.
-            AssertionError: If values are not less than 1.0.
-            AssertionError: If values are not greater than or equal to 0.0.
-
         """
-        values = inputs.content
+
         indicators = inputs.lookup
 
-        assert values.shape == indicators.shape, "values and indicators must always have the same shape"
+        validate(inputs)
 
-        assert torch.all(
-            values.mul(indicators).eq(0.0), dim=None
-        ), "values should be imputed if not null, padded, or masked"
-
-        assert torch.all(values.lt(1.0), dim=None), "values should be less than 1.0"
-
-        assert torch.all(values.ge(0.0), dim=None), "values should be greater than or equal to 0.0"
-
-        if self.training:
-            jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(self.jitter).mul(indicators == Tokens.VAL)
-        else:
-            jitter = torch.zeros_like(values)
+        jittered = jitter(inputs, jitter=self.jitter, is_training=self.training)
 
         # weight inputs with buffers of precision bands
-        weighted = values.add(jitter).clamp(min=0.0, max=1.0).add(indicators * 2).mul(self.weights)
+        weighted = jittered.add(indicators * 2).mul(self.weights)
 
         # apply sine and cosine functions to weighted inputs
         fourier = torch.cat((torch.sin(weighted), torch.cos(weighted)), dim=1)

@@ -356,22 +356,6 @@ class DynamicEntityField(TensorField):
 @FieldInterface.register(FieldType.Numbers)
 @tensorclass
 class DynamicNumberField(TensorField):
-    """
-    A class representing a dynamic number field in a tensor field.
-
-    Attributes:
-        lookup (Int[torch.Tensor, "_N L"]): The lookup tensor.
-        content (Float[torch.Tensor, "_N L"]): The content tensor.
-
-    Methods:
-        new(cls, values, field, params, manager): Creates a new instance of DynamicNumberField.
-        mask(self, is_event_masked, params): Applies a mask to the field.
-        prune(self): Prunes the field.
-        get_target_size(cls, params, manager, field): Returns the target size.
-        postprocess(cls, values, targets, params): Performs postprocessing on the field.
-        mock(cls, field, params, manager): Creates a mock instance of DynamicNumberField.
-    """
-
     lookup: Int[torch.Tensor, "_N L"]
     content: Float[torch.Tensor, "_N L"]
 
@@ -384,84 +368,65 @@ class DynamicNumberField(TensorField):
         params: Hyperparameters,
         manager: SystemManager,
     ) -> TensorField:
-        """
-        Creates a new instance of DynamicNumberField.
+        digest: TDigest = manager.centroids.digests[field.name]
+        array = np.array(values, dtype=np.float64)
+        cdfs = digest.cdf(array)
 
-        Args:
-            values (list[Decimal | int | float | str | None]): The values for the field.
-            field (FieldRequest): The field request.
-            params (Hyperparameters): The hyperparameters.
-            manager (SystemManager): The system manager.
+        lookup = np.where(np.isnan(cdfs), Tokens.UNK, Tokens.VAL)
+        content = np.nan_to_num(np.array(cdfs, dtype=float))
 
-        Returns:
-            TensorField: The new instance of DynamicNumberField.
-        """
-        # Code implementation...
+        padding = (params.n_context - len(content), 0)
+
+        # this effectively creates `1-(1/inf)` to prevent an index error
+        # somewhere in the dataset this exists a CDF of `1.0`, which will not be "floored" correctly
+        dampener = 1 - torch.finfo(torch.half).tiny
+
+        return cls(
+            content=pad(torch.tensor(content), pad=padding, value=0.0).float().unsqueeze(0).mul(dampener),
+            lookup=pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
+            batch_size=[1],
+        )
 
     @jaxtyped(typechecker=beartype)
     def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
-        """
-        Applies a mask to the field.
+        N, L = (1, params.n_context)
+        mask_token = torch.full((N, L), Tokens.MASK)
 
-        Args:
-            is_event_masked (torch.Tensor): The event mask.
-            params (Hyperparameters): The hyperparameters.
+        # fine out what to mask
+        is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
+        is_masked = is_field_masked | is_event_masked
 
-        Returns:
-            TargetField: The masked field.
-        """
-        # Code implementation...
+        # creating discrete targets
+        quantiles = self.content.mul(params.n_quantiles).floor().long().add(len(Tokens))
+        targets = self.lookup.masked_scatter(self.lookup == Tokens.VAL, quantiles)
+
+        # mask original values
+        self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
+        self.content *= ~is_masked
+
+        # return SSL target
+        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
     def prune(self):
-        """
-        Prunes the field.
-        """
-        # Code implementation...
+        self.lookup = torch.full_like(self.lookup, Tokens.PRUNE)
+        self.content = torch.zeros_like(self.content)
 
     @classmethod
     def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-        """
-        Returns the target size.
-
-        Args:
-            params (Hyperparameters): The hyperparameters.
-            manager (SystemManager): The system manager.
-            field (FieldRequest): The field request.
-
-        Returns:
-            int: The target size.
-        """
-        # Code implementation...
+        return params.n_quantiles + len(Tokens)
 
     @classmethod
     def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
-        """
-        Performs postprocessing on the field.
-
-        Args:
-            values (torch.Tensor): The values tensor.
-            targets (torch.Tensor): The targets tensor.
-            params (Hyperparameters): The hyperparameters.
-
-        Returns:
-            torch.Tensor: The processed tensor.
-        """
-        # Code implementation...
+        N, L, T = values.shape
+        return smoothen(targets=targets.lookup, size=params.n_quantiles, sigma=params.quantile_smoothing)
 
     @classmethod
     def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
-        """
-        Creates a mock instance of DynamicNumberField.
+        L = params.n_context
 
-        Args:
-            field (FieldRequest): The field request.
-            params (Hyperparameters): The hyperparameters.
-            manager (SystemManager): The system manager.
+        values = [random.uniform(-100, 100) for _ in range(L)]
 
-        Returns:
-            TensorField: The mock instance of DynamicNumberField.
-        """
-        # Code implementation...
+        return cls.new(values=values, field=field, params=params, manager=manager)
 
 
 @FieldInterface.register(FieldType.Number)
@@ -561,7 +526,6 @@ class StaticNumberField(TensorField):
         Returns:
             The postprocessed tensor.
         """
-        N, T = values.shape
 
         return smoothen(targets=targets.lookup, size=params.n_quantiles, sigma=params.quantile_smoothing)
 
@@ -653,17 +617,6 @@ class StaticQuantileField(TensorField):
 @FieldInterface.register(FieldType.Timestamps)
 @tensorclass
 class DynamicTemporalField(TensorField):
-    """
-    Represents a dynamic temporal field in a tensor field.
-
-    Attributes:
-        lookup (torch.Tensor): The lookup tensor.
-        week_of_year (torch.Tensor): The week of year tensor.
-        day_of_week (torch.Tensor): The day of week tensor.
-        hour_of_year (torch.Tensor): The hour of year tensor.
-        time_of_day (torch.Tensor): The time of day tensor.
-    """
-
     lookup: Int[torch.Tensor, "_N L"]
     week_of_year: Int[torch.Tensor, "_N L"]
     day_of_week: Int[torch.Tensor, "_N L"]
@@ -679,81 +632,88 @@ class DynamicTemporalField(TensorField):
         params: Hyperparameters,
         manager: SystemManager,
     ) -> TensorField:
-        """
-        Creates a new instance of the DynamicTemporalField class.
+        array = np.array(values, dtype="datetime64")
+        padding = (params.n_context - len(array), 0)
 
-        Args:
-            values (list[datetime.datetime | str | None]): The values for the field.
-            field (FieldRequest): The field request.
-            params (Hyperparameters): The hyperparameters.
-            manager (SystemManager): The system manager.
+        is_nan = np.isnan(array)
 
-        Returns:
-            TensorField: The created tensor field.
-        """
-        # Code implementation...
+        lookup = np.where(is_nan, Tokens.UNK, Tokens.VAL)
+        week_of_year = ((array.astype("datetime64[D]") - array.astype("datetime64[Y]")) / 7) + len(Tokens)
+        day_of_week = ((array.view("int64") - 4) % 7) + len(Tokens)
+        time_of_day = (array.astype("datetime64[s]") - array.astype("datetime64[D]")).astype(np.int64) * (
+            1 / (1440 * 60)
+        )
+        hour_of_year = (array.astype("datetime64[h]") - array.astype("datetime64[D]")) + len(Tokens)
+
+        np.putmask(week_of_year, is_nan, Tokens.UNK)
+        np.putmask(day_of_week, is_nan, Tokens.UNK)
+        np.putmask(time_of_day, is_nan, 0.0)
+        np.putmask(hour_of_year, is_nan, Tokens.UNK)
+
+        lookup = pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0)
+        week_of_year = pad(torch.tensor(week_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0)
+        day_of_week = pad(torch.tensor(day_of_week.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0)
+        time_of_day = pad(torch.tensor(time_of_day.astype(np.float32)), pad=padding, value=0.0).unsqueeze(0)
+        hour_of_year = pad(torch.tensor(hour_of_year.astype(np.int64)), pad=padding, value=Tokens.PAD).unsqueeze(0)
+
+        return cls(
+            lookup=lookup,
+            week_of_year=week_of_year,
+            day_of_week=day_of_week,
+            time_of_day=time_of_day,
+            hour_of_year=hour_of_year,
+            batch_size=[1],
+        )
 
     @jaxtyped(typechecker=beartype)
     def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
-        """
-        Masks the field based on the given event mask and hyperparameters.
+        N, L = (1, params.n_context)
 
-        Args:
-            is_event_masked (torch.Tensor): The event mask.
-            params (Hyperparameters): The hyperparameters.
+        mask_token = torch.full((N, L), Tokens.MASK)
 
-        Returns:
-            TargetField: The masked target field.
-        """
-        # Code implementation...
+        # fine out what to mask
+        is_field_masked = torch.rand(N, L).lt(params.p_mask_field)
+        is_masked = is_field_masked | is_event_masked
+
+        # creating discrete targets
+        timespan = self.hour_of_year
+
+        targets = self.lookup.masked_scatter(self.lookup == Tokens.VAL, timespan)
+
+        # mask original values
+        self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
+        self.week_of_year = self.week_of_year.masked_scatter(is_masked, mask_token)
+        self.day_of_week = self.day_of_week.masked_scatter(is_masked, mask_token)
+        self.time_of_day *= ~is_masked
+
+        # return SSL target
+        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
 
     def prune(self):
-        """
-        Prunes the field by setting all values to the prune token.
-        """
-        # Code implementation...
+        self.lookup = torch.full_like(self.lookup, Tokens.PRUNE)
+        self.week_of_year = torch.full_like(self.week_of_year, Tokens.PRUNE)
+        self.day_of_week = torch.full_like(self.day_of_week, Tokens.PRUNE)
+        self.time_of_day = torch.zeros_like(self.time_of_day)
 
     @classmethod
     def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-        """
-        Gets the target size for the field.
-
-        Args:
-            params (Hyperparameters): The hyperparameters.
-            manager (SystemManager): The system manager.
-            field (FieldRequest): The field request.
-
-        Returns:
-            int: The target size.
-        """
-        # Code implementation...
+        return 366 * 24 + len(Tokens)
 
     @classmethod
     def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
-        """
-        Postprocesses the values and targets.
-
-        Args:
-            values (torch.Tensor): The values tensor.
-            targets (torch.Tensor): The targets tensor.
-            params (Hyperparameters): The hyperparameters.
-
-        Returns:
-            torch.Tensor: The postprocessed tensor.
-        """
-        # Code implementation...
+        N, L, T = values.shape
+        return smoothen(targets=targets.lookup, size=(366 * 24), sigma=params.quantile_smoothing)
 
     @classmethod
     def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> TensorField:
-        """
-        Creates a mock instance of the DynamicTemporalField class.
+        start_date = datetime.datetime(2000, 1, 1)
+        end_date = datetime.datetime(2020, 12, 31)
 
-        Args:
-            field (FieldRequest): The field request.
-            params (Hyperparameters): The hyperparameters.
-            manager (SystemManager): The system manager.
+        delta = end_date - start_date
+        delta_seconds = int(delta.total_seconds())
 
-        Returns:
-            TensorField: The created tensor field.
-        """
-        # Code implementation...
+        L = params.n_context
+
+        values = [start_date + datetime.timedelta(seconds=random.randint(0, delta_seconds)) for _ in range(L)]
+
+        return cls.new(values=values, field=field, params=params, manager=manager)

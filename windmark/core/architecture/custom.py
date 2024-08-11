@@ -10,6 +10,7 @@ from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
 
 from windmark.core.constructs.general import Tokens
+from windmark.core.constructs.interface import TensorField
 
 
 @jaxtyped(typechecker=beartype)
@@ -77,7 +78,6 @@ def smoothen(
 # limitations under the License.
 #
 #
-# Implemented by @ananyahjha93
 # also found at: https://github.com/Lightning-AI/lightning-bolts/blob/master/pl_bolts/optimizers/lr_scheduler.py
 
 
@@ -164,3 +164,60 @@ class LinearWarmupCosineAnnealingLR(_LRScheduler):
             * (1 + math.cos(math.pi * (self.last_epoch - self.warmup_epochs) / (self.max_epochs - self.warmup_epochs)))
             for base_lr in self.base_lrs
         ]
+
+
+def validate(inputs: TensorField) -> None:
+    """
+    Validate the input values and indicators.
+
+    Args:
+        inputs (TensorField): The input values to be validated.
+
+    Raises:
+        ValueError: If the shape of values and indicators are not the same.
+        ValueError: If values are not imputed if not null, padded, or masked.
+        ValueError: If values are not less than 1.0.
+        ValueError: If values are not greater than or equal to 0.0.
+    """
+
+    values = inputs.content
+    indicators = inputs.lookup
+
+    if values.shape != indicators.shape:
+        raise ValueError("values and indicators must always have the same shape")
+
+    if not torch.all(values.mul(indicators).eq(0.0), dim=None):
+        raise ValueError("values should be imputed if not null, padded, or masked")
+
+    if not torch.all(values.lt(1.0), dim=None):
+        raise ValueError("values should be less than 1.0")
+
+    if not torch.all(values.ge(0.0), dim=None):
+        raise ValueError("values should be greater than or equal to 0.0")
+
+
+@jaxtyped(typechecker=beartype)
+def jitter(inputs: TensorField, jitter: torch.Tensor, is_training: bool) -> torch.Tensor:
+    """
+    Applies jitter to the input tensor based on the given jitter value and training mode.
+
+    Args:
+        inputs (TensorField): The input tensor field.
+        jitter (torch.Tensor): The jitter value to be applied.
+        is_training (bool): A flag indicating whether the model is in training mode.
+
+    Returns:
+        torch.Tensor: The input tensor with jitter applied.
+
+    """
+    values = inputs.content
+    indicators = inputs.lookup
+
+    dampener = torch.tensor(1 - torch.finfo(torch.half).tiny)
+
+    if is_training:
+        jitter = torch.rand_like(values).sub(torch.rand_like(values)).mul(jitter).mul(indicators == Tokens.VAL)
+    else:
+        jitter = torch.zeros_like(values)
+
+    return values.add(jitter).clamp(min=0.0, max=dampener)

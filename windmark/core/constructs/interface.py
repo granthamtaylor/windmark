@@ -1,5 +1,5 @@
 from functools import cache
-from typing import Type, TypeAlias
+from typing import Type, TypeAlias, Any
 
 import torch
 from beartype.typing import Callable
@@ -7,6 +7,8 @@ from jaxtyping import Bool, Int
 from tensordict.prototype import tensorclass
 
 from windmark.core.constructs.general import FieldRequest, FieldType
+from windmark.core.managers import SystemManager
+from windmark.core.constructs.general import Hyperparameters
 
 
 @tensorclass
@@ -51,27 +53,27 @@ class TensorField:
 
     """
 
-    # @classmethod
-    # def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-    #     pass
+    @classmethod
+    def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+        pass
 
-    # def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> "TargetField":
-    #     pass
+    def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> "TargetField":
+        pass
 
-    # def prune(self) -> None:
-    #     pass
+    def prune(self) -> None:
+        pass
 
-    # @classmethod
-    # def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-    #     pass
+    @classmethod
+    def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
+        pass
 
-    # @classmethod
-    # def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
-    #     pass
+    @classmethod
+    def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
+        pass
 
-    # @classmethod
-    # def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-    #     pass
+    @classmethod
+    def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
+        pass
 
 
 class FieldEmbedder(torch.nn.Module):
