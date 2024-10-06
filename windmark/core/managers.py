@@ -11,7 +11,6 @@ from rich.console import Console, Group
 from rich.table import Table
 from rich.panel import Panel
 from pytdigest import TDigest
-from mashumaro.mixins.json import DataClassJSONMixin
 
 from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest, FieldType
 
@@ -19,7 +18,7 @@ console = Console()
 
 # FIXME is this dead code?
 # @dataclasses.dataclass
-# class ArtifactManager(DataClassJSONMixin):
+# class ArtifactManager:
 #     """
 #     A class that manages artifacts.
 
@@ -35,7 +34,7 @@ console = Console()
 
 
 @dataclasses.dataclass
-class SchemaManager(DataClassJSONMixin):
+class SchemaManager:
     """
     Manages the schema for Windmark data.
 
@@ -146,7 +145,7 @@ class SchemaManager(DataClassJSONMixin):
 
 
 @dataclasses.dataclass
-class BalanceManager(DataClassJSONMixin):
+class BalanceManager:
     """
     A class that manages the balance of class labels in a dataset.
 
@@ -252,7 +251,7 @@ class BalanceManager(DataClassJSONMixin):
 
 
 @dataclasses.dataclass
-class SupervisedTaskManager(DataClassJSONMixin):
+class SupervisedTaskManager:
     """
     A manager class for supervised learning tasks.
 
@@ -276,7 +275,7 @@ class SupervisedTaskManager(DataClassJSONMixin):
 
 
 @dataclasses.dataclass
-class SplitManager(DataClassJSONMixin):
+class SplitManager:
     """
     A class that manages the splits for a dataset.
 
@@ -331,7 +330,7 @@ class SplitManager(DataClassJSONMixin):
 
 
 @dataclasses.dataclass
-class SampleManager(DataClassJSONMixin):
+class SampleManager:
     """
     A class that manages the sampling rates for pretraining and finetuning in a machine learning task.
 
@@ -422,7 +421,7 @@ class SampleManager(DataClassJSONMixin):
 
 
 @dataclasses.dataclass
-class CentroidManager(DataClassJSONMixin):
+class CentroidManager:
     """
     A class that manages centroids and provides methods to calculate digests and display information.
 
@@ -496,7 +495,7 @@ class CentroidManager(DataClassJSONMixin):
 
 
 @dataclasses.dataclass
-class LevelManager(DataClassJSONMixin):
+class LevelManager:
     """
     A class that manages levels and mappings for different fields.
     """
@@ -564,7 +563,7 @@ class LevelManager(DataClassJSONMixin):
 
 
 @dataclasses.dataclass
-class SystemManager(DataClassJSONMixin):
+class SystemManager:
     """
     The SystemManager class manages various components of the system.
 

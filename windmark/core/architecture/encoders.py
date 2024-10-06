@@ -712,7 +712,7 @@ class SequenceModule(lit.LightningModule):
 
         assert isinstance(params, Hyperparameters)
         self.params: Hyperparameters = params
-        self.save_hyperparameters(params.to_dict())
+        self.save_hyperparameters(vars(params))
         self.lr: float = params.learning_rate
         self.mode: str = mode
         self.manager: SystemManager = manager

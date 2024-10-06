@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 import pydantic
 from pytdigest import TDigest
-from mashumaro.mixins.json import DataClassJSONMixin
 
 
 class Tokens(IntEnum):
@@ -55,7 +54,7 @@ class FieldType(namedtuple("Field", ["name", "is_static"]), Enum):
 
 
 @dataclass
-class FieldRequest(DataClassJSONMixin):
+class FieldRequest:
     """
     Represents a field request object.
 
@@ -121,7 +120,7 @@ class FieldRequest(DataClassJSONMixin):
 
 
 @dataclass
-class LevelSet(DataClassJSONMixin):
+class LevelSet:
     """
     Represents a set of levels.
 
@@ -177,7 +176,7 @@ class LevelSet(DataClassJSONMixin):
 
 
 @dataclass
-class Centroid(DataClassJSONMixin):
+class Centroid:
     """
     Represents a centroid with a name, an array of floats, and a validity flag.
 
@@ -228,7 +227,7 @@ class Centroid(DataClassJSONMixin):
 
 
 @pydantic.dataclasses.dataclass
-class Hyperparameters(DataClassJSONMixin):
+class Hyperparameters:
     """Hyperparameters class for defining the model's configuration."""
 
     # architectural
