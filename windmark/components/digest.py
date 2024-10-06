@@ -14,7 +14,6 @@ from windmark.core.processors import multithread, digest
 def create_digest_centroids_from_lifestream(
     lifestreams: directory.FlyteDirectory,
     field: FieldRequest,
-    n_workers: int,
 ) -> Centroid:
     """
     Creates digest centroids from the given lifestreams.
@@ -22,7 +21,6 @@ def create_digest_centroids_from_lifestream(
     Args:
         lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
         field (FieldRequest): The field to create digest centroids for.
-        n_workers (int): The number of workers to use for parallel processing.
 
     Returns:
         Centroid: The digest created for numeric field.
@@ -35,7 +33,7 @@ def create_digest_centroids_from_lifestream(
 
     path = Path(lifestreams.path)
 
-    results = multithread(n_workers=n_workers, process=digest, key=field.name, path=path)
+    results = multithread(process=digest, key=field.name, path=path)
 
     digests = [TDigest.of_centroids(np.array(digest)) for digest in results]
 

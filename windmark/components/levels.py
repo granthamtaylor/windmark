@@ -11,16 +11,13 @@ from windmark.core.processors import multithread, count
 
 
 @task
-def create_unique_levels_from_lifestream(
-    lifestreams: directory.FlyteDirectory, field: FieldRequest, n_workers: int
-) -> LevelSet:
+def create_unique_levels_from_lifestream(lifestreams: directory.FlyteDirectory, field: FieldRequest) -> LevelSet:
     """
     Create unique levels from a lifestream.
 
     Args:
         lifestreams (directory.FlyteDirectory): The lifestream directory.
         field (FieldRequest): The field to create levels for.
-        n_workers (int): The number of workers to use for parallel processing.
 
     Returns:
         LevelSet: The set of unique levels for the given field.
@@ -33,7 +30,7 @@ def create_unique_levels_from_lifestream(
 
     path = Path(lifestreams.path)
 
-    results: list[Counter] = multithread(n_workers=n_workers, process=count, key=field.name, path=path)
+    results: list[Counter] = multithread(process=count, key=field.name, path=path)
 
     counter = reduce(lambda a, b: a + b, results)
 

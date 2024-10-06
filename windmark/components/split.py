@@ -10,14 +10,13 @@ from windmark.core.processors import multithread, count
 
 
 @task
-def create_split_manager(lifestreams: directory.FlyteDirectory, schema: SchemaManager, n_workers: int) -> SplitManager:
+def create_split_manager(lifestreams: directory.FlyteDirectory, schema: SchemaManager) -> SplitManager:
     """
     Create a SplitManager to count number of events in each strata.
 
     Args:
         lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
         schema (SchemaManager): The schema manager object.
-        n_workers (int): The number of workers to use for parallel processing.
 
     Returns:
         SplitManager: The created SplitManager object.
@@ -28,7 +27,7 @@ def create_split_manager(lifestreams: directory.FlyteDirectory, schema: SchemaMa
 
     path = Path(lifestreams.path)
 
-    results: list[Counter] = multithread(n_workers=n_workers, process=count, key=schema.split_id, path=path)
+    results: list[Counter] = multithread(process=count, key=schema.split_id, path=path)
 
     counter = reduce(lambda a, b: a + b, results)
 

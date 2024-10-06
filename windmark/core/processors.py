@@ -68,12 +68,11 @@ def count(resources: dict[str, Any], worker_id: int) -> Counter:
 
 
 @beartype
-def multithread(n_workers: int, process: Callable, key: str, path: Path) -> list[Any]:
+def multithread(process: Callable, key: str, path: Path) -> list[Any]:
     """
     Execute a given process function in parallel using multiple threads.
 
     Args:
-        n_workers (int): The number of worker threads to use.
         process (Callable): The function to be executed in parallel.
         key (str): A key parameter for the process function.
         path (Path): The path to the directory containing the files to be processed.
@@ -83,6 +82,8 @@ def multithread(n_workers: int, process: Callable, key: str, path: Path) -> list
     """
 
     filenames = [filename for filename in os.listdir(path) if filename.endswith(".ndjson")]
+
+    n_workers = os.cpu_count()
 
     resources: dict[str, Any] = dict(n_workers=n_workers, key=key, path=path, filenames=filenames)
 

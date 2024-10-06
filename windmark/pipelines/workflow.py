@@ -31,13 +31,11 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
 
     n_finetune_steps = lib.extract.n_finetune_steps(params=params)
 
-    n_workers = lib.extract.n_workers(params=params)
-
     fields = lib.fan.fields(schema=schema)
 
-    split = lib.split(lifestreams=lifestreams, schema=schema, n_workers=n_workers)
+    split = lib.split(lifestreams=lifestreams, schema=schema)
 
-    task = lib.task(lifestreams=lifestreams, schema=schema, kappa=kappa, n_workers=n_workers)
+    task = lib.task(lifestreams=lifestreams, schema=schema, kappa=kappa)
 
     sample = lib.sample(
         batch_size=batch_size,
@@ -47,11 +45,11 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
         split=split,
     )
 
-    fanned_centroids = fk.map_task(partial(lib.digest, lifestreams=lifestreams, n_workers=n_workers))(field=fields)
+    fanned_centroids = fk.map_task(partial(lib.digest, lifestreams=lifestreams))(field=fields)
 
     centroids = lib.collect.centroids(centroids=fanned_centroids)
 
-    fanned_levelsets = fk.map_task(partial(lib.levels, lifestreams=lifestreams, n_workers=n_workers))(field=fields)
+    fanned_levelsets = fk.map_task(partial(lib.levels, lifestreams=lifestreams))(field=fields)
 
     levelsets = lib.collect.levelsets(levelsets=fanned_levelsets)
 

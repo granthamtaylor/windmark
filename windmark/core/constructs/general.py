@@ -286,8 +286,6 @@ class Hyperparameters(DataClassJSONMixin):
     """Number of Epochs Patience for Early Stopping"""
     jitter: Annotated[float, pydantic.Field(ge=0.0, lt=1.0)]
     """Amount of jitter to apply to continuous values"""
-    n_workers: Annotated[int, pydantic.Field(ge=1, le=256)]
-    """Number of parallelized data pipes"""
     predict_only_sequence_end: bool
     """Predict only last event in sequence"""
 

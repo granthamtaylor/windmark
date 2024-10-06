@@ -223,10 +223,12 @@ class StaticQuantileFieldEmbedder(FieldEmbedder):
 
         jittered = jitter(inputs, jitter=self.jitter, is_training=self.training)
 
+        N = jittered.shape[0]
+
         quantiles = jittered.mul(self.n_quantiles).floor().long().add(len(Tokens))
         lookup = indicators.masked_scatter(indicators == Tokens.VAL, quantiles)
 
-        return self.embeddings(lookup)
+        return self.embeddings(lookup).reshape(N, self.embeddings.embedding_dim)
 
 
 @FieldInterface.register(FieldType.Numbers)

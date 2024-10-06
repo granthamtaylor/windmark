@@ -17,18 +17,20 @@ AnnotationType: TypeAlias = tuple[str, str, int]
 FieldType: TypeAlias = dict[str, list[Any] | Any]
 
 
-def subset(sequence: dict[str, Any], split: str) -> bool:
+def subset(sequence: dict[str, Any], manager: SystemManager, split: str) -> bool:
     """
     Check if the given sequence has a specific split value.
 
     Args:
         sequence (dict[str, Any]): The sequence to check.
+        manager (SystemManager): The system manager.
         split (str): The split value to compare against.
 
     Returns:
         bool: True if the sequence has the specified split value, False otherwise.
     """
-    return sequence["split"] == split
+
+    return sequence[manager.schema.split_id] == split
 
 
 def sample(
@@ -221,7 +223,7 @@ def stream(
         .open_files()
         .readlines(return_path=False)
         .map(msgspec.json.decode)
-        .filter(partial(subset, split=split))
+        .filter(partial(subset, manager=manager, split=split))
         .shuffle()
         .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))
         .shuffle()

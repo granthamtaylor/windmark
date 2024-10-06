@@ -645,11 +645,14 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
     """
     assert strata in ["train", "validate", "test", "predict"]
 
+    n_workers = os.cpu_count()
+
     pipe = self.pipes[strata]
     self.dataloaders[strata] = loader = DataLoader(
         pipe,
         batch_size=self.params.batch_size,
-        num_workers=self.params.n_workers,
+        num_workers=n_workers,
+        persistent_workers=True,
         collate_fn=collate,
         pin_memory=True,
         drop_last=False,

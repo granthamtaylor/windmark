@@ -20,7 +20,6 @@ def create_task_manager(
         lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
         schema (SchemaManager): The schema manager for the task.
         kappa (float): The kappa value for balancing classification targets.
-        n_workers (int): The number of workers for multithreading.
 
     Returns:
         SupervisedTaskManager: The created task manager.
@@ -28,7 +27,7 @@ def create_task_manager(
 
     path = Path(lifestreams.path)
 
-    results: list[Counter] = multithread(n_workers=n_workers, process=count, key=schema.target_id, path=path)
+    results: list[Counter] = multithread(process=count, key=schema.target_id, path=path)
 
     counter = reduce(lambda a, b: a + b, results)
 

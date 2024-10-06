@@ -17,21 +17,21 @@ from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest, F
 
 console = Console()
 
+# FIXME is this dead code?
+# @dataclasses.dataclass
+# class ArtifactManager(DataClassJSONMixin):
+#     """
+#     A class that manages artifacts.
 
-@dataclasses.dataclass
-class ArtifactManager(DataClassJSONMixin):
-    """
-    A class that manages artifacts.
+#     Attributes:
+#         ledger (str): The ledger associated with the artifacts.
+#         model (str): The model associated with the artifacts.
+#         predictions (str): The predictions associated with the artifacts.
+#     """
 
-    Attributes:
-        ledger (str): The ledger associated with the artifacts.
-        model (str): The model associated with the artifacts.
-        predictions (str): The predictions associated with the artifacts.
-    """
-
-    ledger: str
-    model: str
-    predictions: str
+#     ledger: str
+#     model: str
+#     predictions: str
 
 
 @dataclasses.dataclass
@@ -491,6 +491,9 @@ class CentroidManager(DataClassJSONMixin):
 
         console.print(table)
 
+    def __repr__(self) -> str:
+        return f"CentroidManager({[centroid.name for centroid in self.centroids]})"
+
 
 @dataclasses.dataclass
 class LevelManager(DataClassJSONMixin):
@@ -555,6 +558,9 @@ class LevelManager(DataClassJSONMixin):
             table.add_row(field, f"{size:,}", formatted_levels)
 
         console.print(table)
+
+    def __repr__(self) -> str:
+        return f"LevelManager({[levelset.name for levelset in self.levelsets]})"
 
 
 @dataclasses.dataclass
