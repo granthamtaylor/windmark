@@ -11,7 +11,7 @@ from windmark.core.processors import multithread, count
 
 @task
 def create_task_manager(
-    lifestreams: directory.FlyteDirectory, schema: SchemaManager, kappa: float, n_workers: int
+    lifestreams: directory.FlyteDirectory, schema: SchemaManager, kappa: float
 ) -> SupervisedTaskManager:
     """
     Creates a task manager for supervised machine learning tasks.
