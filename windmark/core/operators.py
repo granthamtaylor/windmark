@@ -269,7 +269,7 @@ def collate(batch: list[SequenceData]) -> SequenceData:
         SequenceData: The collated SequenceData object.
 
     """
-    stacked = torch.stack(batch, dim=0).squeeze(1).auto_batch_size_(batch_dims=1)  # type: ignore
+    stacked = torch.stack(batch, dim=0).squeeze(1)
     stacked.meta = [observation.meta for observation in batch]
 
     return stacked

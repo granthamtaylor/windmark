@@ -4,7 +4,7 @@ from typing import Type, TypeAlias, Any
 import torch
 from beartype.typing import Callable
 from jaxtyping import Bool, Int
-from tensordict.prototype import tensorclass
+from tensordict import tensorclass
 
 from windmark.core.constructs.general import FieldRequest, FieldType
 from windmark.core.managers import SystemManager

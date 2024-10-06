@@ -2,7 +2,7 @@ from typing import Annotated
 from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
 from tensordict import TensorDict
-from tensordict.prototype import tensorclass
+from tensordict import tensorclass
 import torch
 
 from windmark.core.constructs.tensorfields import TensorField, TargetField

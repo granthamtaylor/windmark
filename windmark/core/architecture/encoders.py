@@ -654,7 +654,8 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
         num_workers=n_workers,
         persistent_workers=True,
         collate_fn=collate,
-        pin_memory=True,
+        # FIXME: pin_memory not implemented for tensordict
+        # pin_memory=True,
         drop_last=False,
     )
 

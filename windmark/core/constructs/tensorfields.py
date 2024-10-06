@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
-from tensordict.prototype import tensorclass
+from tensordict import tensorclass
 from pytdigest import TDigest
 from torch.nn.functional import pad
 
@@ -63,7 +63,7 @@ class DynamicCategoryField(TensorField):
         array = np.array(tokens, dtype=int)
         lookup = pad(torch.tensor(array), pad=padding, value=Tokens.PAD).unsqueeze(0)
 
-        return cls(lookup=lookup, batch_size=[1])
+        return cls(lookup=lookup)
 
     @jaxtyped(typechecker=beartype)
     def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
@@ -87,7 +87,7 @@ class DynamicCategoryField(TensorField):
 
         self.lookup = self.lookup.masked_scatter(is_masked, mask_token)
 
-        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
+        return TargetField(lookup=targets, is_masked=is_masked)
 
     def prune(self):
         """
@@ -195,7 +195,7 @@ class StaticCategoryField(TensorField):
 
         lookup = torch.tensor([tokens])
 
-        return cls(lookup=lookup, batch_size=[1])
+        return cls(lookup=lookup)
 
     @jaxtyped(typechecker=beartype)
     def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> TargetField:
@@ -222,7 +222,7 @@ class StaticCategoryField(TensorField):
 
         self.lookup = self.lookup.masked_scatter(is_field_masked, mask_token)
 
-        return TargetField(lookup=targets, is_masked=is_field_masked, batch_size=self.batch_size)  # type: ignore
+        return TargetField(lookup=targets, is_masked=is_field_masked)
 
     prune = DynamicCategoryField.prune
     get_target_size = DynamicCategoryField.get_target_size
@@ -311,7 +311,7 @@ class DynamicEntityField(TensorField):
         array = np.array(tokens, dtype=int)
         lookup = pad(torch.tensor(array), pad=padding, value=Tokens.PAD).unsqueeze(0)
 
-        return cls(lookup=lookup, batch_size=[1])
+        return cls(lookup=lookup)
 
     mask = DynamicCategoryField.mask
     prune = DynamicCategoryField.prune
@@ -384,7 +384,6 @@ class DynamicNumberField(TensorField):
         return cls(
             content=pad(torch.tensor(content), pad=padding, value=0.0).float().unsqueeze(0).mul(dampener),
             lookup=pad(torch.tensor(lookup), pad=padding, value=Tokens.PAD).unsqueeze(0),
-            batch_size=[1],
         )
 
     @jaxtyped(typechecker=beartype)
@@ -405,7 +404,7 @@ class DynamicNumberField(TensorField):
         self.content *= ~is_masked
 
         # return SSL target
-        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
+        return TargetField(lookup=targets, is_masked=is_masked)
 
     def prune(self):
         self.lookup = torch.full_like(self.lookup, Tokens.PRUNE)
@@ -477,7 +476,6 @@ class StaticNumberField(TensorField):
         return cls(
             content=torch.tensor([content]).unsqueeze(0).mul(dampener),
             lookup=torch.tensor([lookup]).unsqueeze(0),
-            batch_size=[1],
         )
 
     @jaxtyped(typechecker=beartype)
@@ -508,7 +506,7 @@ class StaticNumberField(TensorField):
         self.content *= ~is_field_masked
 
         # return SSL target
-        return TargetField(lookup=targets, is_masked=is_field_masked, batch_size=self.batch_size)  # type: ignore
+        return TargetField(lookup=targets, is_masked=is_field_masked)
 
     prune = DynamicNumberField.prune
     get_target_size = DynamicNumberField.get_target_size
@@ -662,7 +660,6 @@ class DynamicTemporalField(TensorField):
             day_of_week=day_of_week,
             time_of_day=time_of_day,
             hour_of_year=hour_of_year,
-            batch_size=[1],
         )
 
     @jaxtyped(typechecker=beartype)
@@ -687,7 +684,7 @@ class DynamicTemporalField(TensorField):
         self.time_of_day *= ~is_masked
 
         # return SSL target
-        return TargetField(lookup=targets, is_masked=is_masked, batch_size=self.batch_size)  # type: ignore
+        return TargetField(lookup=targets, is_masked=is_masked)
 
     def prune(self):
         self.lookup = torch.full_like(self.lookup, Tokens.PRUNE)
