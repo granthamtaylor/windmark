@@ -1,13 +1,12 @@
 from windmark.core.managers import SupervisedTaskManager, SplitManager, SampleManager
+from windmark.core.constructs.general import Hyperparameters
 from windmark.core.orchestration import task
 
 
 @task
 def create_sample_manager(
     task: SupervisedTaskManager,
-    batch_size: int,
-    n_pretrain_steps: int,
-    n_finetune_steps: int,
+    params: Hyperparameters,
     split: SplitManager,
 ) -> SampleManager:
     """
@@ -15,9 +14,7 @@ def create_sample_manager(
 
     Args:
         task (SupervisedTaskManager): The task manager for the supervised task.
-        batch_size (int): The batch size for training.
-        n_pretrain_steps (int): The number of pre-training steps.
-        n_finetune_steps (int): The number of fine-tuning steps.
+        params (Hyperparameters): model hyperparameters.
         split (SplitManager): The split manager for the dataset.
 
     Returns:
@@ -25,9 +22,9 @@ def create_sample_manager(
     """
 
     return SampleManager(
-        batch_size=batch_size,
-        n_pretrain_steps=n_pretrain_steps,
-        n_finetune_steps=n_finetune_steps,
+        batch_size=params.batch_size,
+        n_pretrain_steps=params.n_pretrain_steps,
+        n_finetune_steps=params.n_finetune_steps,
         task=task,
         split=split,
     )

@@ -14,24 +14,6 @@ from pytdigest import TDigest
 
 from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest, FieldType
 
-console = Console()
-
-# FIXME is this dead code?
-# @dataclasses.dataclass
-# class ArtifactManager:
-#     """
-#     A class that manages artifacts.
-
-#     Attributes:
-#         ledger (str): The ledger associated with the artifacts.
-#         model (str): The model associated with the artifacts.
-#         predictions (str): The predictions associated with the artifacts.
-#     """
-
-#     ledger: str
-#     model: str
-#     predictions: str
-
 
 @dataclasses.dataclass
 class SchemaManager:
@@ -214,6 +196,9 @@ class BalanceManager:
         """
         Displays the balance manager information in a table.
         """
+
+        console = Console()
+
         table = Table(title=f"Balance Manager (kappa={self.kappa:.2%})")
 
         table.add_column("Class Labels", justify="right", style="cyan", no_wrap=True)
@@ -387,6 +372,8 @@ class SampleManager:
         Displays the sample rates for pretraining and finetuning in a table format.
         """
 
+        console = Console()
+
         def render(mode: str) -> Table:
             assert mode in ["finetune", "pretrain"]
 
@@ -469,6 +456,8 @@ class CentroidManager:
             None
         """
 
+        console = Console()
+
         percentiles = [0.0, 0.05, 0.25, 0.50, 0.75, 0.95, 1.0]
 
         table = Table(title="Centroid Manager")
@@ -536,6 +525,9 @@ class LevelManager:
         """
         Display the level manager information in a table format.
         """
+
+        console = Console()
+
         table = Table(title="Level Manager")
 
         table.add_column("Field Names", justify="right", style="cyan", no_wrap=True)

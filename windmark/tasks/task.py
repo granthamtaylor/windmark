@@ -5,13 +5,14 @@ from functools import reduce
 from flytekit.types import directory
 
 from windmark.core.managers import SchemaManager, SupervisedTaskManager, BalanceManager
+from windmark.core.constructs.general import Hyperparameters
 from windmark.core.orchestration import task
 from windmark.core.processors import multithread, count
 
 
 @task
 def create_task_manager(
-    lifestreams: directory.FlyteDirectory, schema: SchemaManager, kappa: float
+    lifestreams: directory.FlyteDirectory, schema: SchemaManager, params: Hyperparameters
 ) -> SupervisedTaskManager:
     """
     Creates a task manager for supervised machine learning tasks.
@@ -19,7 +20,7 @@ def create_task_manager(
     Args:
         lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
         schema (SchemaManager): The schema manager for the task.
-        kappa (float): The kappa value for balancing classification targets.
+        params (Hyperparameters): model hyperparameters.
 
     Returns:
         SupervisedTaskManager: The created task manager.
@@ -41,6 +42,6 @@ def create_task_manager(
     labels: list[str] = list(targets.keys())
     counts: list[int] = list(targets.values())
 
-    balancer = BalanceManager(labels=labels, counts=counts, kappa=kappa, unlabeled=unlabeled)
+    balancer = BalanceManager(labels=labels, counts=counts, kappa=params.interpolation_rate, unlabeled=unlabeled)
 
     return SupervisedTaskManager(task="classification", n_targets=len(targets), balancer=balancer)

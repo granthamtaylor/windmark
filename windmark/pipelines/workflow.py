@@ -16,34 +16,17 @@ def train(datapath: str, schema: SchemaManager, params: Hyperparameters):
         datapath (str): The path to the data.
         schema (SchemaManager): The schema manager object.
         params (Hyperparameters): The hyperparameters object.
-
-    Returns:
-        None
     """
 
     lifestreams = lib.sanitize(datapath=datapath)
-
-    kappa = lib.extract.kappa(params=params)
-
-    batch_size = lib.extract.batch_size(params=params)
-
-    n_pretrain_steps = lib.extract.n_pretrain_steps(params=params)
-
-    n_finetune_steps = lib.extract.n_finetune_steps(params=params)
 
     fields = lib.fan.fields(schema=schema)
 
     split = lib.split(lifestreams=lifestreams, schema=schema)
 
-    task = lib.task(lifestreams=lifestreams, schema=schema, kappa=kappa)
+    task = lib.task(lifestreams=lifestreams, schema=schema, params=params)
 
-    sample = lib.sample(
-        batch_size=batch_size,
-        n_pretrain_steps=n_pretrain_steps,
-        n_finetune_steps=n_finetune_steps,
-        task=task,
-        split=split,
-    )
+    sample = lib.sample(params=params, task=task, split=split)
 
     fanned_centroids = fk.map_task(partial(lib.digest, lifestreams=lifestreams))(field=fields)
 

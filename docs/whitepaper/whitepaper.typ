@@ -923,29 +923,6 @@ Because the orchestrated pipeline can operate automatically, we may incorporate 
 + Generate a report on model performance using out-of-sample data.
 + Generate a whitepaper on model hyperparameters, including information from the steps above for automated model version documentation.
 
-== Results
-
-Windmark obtained a near-perfect score on the Transactions dataset published by IBM.
-
-#figure(
-    align(center)[#table(
-        columns: 5,
-        align: (col, row) => (auto, auto, auto, auto, auto).at(col),
-        inset: 6pt,
-        [Model], [F1 score], [Average Precision], [ROC AUC], [Accuracy],
-        [Windmark (ours)], [0.977], [0.999], [0.999], [99.9],
-        [TabBERT], [0.910], [0.872], [0.974], [93.3],
-        [TabAConvBERT], [0.896], [-], [-], [-],
-        [UniTTab], [0.915], [0.894], [0.974], [93.5],
-        [TabBERT + LSTM], [0.860], [-], [-], [-],
-        [LUNA], [0.862], [-], [-], [-],
-        [UniTTab + LSTM], [0.914], [0.917], [0.987], [93.1],
-        [XGBoost], [0.779], [0.756], [0.939], [84.7],
-        [CatBoost], [0.499], [0.480], [0.916], [68.9],
-    )],
-    caption: [Model Results]
-)
-
 == Further Research
 
 === Media Fields
