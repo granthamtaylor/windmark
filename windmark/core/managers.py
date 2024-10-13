@@ -1,11 +1,7 @@
 import math
 import dataclasses
 import functools
-from datetime import datetime
-import string
-import random
 
-from faker import Faker
 import numpy as np
 from rich.console import Console, Group
 from rich.table import Table
@@ -26,13 +22,6 @@ class SchemaManager:
         split_id (str): The split ID.
         target_id (str): The target ID.
         fields (list[FieldRequest]): The list of field requests.
-
-    Methods:
-        new: Creates a new SchemaManager instance.
-        __post_init__: Performs post-initialization checks.
-        __len__: Returns the number of fields in the schema.
-        static: Returns a list of static fields in the schema.
-        dynamic: Returns a list of dynamic fields in the schema.
     """
 
     sequence_id: str
@@ -143,12 +132,6 @@ class BalanceManager:
         interpolation (list[float]): The interpolated distribution of class labels.
         thresholds (list[float]): The thresholds for each class label.
         weights (list[float]): The loss weights for each class label.
-
-    Methods:
-        __post_init__(): Initializes the class and calculates the necessary attributes.
-        show(): Displays the balance manager information in a table.
-        mapping() -> dict[str, int]: Returns a mapping of class labels to their indices.
-        n_events() -> int: Returns the total number of events, including unlabeled instances.
     """
 
     labels: list[str]
@@ -325,10 +308,6 @@ class SampleManager:
         n_finetune_steps (int): The number of finetuning steps.
         task (SupervisedTaskManager): The task manager for the supervised learning task.
         split (SplitManager): The split manager for the dataset.
-
-    Methods:
-        __post_init__(): Initializes the SampleManager and calculates the sample rates for pretraining and finetuning.
-        show(): Displays the sample rates for pretraining and finetuning in a table format.
     """
 
     batch_size: int
@@ -414,11 +393,6 @@ class CentroidManager:
 
     Attributes:
         centroids (list[Centroid]): The list of centroids to be managed.
-
-    Methods:
-        __post_init__(): Initializes the CentroidManager object and filters out invalid centroids.
-        digests() -> dict[str, TDigest]: Calculates the digests for each centroid.
-        show(): Displays the centroid information in a table format.
     """
 
     centroids: list[Centroid]
@@ -588,56 +562,3 @@ class SystemManager:
 
         for presenter in presenters:
             presenter.show()
-
-
-class LabelManager:
-    """
-    A class that provides methods for managing labels.
-    """
-
-    @classmethod
-    def new(cls) -> str:
-        """
-        Generates a new label.
-
-        Returns:
-            str: The generated label in the format "address:hashtag".
-        """
-        fake = Faker()
-
-        address = fake.street_name().replace(" ", "-").lower()
-
-        hashtag = ("").join(random.choice(string.ascii_uppercase) for _ in range(4))
-
-        return f"{address}:{hashtag}"
-
-    @classmethod
-    def finetune(cls, pathname: str) -> tuple[str, str]:
-        """
-        Performs finetuning on a given pathname.
-
-        Args:
-            pathname (str): The pathname to be finetuned.
-
-        Returns:
-            tuple[str, str]: A tuple containing the version and date of the finetuned pathname.
-        """
-        version = pathname.split("/")[-1].split(".")[0]
-        date = datetime.now().strftime("%Y-%m-%d|%H:%M")
-
-        return version, date
-
-    @classmethod
-    def inference(cls, pathname: str) -> str:
-        """
-        Performs inference on a given pathname.
-
-        Args:
-            pathname (str): The pathname to perform inference on.
-
-        Returns:
-            str: The result of the inference, which is the filename without the extension.
-        """
-        print(pathname)
-
-        return pathname.split("/")[-1].split(".")[0]

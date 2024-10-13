@@ -4,12 +4,12 @@ import json
 from flytekit.types import file
 
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.managers import SystemManager, LabelManager
+from windmark.core.managers import SystemManager
 from windmark.core.orchestration import task
 
 
 @task
-def stash_model_state(checkpoint: file.FlyteFile, manager: SystemManager, params: Hyperparameters):
+def stash_model_state(checkpoint: file.FlyteFile, manager: SystemManager, params: Hyperparameters, label: str):
     """
     Stash state required to reproduce a model.
 
@@ -17,14 +17,13 @@ def stash_model_state(checkpoint: file.FlyteFile, manager: SystemManager, params
         model (file.FlyteFile): The model file to pretrain.
         manager (SystemManager): The system state manager.
         params (Hyperparameters): The hyperparameters for pretraining.
+        label (str): The name for the experiment.
 
     Returns:
         directory.FlyteDirectory
     """
 
-    version = LabelManager.inference(checkpoint.path)
-
-    path = Path("./model") / version
+    path = Path("./model") / label
 
     with open(path / "manager.json") as file:
         json.dump(manager.to_json(), file)
