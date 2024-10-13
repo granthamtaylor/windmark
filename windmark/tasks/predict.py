@@ -59,6 +59,8 @@ def predict_sequence_encoder(
         ],
     )
 
+    print(f"writing predictions to '{outpath}'")
+
     trainer.predict(module, return_predictions=False)
 
     return file.FlyteFile(str(outpath))
