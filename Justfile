@@ -1,48 +1,33 @@
-_list:
+help:
   @just --list
 
 # run pre-commit checks
-check: whitepaper
+check: author
   @git add .
-  @poetry run pre-commit
-
-# run pytest
-test:
-  @poetry run pytest ./windmark/tests
-
-# start tensorboard
-tensorboard:
-  @poetry run tensorboard --logdir ./logs --host localhost --port 8888
+  @uv run pre-commit
 
 # compile documentation with pdoc
-doc:
-  @poetry run sphinx-build -M html "./docs/site" "./docs/site/_build"
+document:
+  @uv run sphinx-build -M html "./docs/site" "./docs/site/_build"
 
 # compile whitepaper with typst
-whitepaper:
+author:
   @typst compile docs/whitepaper/whitepaper.typ docs/whitepaper/windmark.pdf  --root=docs
 
 # run training pipeline
 train:
-  @poetry run python windmark
+  @uv run -m windmark
 
 # clear pyflyte cache
 clear:
-  @poetry run pyflyte local-cache clear
+  @uv run pyflyte local-cache clear
 
 # obfuscate codebase with pyarmor
 obfuscate:
-  @poetry run pyarmor generate -r windmark
+  @uv run pyarmor generate -r windmark
   @cp -r ./dist/pyarmor_runtime_000000 ./dist/windmark && rm -R ./dist/pyarmor_runtime_000000
   @cp -r config ./dist/config
-  # @cp -r notebooks ./dist/notebooks
-  # @cp -r data ./dist/data
-  # @cp pyproject.toml ./dist/pyproject.toml
-  # @cp .python-version ./dist/.python-version
-  # @cp .pre-commit-config.yaml ./dist/.pre-commit-config.yaml
-
-compress: obfuscate
   @zip -r dist.zip dist
 
 explore:
-  @poetry run python windmark/devtools/explorer.py
+  @uv run -m windmark.devtools.explorer

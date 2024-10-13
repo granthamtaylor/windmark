@@ -4,7 +4,7 @@
     {
       "label": "$(run) Train",
       "type": "shell",
-      "command": "poetry run just train",
+      "command": "uv run just train",
       "presentation": {
         "reveal": "always",
         "panel": "new"
@@ -13,25 +13,16 @@
     {
       "label": "$(check) Check",
       "type": "shell",
-      "command": "poetry run just check",
+      "command": "uv run just check",
       "presentation": {
         "reveal": "always",
         "panel": "new"
       }
     },
     {
-      "label": "$(graph) Tensorboard",
+      "label": "$(book) Author",
       "type": "shell",
-      "command": "poetry run just tensorboard",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      }
-    },
-    {
-      "label": "$(book) Whitepaper",
-      "type": "shell",
-      "command": "poetry run just whitepaper",
+      "command": "uv run just author",
       "presentation": {
         "reveal": "always",
         "panel": "new"
@@ -40,7 +31,7 @@
     {
       "label": "$(terminal) Explore",
       "type": "shell",
-      "command": "poetry run just explore",
+      "command": "uv run just explore",
       "presentation": {
         "reveal": "always",
         "panel": "new"

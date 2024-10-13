@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 
-from flytekit.types import file, directory
+from flytekit.types import file
 
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.managers import SystemManager, LabelManager
@@ -9,9 +9,7 @@ from windmark.core.orchestration import task
 
 
 @task
-def stash_model_state(
-    checkpoint: file.FlyteFile, manager: SystemManager, params: Hyperparameters
-) -> directory.FlyteDirectory:
+def stash_model_state(checkpoint: file.FlyteFile, manager: SystemManager, params: Hyperparameters):
     """
     Stash state required to reproduce a model.
 

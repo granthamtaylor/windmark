@@ -1,6 +1,6 @@
 import random
-from typing import TypeAlias, Any, Generator, Callable
-from types import SimpleNamespace
+from typing import TypeAlias, Any, Generator
+from enum import Enum
 
 from windmark.core.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
@@ -66,11 +66,10 @@ def inference(sequence: dict, params: Hyperparameters, manager: SystemManager, s
     return zip(list(events), targets)
 
 
-samplers = SimpleNamespace(
-    pretrain=pretrain,
-    finetune=finetune,
-    inference=inference,
-)
+class Sampler(Enum):
+    pretrain = pretrain
+    finetune = finetune
+    inference = inference
 
 
 def sample(
@@ -78,7 +77,7 @@ def sample(
     params: Hyperparameters,
     manager: SystemManager,
     split: str,
-    sampler: Callable,
+    sampler: Sampler,
 ) -> Generator[tuple[AnnotationType, FieldType], None, None]:
     indices: list[tuple[int, int]] = sampler(sequence=sequence, params=params, manager=manager, split=split)
 

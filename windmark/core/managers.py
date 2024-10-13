@@ -623,7 +623,7 @@ class LabelManager:
             tuple[str, str]: A tuple containing the version and date of the finetuned pathname.
         """
         version = pathname.split("/")[-1].split(".")[0]
-        date = datetime.now().strftime("%Y-%m-%d %H:%M")
+        date = datetime.now().strftime("%Y-%m-%d|%H:%M")
 
         return version, date
 

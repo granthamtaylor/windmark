@@ -8,19 +8,20 @@ from lightning.pytorch.callbacks import (
     RichProgressBar,
     LearningRateMonitor,
 )
-from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.loggers.wandb import WandbLogger
 
 from windmark.core.architecture.encoders import SequenceModule
-from windmark.core.managers import SystemManager, LabelManager
+from windmark.core.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.orchestration import task
 
 
-@task(requests=fk.Resources(cpu="32", mem="64Gi"))
+@task(requests=fk.Resources(cpu="32", mem="64Gi"), cache_ignore_input_vars=tuple(["label"]))
 def pretrain_sequence_encoder(
     lifestreams: directory.FlyteDirectory,
     params: Hyperparameters,
     manager: SystemManager,
+    label: str,
 ) -> file.FlyteFile:
     """
     Pretrains a sequence encoder model using the provided lifestreams, hyperparameters, and system manager.
@@ -29,6 +30,7 @@ def pretrain_sequence_encoder(
         lifestreams (directory.FlyteDirectory): The directory containing the lifestreams data.
         params (Hyperparameters): The hyperparameters for pretraining.
         manager (SystemManager): The system state manager.
+        label (str): The name for the experiment.
 
     Returns:
         file.FlyteFile: The path to the best model checkpoint file.
@@ -36,8 +38,6 @@ def pretrain_sequence_encoder(
 
     torch.set_float32_matmul_precision("medium")
     torch.multiprocessing.set_sharing_strategy("file_system")
-
-    version: str = LabelManager.new()
 
     module = SequenceModule(
         datapath=str(lifestreams.path),
@@ -47,14 +47,11 @@ def pretrain_sequence_encoder(
     )
 
     checkpointer = ModelCheckpoint(
-        dirpath=f"./checkpoints/{version}", monitor="pretrain-total-validate/loss", filename=version
+        dirpath=fk.current_context().working_directory, monitor="pretrain-total-validate/loss", filename=label
     )
 
     trainer = Trainer(
-        logger=TensorBoardLogger("logs", name="windmark", version=version),
-        accelerator="auto",
-        devices="auto",
-        strategy="auto",
+        logger=WandbLogger(name="windmark", version=label),
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
         max_epochs=params.max_pretrain_epochs,

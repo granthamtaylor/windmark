@@ -258,6 +258,59 @@ def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
     return torch.stack(observations, dim=0).squeeze(1)
 
 
+class MultiStructureSequenceDataset(torch.utils.data.IterableDataset):
+    def __init__(
+        self,
+        datapath: str,
+        mode: str,
+        params: Hyperparameters,
+        manager: SystemManager,
+        split: str,
+    ) -> None:
+        super().__init__()
+
+        self.datapath = datapath
+        self.mode = mode
+        self.params = params
+        self.manager = manager
+        self.split = split
+
+    def __iter__(self):
+        return iter(self.generate())
+
+    def generate(self):
+        n_workers: int = torch.utils.data.get_worker_info().num_workers
+        worker: int = torch.utils.data.get_worker_info().id
+
+        # coordinates = list(itertools.product(range(self.x), range(self.y)))
+
+        random.shuffle(self.filenames)
+
+        for filename in self.filenames:
+            if hash(filename) % n_workers != worker:
+                continue
+
+            with open(filename, "r") as file:
+                shard = file.readlines()
+
+            for line in shard:
+                sequence = msgspec.json.decode(line)
+
+                if sequence[self.manager.schema.split_id] != self.split:
+                    continue
+
+                # shuffle
+
+                events = sample(sequence)
+
+                # shuffle
+
+                for event in events:
+                    tensorfields = tensorfield(event, self.params, self.manager)
+
+                    yield package(tensorfields, self.params, self.manager, self.mode)
+
+
 def collate(batch: list[SequenceData]) -> SequenceData:
     """
     Collates a batch of SequenceData objects into a single SequenceData object.
