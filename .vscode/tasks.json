@@ -20,9 +20,9 @@
       }
     },
     {
-      "label": "$(book) Author",
+      "label": "$(book) publish",
       "type": "shell",
-      "command": "uv run just author",
+      "command": "uv run just publish",
       "presentation": {
         "reveal": "always",
         "panel": "new"
