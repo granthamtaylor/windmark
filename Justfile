@@ -15,7 +15,7 @@ author:
   @typst compile docs/whitepaper/whitepaper.typ docs/whitepaper/windmark.pdf  --root=docs
 
 # run training pipeline
-train:
+train: freeze
   @uv run -m windmark
 
 # clear pyflyte cache
@@ -23,7 +23,7 @@ clear:
   @uv run pyflyte local-cache clear
 
 # obfuscate codebase with pyarmor
-obfuscate:
+obfuscate: freeze
   @uv run pyarmor generate -r windmark
   @cp -r ./dist/pyarmor_runtime_000000 ./dist/windmark && rm -R ./dist/pyarmor_runtime_000000
   @cp -r config ./dist/config
@@ -31,3 +31,6 @@ obfuscate:
 
 explore:
   @uv run -m windmark.devtools.explorer
+
+freeze:
+  @uv pip compile pyproject.toml > requirements.txt --python-platform linux
