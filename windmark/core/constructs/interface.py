@@ -31,26 +31,6 @@ class TensorField:
 
     Attributes:
         None
-
-    Methods:
-        new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-            Creates a new TensorField instance.
-
-        mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> "TargetField":
-            Masks the tensor field based on the given mask tensor.
-
-        prune(self) -> None:
-            Prunes the tensor field.
-
-        get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-            Returns the target size of the tensor field.
-
-        postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
-            Performs post-processing on the tensor field.
-
-        mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-            Creates a mock TensorField instance.
-
     """
 
     @classmethod

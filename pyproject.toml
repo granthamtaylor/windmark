@@ -5,11 +5,10 @@ description = "Heterogenous Time Series Modeling"
 readme = "docs/README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "flytekit>=1.13.7",
+    "flytekit==1.14.0b6",
     "torch>=2.4.0",
     "lightning>=2.1.3",
     "tensordict>=0.5.0",
-    "torchdata==0.7.1",
     "jaxtyping>=0.2.25",
     "beartype>=0.17.0",
     "torchmetrics>=1.3.2",

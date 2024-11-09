@@ -1,116 +1,23 @@
+import os
+from pathlib import Path
 import random
 from functools import partial
-from typing import TypeAlias, Any, Generator
+from typing import TypeAlias, Any, Iterator
 
 import msgspec
 import torch
 from tensordict import TensorDict
-from torchdata import datapipes
 
 from windmark.core.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.architecture.embedders import FieldInterface
 from windmark.core.constructs.packages import SupervisedData, PretrainingData, SequenceData
 
+from windmark.core.samplers import Sampler, sample as sample_fn
+
 
 AnnotationType: TypeAlias = tuple[str, str, int]
 FieldType: TypeAlias = dict[str, list[Any] | Any]
-
-
-def subset(sequence: dict[str, Any], manager: SystemManager, split: str) -> bool:
-    """
-    Check if the given sequence has a specific split value.
-
-    Args:
-        sequence (dict[str, Any]): The sequence to check.
-        manager (SystemManager): The system manager.
-        split (str): The split value to compare against.
-
-    Returns:
-        bool: True if the sequence has the specified split value, False otherwise.
-    """
-
-    return sequence[manager.schema.split_id] == split
-
-
-def sample(
-    sequence: dict,
-    params: Hyperparameters,
-    manager: SystemManager,
-    split: str,
-    mode: str,
-) -> Generator[tuple[AnnotationType, FieldType], None, None]:
-    """
-    Generate samples from a sequence based on the specified mode.
-
-    Args:
-        sequence (dict): The sequence of data.
-        params (Hyperparameters): The hyperparameters for sampling.
-        manager (SystemManager): The system manager.
-        split (str): The split of the data (e.g., train, validation, test).
-        mode (str): The mode of sampling (e.g., pretrain, finetune, inference).
-
-    Yields:
-        tuple[AnnotationType, FieldType]: A tuple containing the annotations and fields for each sample.
-
-    Raises:
-        ValueError: If an invalid mode is provided.
-    """
-
-    for event in range(len(sequence[manager.schema.event_id])):
-        if mode == "pretrain":
-            if manager.sample.pretraining[split] < random.random():
-                continue
-
-            target = -1
-
-        elif mode == "finetune":
-            label: str | None = sequence[manager.schema.target_id][event]
-
-            if label is None:
-                continue
-            else:
-                target: int = manager.task.balancer.mapping[label]
-
-            if split != "test":
-                if manager.sample.finetuning[split] < random.random():
-                    continue
-
-                if manager.task.balancer.thresholds[target] < random.random():
-                    continue
-
-        elif mode == "inference":
-            label: str | None = sequence[manager.schema.target_id][event]
-
-            if params.predict_only_sequence_end:
-                if len(sequence[manager.schema.event_id]) != (event + 1):
-                    continue
-
-            if label is None:
-                target: int = -1
-            else:
-                target: int = manager.task.balancer.mapping[label]
-
-        else:
-            raise ValueError
-
-        window = slice(max(0, event - params.n_context), event)
-
-        sequence_id = str(sequence[manager.schema.sequence_id])
-        event_id = str(sequence[manager.schema.event_id][event])
-
-        annotations: AnnotationType = (sequence_id, event_id, target)
-
-        fields = {}
-
-        for field in manager.schema.dynamic:
-            assert len(sequence[manager.schema.event_id]) == len(sequence[field.name])
-            fields[field.name] = sequence[field.name][window]
-
-        for field in manager.schema.static:
-            fields[field.name] = sequence[field.name]
-
-        yield annotations, fields
 
 
 def tensorfield(
@@ -190,48 +97,6 @@ def package(
     return PretrainingData.new(inputs=fields, targets=targets, meta=tuple(meta))
 
 
-def stream(
-    datapath: str,
-    mode: str,
-    params: Hyperparameters,
-    manager: SystemManager,
-    split: str,
-) -> datapipes.iter.IterDataPipe:
-    """
-    Create a data stream for a specific mode and split.
-
-    Args:
-        datapath (str): The path to the data.
-        mode (str): The mode of operation. Can be one of "pretrain", "finetune", or "inference".
-        params (Hyperparameters): The hyperparameters for the model.
-        manager (SystemManager): The system manager.
-        split (str): The data split. Can be one of "train", "validate", or "test".
-
-    Returns:
-        datapipes.iter.IterDataPipe: The data stream.
-
-    Raises:
-        AssertionError: If the mode or split is not valid.
-    """
-    assert mode in ["pretrain", "finetune", "inference"]
-    assert split in ["train", "validate", "test"]
-
-    return (
-        datapipes.iter.FileLister(datapath, masks="*.ndjson")
-        .shuffle()
-        .sharding_filter()
-        .open_files()
-        .readlines(return_path=False)
-        .map(msgspec.json.decode)
-        .filter(partial(subset, manager=manager, split=split))
-        .shuffle()
-        .flatmap(partial(sample, manager=manager, params=params, mode=mode, split=split))
-        .shuffle()
-        .map(partial(tensorfield, manager=manager, params=params))
-        .map(partial(package, params=params, manager=manager, mode=mode))
-    )
-
-
 def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
     """
     Generate mock observations based on the given hyperparameters and system manager.
@@ -258,7 +123,7 @@ def mock(params: Hyperparameters, manager: SystemManager) -> TensorDict:
     return torch.stack(observations, dim=0).squeeze(1)
 
 
-class MultiStructureSequenceDataset(torch.utils.data.IterableDataset):
+class SequenceDataset(torch.utils.data.IterableDataset):
     def __init__(
         self,
         datapath: str,
@@ -269,20 +134,22 @@ class MultiStructureSequenceDataset(torch.utils.data.IterableDataset):
     ) -> None:
         super().__init__()
 
-        self.datapath = datapath
         self.mode = mode
         self.params = params
         self.manager = manager
         self.split = split
 
-    def __iter__(self):
-        return iter(self.generate())
+        root = Path(datapath)
 
-    def generate(self):
+        self.filenames = [root / filename for filename in os.listdir(root) if filename.endswith(".ndjson")]
+        self.sampler = partial(sample_fn, manager=manager, params=params, split=split, sampler=Sampler[mode].value)
+
+    def __iter__(self):
+        return iter(self.sample())
+
+    def sample(self) -> Iterator[SequenceData]:
         n_workers: int = torch.utils.data.get_worker_info().num_workers
         worker: int = torch.utils.data.get_worker_info().id
-
-        # coordinates = list(itertools.product(range(self.x), range(self.y)))
 
         random.shuffle(self.filenames)
 
@@ -299,15 +166,10 @@ class MultiStructureSequenceDataset(torch.utils.data.IterableDataset):
                 if sequence[self.manager.schema.split_id] != self.split:
                     continue
 
-                # shuffle
+                observations = self.sampler(sequence=sequence)
 
-                events = sample(sequence)
-
-                # shuffle
-
-                for event in events:
-                    tensorfields = tensorfield(event, self.params, self.manager)
-
+                for observation in observations:
+                    tensorfields = tensorfield(observation, self.params, self.manager)
                     yield package(tensorfields, self.params, self.manager, self.mode)
 
 

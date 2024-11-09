@@ -1,5 +1,6 @@
-import random
-from typing import TypeAlias, Any, Generator
+from random import random
+from typing import TypeAlias, Any, Iterator
+from functools import partial
 from enum import Enum
 
 from windmark.core.managers import SystemManager
@@ -9,67 +10,53 @@ AnnotationType: TypeAlias = tuple[str, str, int]
 FieldType: TypeAlias = dict[str, list[Any] | Any]
 
 
-def index(sequence: dict, manager: SystemManager) -> Generator[int, None, None]:
+def index(sequence: dict, manager: SystemManager) -> Iterator[int]:
     return range(len(sequence[manager.schema.event_id]))
 
 
-def pretrain(sequence: dict, params: Hyperparameters, manager: SystemManager, split: str) -> list[tuple[int, int]]:
-    events = index(sequence)
-
+def pretrain(sequence: dict, params: Hyperparameters, manager: SystemManager, split: str) -> Iterator[tuple[int, int]]:
+    events = index(sequence, manager=manager)
     rate = manager.sample.pretraining[split]
-
-    events = [event for event in events if rate > random.random()]
-    targets = [-1] * len(events)
-
-    return zip(events, targets)
-
-
-def finetune(sequence: dict, params: Hyperparameters, manager: SystemManager, split: str) -> list[tuple[int, int]]:
-    events = index(sequence)
-
-    thresholds: dict[str, float] = manager.task.balancer.thresholds
-
-    split_rate = manager.sample.finetuning[split]
-
-    rates = {target: threshold * split_rate for target, threshold in thresholds.items()}
-
-    out: list[tuple[int, int]] = []
-
-    for event in events:
-        label: str | None = sequence[manager.schema.target_id][event]
-
-        if label is None:
-            continue
-        else:
-            target: int = manager.task.balancer.mapping[label]
-
-        if (split != "test") & (rates[target] < random.random()):
-            continue
-
-        out.append((event, target))
+    out = ((event, -1) for event in events if rate > random())
 
     return out
 
 
-def inference(sequence: dict, params: Hyperparameters, manager: SystemManager, split: str) -> list[tuple[int, int]]:
+def finetune(sequence: dict, params: Hyperparameters, manager: SystemManager, split: str) -> Iterator[tuple[int, int]]:
+    events = index(sequence, manager=manager)
+    labels = sequence[manager.schema.target_id]
+    mapping = manager.task.balancer.label_mapping
+    split_rate = manager.sample.finetuning[split]
+    rates: dict[str, float] = manager.task.balancer.sample_rates_mapping
+
+    out = (
+        (event, mapping[label])
+        for event, label in zip(events, labels)
+        if (label is not None) & ((rates[label] * split_rate > random()) or (split == "test"))
+    )
+
+    return out
+
+
+def inference(sequence: dict, params: Hyperparameters, manager: SystemManager, split: str) -> Iterator[tuple[int, int]]:
+    mapping = manager.task.balancer.mapping
+
     if params.predict_only_sequence_end:
-        # FIXME minus one, right??
-        event = [len(sequence[manager.schema.event_id]) - 1]
-        target = [sequence[manager.schema.target_id][-1]]
+        event: int = len(sequence[manager.schema.event_id]) - 1
+        target: int = mapping[sequence[manager.schema.target_id][-1]]
+        return [(event, target)]
 
-        return event, target
-        # return [len(sequence[manager.schema.event_id])]
+    targets = (mapping[label] for label in sequence[manager.schema.target_id])
+    zipped = zip(index(sequence, manager=manager), targets)
+    out = ((event, target) for event, target in zipped)
 
-    events = index(sequence)
-    targets = [target for target in sequence[manager.schema.target_id]]
-
-    return zip(list(events), targets)
+    return out
 
 
 class Sampler(Enum):
-    pretrain = pretrain
-    finetune = finetune
-    inference = inference
+    pretrain = partial(pretrain)
+    finetune = partial(finetune)
+    inference = partial(inference)
 
 
 def sample(
@@ -78,7 +65,7 @@ def sample(
     manager: SystemManager,
     split: str,
     sampler: Sampler,
-) -> Generator[tuple[AnnotationType, FieldType], None, None]:
+) -> Iterator[tuple[AnnotationType, FieldType]]:
     indices: list[tuple[int, int]] = sampler(sequence=sequence, params=params, manager=manager, split=split)
 
     for event, target in indices:

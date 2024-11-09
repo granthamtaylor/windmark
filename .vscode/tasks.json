@@ -20,9 +20,18 @@
       }
     },
     {
-      "label": "$(book) publish",
+      "label": "$(book) Publish",
       "type": "shell",
       "command": "uv run just publish",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "$(refresh) Reset",
+      "type": "shell",
+      "command": "uv run just reset",
       "presentation": {
         "reveal": "always",
         "panel": "new"

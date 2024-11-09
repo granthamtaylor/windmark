@@ -25,14 +25,6 @@ class DynamicCategoryField(TensorField):
 
     Attributes:
         lookup (Int[torch.Tensor, "_N L"]): The lookup tensor for the dynamic category field.
-
-    Methods:
-        new(cls, values, field, params, manager): Creates a new instance of DynamicCategoryField.
-        mask(self, is_event_masked, params): Masks the dynamic category field.
-        prune(self): Prunes the dynamic category field.
-        get_target_size(cls, params, manager, field): Returns the target size of the dynamic category field.
-        postprocess(cls, values, targets, params): Postprocesses the dynamic category field.
-        mock(cls, field, params, manager): Creates a mock instance of DynamicCategoryField.
     """
 
     lookup: Int[torch.Tensor, "_N L"]
@@ -108,7 +100,7 @@ class DynamicCategoryField(TensorField):
         Returns:
             int: The target size of the dynamic category field.
         """
-        return manager.levelsets.get_size(field) + len(Tokens)
+        return len(manager.levelsets[field]) + len(Tokens)
 
     @classmethod
     def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
@@ -158,13 +150,6 @@ class StaticCategoryField(TensorField):
 
     Attributes:
         lookup (Int[torch.Tensor, "_N"]): The lookup tensor for the field.
-
-    Methods:
-        new(cls, values, field, params, manager): Creates a new instance of StaticCategoryField.
-        mask(self, is_event_masked, params): Masks the field based on the given mask tensor.
-        postprocess(cls, values, targets, params): Postprocesses the field values and targets.
-        mock(cls, field, params, manager): Creates a mock instance of StaticCategoryField.
-
     """
 
     lookup: Int[torch.Tensor, "_N"]  # noqa: F821
@@ -556,10 +541,6 @@ class DynamicQuantileField(TensorField):
     Attributes:
         lookup (Int[torch.Tensor, "_N L"]): The lookup tensor.
         content (Float[torch.Tensor, "_N L"]): The content tensor.
-
-    Methods:
-        get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-            Returns the target size of the dynamic quantile field.
     """
 
     lookup: Int[torch.Tensor, "_N L"]

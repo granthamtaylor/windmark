@@ -5,7 +5,7 @@
 #set raw(lang:"python")
 
 #show: ams-article.with(
-  title: [Natively Modeling Complex Sequential Data with Modular Field Embeddings],
+  title: [Multi-Structure Sequence Modeling: Natively Modeling Complex Sequential Data with Modular Field Embeddings],
   authors: (
     (
       name: "Grantham Taylor",
@@ -17,12 +17,12 @@
     ),
   ),
   abstract: [
-    Large organizations struggle to model complex sequential data collected via Event Sourcing.
-    Without the proper solutions to apply modern deep learning techniques, businesses still use traditional machine learning techniques, which require significant time and monetary costs and yield suboptimal performance.
+    Large organizations struggle to effectively model complex sequential time series data.
+    Without the proper solutions to apply modern deep learning techniques, businesses resort to traditional machine learning techniques, which require significant time and monetary costs and yield suboptimal performance.
     Previous research has developed techniques that narrowly outperform tabular machine learning but only with extensive data preprocessing and domain expertise.
     This paper describes a model training pipeline that can natively model complex sequential data with a novel modular embedding system paired with a dynamically generated transformer-encoder model architecture.
     This approach can represent multiple nullable arrays of any combination of discrete, numerical, temporal, and anonymous entity representations without feature engineering or batch preprocessing.
-    This paper also includes novel techniques that enable end-to-end automation and optimize computational performance.
+    This paper also includes novel techniques that enable end-to-end automation and optimize computational performance, requiring zero data copying, the ability to sample training observations from disk, and the ability to "prune" features to bootstrap feature importance metrics.
     Our contributions deliver a novel solution that may automate model development, reduce model deployment costs, and significantly improve model performance.
   ],
   bibliography: bibliography("refs.bib"),
@@ -52,15 +52,15 @@
 
 == Problem Statement
 
-From fraud detection to predicting each customer's risk of charging off, many organizations approach their business problems with tabular machine learning. However, modeling data with tabular machine learning can be surprisingly challenging in practice. Some machine learning projects can take years to develop and deploy to production. We aim to solve the following four shortcomings of applying tabular machine learning to problems among a subset of these problems:
+From fraud detection to predicting customer charge off, many organizations approach their sequential modeling problems with tabular machine learning techniques. However, modeling this specific structure of data with tabular machine learning can be surprisingly challenging in practice. Some machine learning projects can take months to years to develop and deploy to production. We aim to solve the following four shortcomings of applying tabular machine learning to these problems:
 + Preparing production data for tabular machine learning requires manual feature engineering that dilutes the signals present in the raw source data, thus harming model performance.
 + Optimizing tabular models is tedious and time-consuming because the model developers must iteratively engineer tabular features from complex non-tabular data and explore their marginal contributions to the model's performance across various iterations and methods of signal aggregation while ensuring calculated features's computational requirements and complexity are justified.
 + Deploying tabular models in real-time requires extensive data engineering to calculate multiple, arbitrarily complex tabular features within milliseconds.
-+ Developing models for emerging business problems requires engineering new, arbitrarily unique features to extract different signals from the same data sources, thus limiting an organization's ability to consolidate technological and personnel resources among otherwise identical implementations.
++ Developing models for emerging business problems requires engineering new, arbitrarily unique features to extract different signals from the same data sources, thus limiting an organization's ability to consolidate technological and personnel resources among otherwise identical implementations, or requiring significant investments in "feature stores".
 
-These problems originate from one critical insight: Many common machine learning problems solved with tabular machine techniques are not of a tabular form. Organizations restructure their business problems so that they may utilize tabular machine learning techniques to model their complex sequential data, accruing vast amounts of technical debt in the process.
+These problems originate from one critical insight: Many common machine learning problems solved with tabular machine techniques are not of a tabular form. Organizations restructure their business problems so that they may utilize tabular machine learning techniques to model their multi-structured sequential data, accruing vast amounts of technical debt in the process.
 
-By unraveling this misconception and developing a tailored solution for a large subset of business data in its native form, we can address these four deficiencies to significantly improve model performance, increase speed-to-market, automate model deployment, and consolidate the resources among the arbitrarily unique implementations of individual machine learning projects, thus solving all four posited issues simultaneously.
+By unraveling this misconception and developing a tailored solution for a large subset of business data in its native form, we can address these four challenges to significantly improve model performance, increase speed-to-market, automate model deployment, and consolidate the resources among the arbitrarily unique implementations of individual machine learning projects.
 
 == The Practical Limitations of Tabular Machine Learning
 
@@ -87,13 +87,15 @@ Suppose you work at a financial institution and are training a model to determin
     caption: [How sequential/transactional data might look in a production table]
 )
 
-This table contains the complete history of every event posted by every customer, although we only show the history of our customer "Jane" for simplicity. Tabular machine learning techniques cannot model this rich data structure even though the data may fit in a table, as each observation is not independent. In other words, there are inter-record relationships that tabular models cannot understand. This data structure is universal: a "ledger" of events every customer posts. Each event arrives asynchronously and is immutable such that once a customer does something, it permanently stays on the ledger for all time. Each event can contain any number of complex fields, and each field can be of any data type. For example, the type of any field may be categorical, of raw text, having graph-like entity identifiers such as an IP Address or phone number, of arbitrarily complex numeric distributions, a simple boolean value, structured timestamp, structured geospatial coordinates, or even file paths to images, audio clips or other such media.
+This table contains the complete history of every event posted by every customer, although we only show the history of our customer "Jane" for simplicity. Tabular machine learning techniques cannot model this rich data structure even though the data may fit in a table, as each observation is not independent. In other words, there are relationships among multiple observation that tabular models cannot model by design. This data structure is universal: a "ledger" of events that every customer posts. Each event arrives asynchronously and is immutable such that once a customer does something, it permanently stays on the ledger for all time. Each event can contain any number of complex fields, and each field can be of any data type. For example, the type of any field may be categorical, of raw text, having graph-like entity identifiers such as an IP Address or phone number, of arbitrarily complex numeric distributions, a simple boolean value, structured timestamp, structured geospatial coordinates, or even file paths to images, audio clips or other media.
 
-This data architecture pattern is called "Event Sourcing." Event sourcing can easily apply complex business logic and record every customer's history for complete reproducibility. It is also able to scale with _Big Data_.
+This data structure is sequential and has potentially multiple fields, each of which may have any data type. We refer to this data structure as being "multi-structured", and refer to a specific instance of this data structure as a "ledger".
 
-*The ledger is the source of truth for everything that has ever happened.*
+This data architecture pattern is called "Event Sourcing." Event sourcing can easily apply complex business logic and record every customer's history for complete reproducibility. It scales well with _Big Data_.
 
-Modeling the ledger is exceedingly challenging, however. It is standard to simplify such a complex data structure into a tabular format to utilize traditional machine learning techniques, such Gradient Boosting Machines (GBMs), by creating independent observations with hundreds to thousands of tabular features, each representing the composite of previous events. Developing such tabular features from the ledger is called "tabular feature engineering." If done correctly, a tabular machine learning model can model the target variable as a function of the tabular features. However, extensive manual effort and subject matter expertise are required to solve common business problems adequately.
+*The ledger is the source of truth for everything that has ever happened within an organization.*
+
+Modeling a ledger is challenging, however. It is commonplace to simplify this ledger structure into a set of tabular "features" to utilize traditional machine learning techniques, such Gradient Boosting Machines (GBMs), by creating independent observations with hundreds to thousands of tabular features, each representing the composite of previous events. Developing such tabular features from the ledger is called "tabular feature engineering." If done correctly, a tabular machine learning model can model the target variable as a function of the tabular features. However, extensive manual effort and subject matter expertise are required to optimally engineer the features that sufficiently solve a business problem.
 
 Given the above ledger, as a crude first draft, one might engineer the following features:
 - `income`: The customer's most recently reported income
@@ -113,26 +115,26 @@ Given the above ledger, as a crude first draft, one might engineer the following
     caption: [An example of tabular features created from sequential data]
 )
 
-With the newly transformed data, a model developer may apply a tabular technique, such as a GBM, to predict the probability of whether a customer is lying about their identity. Such a model may provide decent initial model results given enough labeled training observations.
+With the newly transformed data, a model developer may apply a tabular machine learning model, such as a GBM, to predict the probability of whether this customer is lying about their identity. Such a model may provide decent initial model results given enough labeled training observations.
 
 While the ledger is much more complicated to model than this tabular view, it contains significantly more information. For example, the ledger shows three interesting insights that are missing from the tabular view:
 + Jane originally misspelled her email address as "jame\@hotmail.co", so she couldn't verify it until she corrected it to "jane\@hotmail.com".
 + The time that transpired between each event observed of Jane's activity.
 + Jane has not changed her income since she joined.
 
-All of these signals _could be_ vital to modeling an identity verification problem. Tabular machine learning cannot model all these potential signals unless a model developer manually engineers new features. A model developer _can_ create more tabular features that can collectively approach the signal available within the ledger.
+All of these signals _could be_ vital to modeling an identity verification problem. Tabular machine learning cannot model all these potential signals unless a model developer manually engineers new features. A model developer _can_ create more tabular features that can collectively approach the signal available within the ledger, but they need to understand which features they should engineer.
 
-For example, a model developer could create more tabular features to count the times each customer has changed their email over varying time windows (the last day, week, and month). They would also need to count the number of times the email was verified among varying time windows (over the last day, week, and month) and the number of times the email verification failed. However, consider how many nuanced signals may be lost during this aggregation while operating with more complex data in which customers may post hundreds of unique events, each with dozens of potential fields associated with them. The model developer would need to create hundreds, if not thousands, of tabular features to account for many intersecting events over varying time windows, with multiple possible aggregation functions. Meanwhile, the ledger already contains this information in a concise form.
+For example, a model developer could create more tabular features to count the times each customer has changed their email over varying time windows (the last day, week, and month). They would also need to count the number of times the email was verified among varying time windows (over the last day, week, and month) and the number of times the email verification failed. However, consider how many nuanced signals may be lost during this aggregation while operating with more complex data in which customers may post hundreds of unique events, each with dozens of potential ledger fields associated with them. The model developer would need to create hundreds, if not thousands, of tabular features to account for many intersecting events over varying time windows, with multiple possible aggregation functions. Meanwhile, the ledger already contains this information in a concise form.
 
-No matter how skilled or experienced a model developer cannot sufficiently explore all possible tabular features because the set of possible tabular features is of effectively infinite size.
+No matter how skilled or experienced, a model developer cannot sufficiently explore all possible tabular features because the set of possible tabular features is of effectively infinite size.
 
-When modeling complex sequential data with tabular models, model developers rely upon such aggregative window functions to capture the complex signal that would otherwise be lost. These window functions are extremely computationally expensive to calculate at scale, and it takes a great deal of time and domain expertise to know which features to prioritize. However, even beyond the costly computational and domain expertise requirements, calculating hundreds of arbitrarily unique window functions in real time requires teams of dedicated on-call engineers.
+When modeling multi-structured sequential data with tabular models, model developers rely upon such aggregative rolling window functions to capture the complex signal that would otherwise be lost. These rolling window functions are extremely computationally expensive to calculate at scale, and it takes a great deal of time and domain expertise to know which features to prioritize. However, even beyond the costly computational and domain expertise requirements, calculating hundreds of arbitrarily unique window functions in real time requires teams of dedicated on-call engineers.
 
 Lastly, GBMs, being _greedy_ learners, are especially prone to overfitting with many tabular features. You cannot simply throw thousands of infinitely many potential features into the model, or its performance will start to degrade. This constraint adds even more complexity to the optimization process, as the model developer now must iteratively prune the tabular features from the model while also considering the model's performance and the computational requirements to deploy the model.
 
 These factors culminate in a painful, manual iterative process of engineering tabular features, training models with them, and then pruning the tabular features for the sake of model complexity and real-time compute requirements. Because of all of these costs of modeling sequential data with tabular models, many organizations cannot address many problems that would otherwise provide tremendous value-add. This unfortunate combination of constraints is why traditional modeling techniques can require years to develop and deploy despite being relatively simple from a machine learning perspective.
 
-By modeling the ledger exactly how it already exists instead of creating a "view" of it, we may be able to skip all of the feature engineering. Feature engineering is the primary reason tabular machine learning is so expensive to develop and deploy for real-world use cases. It is time-consuming, tedious, prone to error, and extremely hard to scale for real-time computation. It requires extensive testing, maintenance, and monitoring. Tabular machine learning fails to address the requirements of businesses' problems.
+By modeling multi-structured sequential data exactly how it already exists instead of creating a tabular "view" of it, we may be able to skip all of the feature engineering. Feature engineering is the primary reason tabular machine learning is so expensive and tedious to develop and deploy for real-world use cases. It is time-consuming, prone to error, and extremely hard to scale for real-time computation. It requires extensive testing, maintenance, and monitoring because the logic used to define tabular features are a common source of multiple modes of failure.
 
 Using the raw data to model our problem allows us to eliminate these significant costs from the modeling process while also providing a means to introduce the many benefits of more modern machine learning techniques.
 
@@ -155,9 +157,9 @@ Identity verification is hardly the only problem that suffers from the shortcomi
 + Given the previous transactions posted by a Venmo user, what is the probability that the current transaction is an attempt to defraud another user?
 + Given the previous tweets posted by a Twitter user, what is the probability that this user is a bot?
 
-We expect hundreds of other such business problems with dozens of different industries. By developing a consolidated modeling framework that can model all of them with a single strategy that does not require arbitrarily unique means of extracting signals, we may commoditize the machine learning requirements that underlay their business operations.
+We expect hundreds of other such business problems with dozens of different industries. By developing a consolidated modeling framework that can model all of them with a single strategy that does not require arbitrarily unique means of extracting signals, we may commoditize the machine learning requirements that underlie their business operations.
 
-In summary, instead of manually aggregating the events through miscellaneous window functions to represent their current state, we may, with the use of deep learning, create a representation of each customer at any point in time, given all of the events that they have posted up until that point in time. We assume, from the perspective of our model, that the composite of their actions may define each individual. We may then use these customer representations to solve any arbitrary machine learning problem with a single generalized modeling approach that does not require manual feature engineering, thus accelerating model development timelines, increasing model performance, and decreasing model deployment costs.
+Instead of manually aggregating the events through arbitrary rolling window functions to represent their current state, we may, with the use of deep learning, create a representation of each customer at any point in time, given all of the events that they have posted up until that point in time. We assume, from the perspective of our model, that the composite of their actions may define each individual. We may then use these customer representations to solve any arbitrary machine learning problem with a single generalized modeling approach that does not require manual feature engineering, thus accelerating model development timelines, increasing model performance, and decreasing model deployment costs. A sufficiently powerful model will be able to bootstrap its own features from the raw data, thus eliminating the need for manual feature engineering.
 
 == Contributions
 
@@ -171,29 +173,29 @@ We contribute the following novelties:
 + "Random Event-Level Sampling": A novel observation sampling technique capable of generating significantly more unique observations than previous methods with minimal batch preprocessing and an associated proprietary data streaming library capable of streaming larger-than-memory, arbitrarily complex fields.
 + "Partial Field Pruning": A novel technique to provide enhanced model explainability with efficient field pruning.
 
-Lastly, we apply these novel techniques within the internally codenamed "Windmark" machine-learning pipeline, which constructs, pre-trains, and fine-tunes custom complex sequence models directly from a ledger to yield state-of-the-art results.
+Lastly, we apply these novel techniques within the internally codenamed "Windmark" machine-learning pipeline, which constructs, pre-trains, and fine-tunes custom multi-structured sequence models directly from multi-structured sequential data. This pipeline is capable of solving arbitrary supervised learning tasks with a single generalized modeling approach that does not require manual feature engineering. It does so without copying the inputted ledger, and is cloud-native, capable of training on arbitrarily large datasets with minimal computational requirements.
 
 
 == Terminology
 <terminology>
 
-It will be helpful to define some terminology before going forward. We will discuss the architecture of a _complex sequence model_. A complex sequence model trains on _observations_, each created from a slice of a _sequence_. A sequence contains multiple _events_, in which each event may have any number of _fields_. Each field has an associated _field type_. We may refer to this data as "sequential" or "transactional." It is, however, a sequence of multivariate events with nullable, heterogeneous fields that exists within a _ledger_.
+It will be helpful to define some terminology before going forward. We will discuss the architecture of a _multi-structured sequence model_. A multi-structured sequence model trains on _observations_, each created from a slice of a _sequence_. A sequence contains multiple _events_, in which each event may have any number of _fields_. Each field has an associated _field type_. We may refer to this data as "sequential" or "transactional." It is, however, a sequence of multivariate events with nullable, heterogeneous fields that exists within a _ledger_.
 
-The population of sequences exists in one or more database tables, in which each event is a record. We refer to this source of raw data as a ledger. We stream through the ledger, identify the unique sequence IDs (i.e., customer IDs), and find all the events within each sequence. Each event may include one or more unique fields. Every field exists as a column in this table. The values of each field are nullable; any field value can be empty, which the model must be able to represent and learn as distinct and information-bearing values.
+The population of sequences exists in one or more database tables, in which each event is a record. We refer to this source of raw data as a ledger. We stream through the ledger, identify the unique sequence IDs (i.e., customer IDs), and find all the events within each sequence. Each event may include one or more unique fields. Every field exists as a column in this table. The values of each field are nullable; any field value can be empty, which the model must be able to uniquely represent and learn as distinct and information-bearing values.
 
 We then stream over each sequence, sampling events from each sequence. Each event has an equal probability of being sampled, as determined by a hyperparameter. After sampling an event (the _anchor_), we take that event and the $L-1$ preceding events to form the _context_ for a training sample. If there are not $L-1$ many preceding events before the sampled event, then the context is equal to however many events are available. We then pad and collate the context by collecting every field value within the context to create an _observation_ of length $L$. As an analogy to the domain of language modeling, $L$ is similar to $"max_seq_length"$.
 
 We take the associated _target_ value from the sampled event for any supervised modeling task. In other words, using this methodology, we may support event-level targets for either classification or regression.
 
-We create $N$ many observations from other sampled events, some of which may be (but need not be) from the same sequence, to create a training batch, which we then pass into the sequence encoder. We then pre-train and fine-tune the sequence model with the observations.
+We create $N$ many observations from other sampled events, some of which may be (but need not be) from the same sequence, to create a training batch, which we then pass into the sequence encoder. We then pre-train and fine-tune the sequence model with the sampled observations.
 
 #figure(
     image("../diagrams/context.drawio.svg"),
     caption: [An observation being sampled and collated from a sequence],
 )
 
-The model architecture, which we later discuss in detail, utilizes transformer-encoder blocks like BERT @bert. We fine-tune the complex sequence model to create a representation of the events within the context for modeling arbitrary supervised learning tasks. This approach differs from models like GPT, which utilize transformer-decoder blocks to predict subsequent tokens. Additionally, the data structure is similar to a sequence of word-piece tokens used to train BERT but with two significant differences:
-+ You may conceptualize a list of word-piece tokens as events with a single discrete field, whereas multivariate sequential data may include more than one field. In other words, this model architecture encodes embeddings of shape ($RR^(N times L times F times C)$), whereas BERT encodes embeddings of shape ($RR^(N times L times C)$).
+The model architecture, which we later discuss in detail, utilizes transformer-encoder blocks like BERT @bert. We fine-tune the multi-structured sequence model to create a representation of the events within the context for modeling arbitrary supervised learning tasks. This approach differs from auto-regressive models like GPT, which utilize transformer-decoder blocks to predict subsequent tokens. Additionally, the data structure is similar to a sequence of word-piece tokens used to train BERT but with two significant differences:
++ You may conceptualize a list of word-piece tokens as events with a single discrete field, whereas multi-structured sequential data may include more than one field. In other words, this model architecture encodes embeddings of shape ($RR^(N times L times F times C)$), whereas BERT encodes embeddings of shape ($RR^(N times L times C)$), where $F$ defines the number of fields.
 + BERT samples observations at a sequence level, but we sample observations from sequences at an event level. For example, a customer with 10,000 events should create approximately ten times more observations than a customer with only 1,000 events because a randomly sampled event defines each observation. This technique enables the model to support fine-tuning with targets uniquely defined for each event.
 
 == Tensor Notation
@@ -219,7 +221,7 @@ Given that we are talking about a rather complicated model structure, here is a 
 === TabBERT
 In early 2021, developers at IBM published _Tabular Transformers for Modeling Multivariate Time Series_ (Padhi 2021), in which they described a novel model architecture (TabBERT) that could outperform GBMs trained on handcrafted tabular features for a set of supervised problems with sequential data. @tabformer
 
-In essence, they frame each sequence as a two-dimensional array. One dimension of the array represents each event in the sequence, and the second dimension represents each field in each event, thus having a dimensionality of $WW^(N times L times F)$ when collated and batched together to form a training observation. In their implementation, every single field is limited to discrete tokens. They embed the discrete field values like BERT.
+In essence, they frame each sequence as a two-dimensional array. The first dimension of the array represents each event in the sequence, and the second dimension represents each field in each event, thus having a dimensionality of $WW^(N times L times F)$ when collated and batched together to form a training observation. In their implementation, every single field is limited to discrete tokens. They embed the discrete field values like BERT.
 
 BERT embeds a 1D discrete input of tokens (a sentence of words) into 2D space (an array of embeddings):
 ```python
@@ -236,7 +238,7 @@ TabBERT utilizes a hierarchical transformer-encoder architecture with two encode
 
 A great analogy for hierarchical transformer architecture comes from computer vision. Ideally, if one is building an image representation, each pixel should interact with the other. However, if one is building a representation of a video, it would be virtually impossible to allow every pixel of every frame to interact with one another. Instead, it is significantly more efficient to first build a representation of each frame by letting each of its pixels interact with one another and then build a representation of the video by allowing each frame representation to interact. Similarly, TabBERT decomposes a large and complex operation into two smaller operations: contextualizing representations of each event and then using those contextualized event representations to represent the sequence as a whole.
 
-The hierarchical transformer architecture dramatically reduces the memory complexity of the model. Self-attention is notorious for its quadratic memory complexity (both during training and inference) with respect to context size. By utilizing two transformer-encoders to attend the fields and events separately, we do not require extensive memory requirements for sufficiently long contexts. In effect, we have reduced the memory complexity from a worst-case of $O((L F)^2)$ into a less prohibitive $O(L^2 F + L F^2)$. Within the typical ranges of $L$ (128 to 512) and $F$ (5 to 20), this reduces memory requirements by a bit over an order of magnitude.
+The hierarchical transformer architecture dramatically reduces the memory complexity of the model. Self-attention has quadratic memory complexity (both during training and inference) with respect to context size. By utilizing two transformer-encoders to attend the fields and events separately, we do not require extensive memory requirements for sufficiently long contexts. In effect, we have reduced the memory complexity from a worst-case of $O((L F)^2)$ into a less prohibitive $O(L^2 F + L F^2)$. Within the typical ranges of $L$ (128 to 512) and $F$ (5 to 20), this reduces memory requirements by a bit over an order of magnitude.
 
 TabBERT, while elegant, did come with some major drawbacks. The most significant limitation is that TabBERT coerces continuous fields ($RR^(N times L times F)$) into a categorical data type ($WW^(N times L times F)$). For example, the model cannot represent the dollar amounts associated with a transaction unless you bin them into categorical levels:
 
@@ -254,11 +256,9 @@ TabBERT, while elegant, did come with some major drawbacks. The most significant
     caption: [How one might discretize continuous dollar amounts to categorical values]
 )
 
-Discretizing every field comes with significant model performance costs. Much of gradient boosting machines' success comes from their ability to define arbitrary cutoff points for continuous features. For example, in some fraud patterns, fraudsters might prefer gift cards, which commonly come in denominations of exactly \$25, \$50, or \$100. In such a fraud pattern, transactions with dollar amounts equal to exactly those values may be far more likely to be associated with known fraud patterns than transactions with dollar amounts with, say, values around \$25.08, \$49.12, or \$99.53. A GBM may chase the residuals around these exact cutoffs in the continuous distributions. For some tasks, discretizing the raw continuous fields could worsen model performance because the high-frequency nature of continuous fields could be essential.
+Depending on business problem at hand, discretizing continuous fields may have significant model performance costs. Much of gradient boosting machines' success comes from their ability to define arbitrary cutoff points for continuous features. For example, in some fraud patterns, fraudsters might prefer gift cards, which commonly come in denominations of exactly \$25, \$50, or \$100. In such a fraud pattern, transactions with dollar amounts equal to exactly those values may be far more likely to be associated with known fraud patterns than transactions with dollar amounts with, say, values around \$25.08, \$49.12, or \$99.53. A GBM may chase the residuals around these exact cutoffs in the continuous distributions. For some tasks, discretizing the raw continuous fields could worsen model performance because the high-frequency nature of continuous fields could be essential.
 
-Additionally, neither the model nor the loss function knows the ordinal nature of the binned field values. For example, if a masked dollar amount was originally \$9.95 but the model predicts that the value is in the bucket `"$10<x<$20"`, the loss function harshly penalizes the model even though the model was almost correct. In other words, the loss function is unaware that the model's prediction of `"$10<x<$20"` is not as incorrect as a prediction of `"$100<x<$200"`.
-
-Lastly, LSTM networks are prone to exploding gradients and require linear time complexity with respect to context size, such that training them can be slow.
+Lastly, neither the model nor the loss function knows the ordinal nature of the binned field values. For example, if a masked dollar amount was originally \$9.95 but the model predicts that the value is in the bucket `"$10<x<$20"`, the loss function harshly penalizes the model even though the model was almost correct. In other words, the loss function is unaware that the model's prediction of `"$10<x<$20"` is not as incorrect as a prediction of `"$100<x<$200"`.
 
 === UniTTab
 In 2023, Prometeia, a small Italian consulting firm, published _One Transformer for All-Time Series: Representing and Training with Time-Dependent Heterogeneous Tabular Data_, in which they introduced the UniTTab architecture. Their novelties included using Fourier feature encodings to represent floating point field values without discretizing them. They referenced the NeRF paper (Neural Radiance Fields), which highlighted how Fourier feature encodings provide neural networks with a better representation of floating point values than passing in raw scalar values. @unittab @nerf @fourier
@@ -267,22 +267,24 @@ Fourier feature encodings effectively embed the true value of continuous inputs.
 
 UniTTab also adapted TabBERT's custom self-supervised learning task to work with continuous fields. Instead of reconstructing the raw scalar values of each field via regression, UniTTab simplified the problem into one of ordinal classification, in which the model attempts to determine the discretized bin of masked continuous field values. They modified the loss function to "smoothen" the loss if the predicted bin is "closer" to the actual value, a technique that they described as "neighborhood loss smoothing."
 
-UniTTab's improvements over TabBERT resulted in significantly better performance; however. The authors did not share their source code. Additionally, they were vague in how they implemented their "row type" embedding system. They require that each event be associated with a registered "row type" and that each "row type" has a required, non-nullable schema, which requires an extraordinarily complex implementation to be able to be trained with accelerated hardware. We were unable to reproduce their results.
+UniTTab's improvements over TabBERT resulted in significantly better performance; however. The authors did not share their source code. Additionally, they were vague in how they implemented their "row type" embedding system. They require that each event be associated with a registered "row type" and that each "row type" has a required, non-nullable schema, which requires an extraordinarily complex implementation to be able to be trained with accelerated hardware.
 
 == Consolidating Complex Field Types with the Modular Field Embedding System
 
-TabBERT and UniTTab both contributed a great deal to complex sequential modeling. TabBERT introduced the idea of hierarchical attention to capture the two-dimensional nature of multivariate sequences. UniTTab improved upon TabBERT to utilize continuous fields. @unittab @tabformer
+TabBERT and UniTTab both contributed a great deal to multi-structured sequential modeling. TabBERT introduced the idea of hierarchical attention to capture the two-dimensional nature of multivariate sequences. UniTTab improved upon TabBERT to utilize continuous fields. @unittab @tabformer
 
 We introduce a novel approach to consolidate the embedding strategies of the previous papers with a focus on automation and extensibility, providing the following benefits:
 + Combine the abilities of the above papers (supporting discrete, continuous field types) while providing improved support for nullable heterogeneous fields without requiring a set schema for each "row type."
-+ Introduce a unique representation of "entities" and geospatial coordinates. We define an "entity" as a discrete input with a finite but impractically large input space, such as a device ID, a login session, a phone number, or a merchant name.
-+ Support arbitrarily complex field types, such as text, images, video, and audio, by leveraging foundation models to embed field values for each universal modality as required.
++ Introduce a unique representation of timestamps, "entities" and geospatial coordinates. We define an "entity" as a discrete input with a finite but impractically large input space, such as a device ID, a login session, a phone number, or a merchant name.
++ Develop a modular embedding strategy to embed arbitrarily complex field types, such as text, images, video, and audio, by leveraging foundation models to embed field values for each universal modality as required.
 
 To embed the wide variety of these fields, we have developed the Modular Field Embedding System (MFES) to initiate and route modular field types. The MFES manages a set of unique field embedders for each supported field type with extensibility in mind, so embedders for new field types may be independently managed as a "plugin" system.
 
 As stated above, UniTTab supports discrete and continuous fields through a system the authors call "row types," in which each event must have a specific type with a rigid, non-nullable structure. This system is inflexible and not necessarily intuitive to implement either. We offer an alternative approach that does not require any concept of "row types" but instead relies upon "field types." Instead of trying to define the unique "type" of each event, we view the data structure from the perspective of its unique fields.
 
-A simple analogy comes from the concept of _dataframes_. You might view a data frame as a list of tuples, each tuple being a row. Alternatively, you could view a data frame as a dictionary of lists, each being a column. In this analogy, UniTTab elected to focus on the row-major structure of lists of tuples to avoid representing null values. We developed a tensor representation around the field types similar to a column-major data frame representation. This approach allows for extensible methodology by which we later define arbitrarily complex field types.
+Because of this design, each model is designed exclusively for a ledger. In other words, the fields in a ledger define the model's architecture.
+
+A simple analogy comes from the concept of _dataframes_. You might view a data frame as a list of tuples, each tuple being a row. Alternatively, you could view a data frame as a dictionary of lists, each being a column. In this analogy, UniTTab elected to focus on the row-major structure of lists of tuples to avoid having to represent null values. We developed a tensor representation around the field types similar to a column-major data frame representation. This approach is more flexible and allows for automatic architecture resolution.
 
 #figure(
     image("../diagrams/dataframe.drawio.svg"),
@@ -297,7 +299,7 @@ We define "field types" instead of creating "row types" like UniTTab. Each field
     - `TensorField::mock`: Create random mock data for unit testing.
 + A `FieldEmbedder` module to create the field embeddings from a `TensorField` instance.
 
-After defining a `TensorField` and `FieldEmbedder` class, and registering it to the `FieldInterface` class, one may integrate their own custom field types into the MFES.
+After defining both a `TensorField` and `FieldEmbedder` class, and registering them to the `FieldInterface`, one may integrate their own custom field types into the MFES.
 
 #figure(
     image("../diagrams/mfes.drawio.svg"),
@@ -318,7 +320,7 @@ Suppose one intends to initiate a simple model architecture that utilizes four d
 
 We use torch's `TensorDict` and `tensorclass` implementations to represent a collection of the fields. For those unfamiliar with these constructs, they are almost exactly how they sound. A `TensorDict` is a pytorch dictionary that can contain instances of `torch.Tensor`. A `tensorclass` may be used similarly to `dataclass`. We use it to create a unique, type-checked instance for each field type.
 
-Below is an example of the input to a complex sequence model with four discrete fields. A `TensorField` called `DiscreteField` contains the input for each discrete field.
+Below is an example of the input to a multi-structured sequence model with four discrete fields. A `TensorField` called `DiscreteField` contains the input for each discrete field.
 
 ```python
 @tensorclass
@@ -370,10 +372,10 @@ ModularFieldEmbeddingSystem(
 
 Upon inputting the above `TensorDict` into the `ModularFieldEmbeddingSystem`, the MFES will iterate over each of the four discrete fields, embedding each of them with their respective `DiscreteFieldEmbedder` to create four tensors, each of dimensionality $RR^(N times L times C)$. The `ModularFieldEmbeddingSystem` module concatenates the embeddings into a single tensor of dimensionality $RR^(N times L times F times C)$, which we then pass into the field encoder.
 
-Representing the non-valued states (padded, null, or masked) is trivial for discrete fields. There are additional tokens available within the `DiscreteFieldEmbedder`'s embedding table. With three exceptions, this technique is almost precisely like how one embeds discrete tokens for models like BERT:
+Representing the non-valued states (padded, null, or masked) is trivial for discrete fields. There are additional tokens available within the `DiscreteFieldEmbedder`'s embedding table. This technique is similar to how one embeds discrete tokens for models like BERT with three notable exceptions:
 + Each unique field embedding module has an independent embedding table for these non-valued states.
 + No `[CLS]` token exists in the field embedding module. We append the equivalent of a `[CLS]` token to the event representations, which we then input to the event encoder module. The field encoder would not add value to a `[CLS]` token.
-+ Positional embeddings are required for both the field and event encoders. The field encoder's positional embeddings will learn to uniquely represent each unique field (I.E., what _is_ a POS transaction dollar amount or an MCC code). The event encoder's positional embeddings will learn to represent the order of the events within the observation. The positional embeddings for the field and event encoders are tensors of dimensionality $RR^(F times C)$ and $RR^(L times F C)$, respectively.
++ Positional embeddings are required for both the field and event encoders. The field encoder's positional embeddings will learn to uniquely represent each unique field (I.E., what _is_ a transaction dollar amount or an MCC code). The event encoder's positional embeddings will learn to represent the order of the events within the observation. The positional embeddings for the field and event encoders are tensors of dimensionality $RR^(F times C)$ and $RR^(L times F C)$, respectively.
 
 === Continuous Field Embeddings
 
@@ -715,6 +717,15 @@ This technique is only possible because we are defining a context window with an
 
 Representing "entities" is virtually impossible for tabular machine learning techniques. We posit that entities provide enormous value to practical problems. Many real business problems require tracking complex entities such as IP addresses, phone numbers, email addresses, mailing addresses, device identifiers, login sessions, transaction counter-parties, merchants, and account numbers.
 
+
+=== Tabular Field Embeddings
+
+We have have also developed "static" tabular data with sequential data similar to how Visa Researchdid in their FATA-Trans paper. @fatatrans. Where each dynamic field has an embedding of dimension $RR^(N times L times C)$, each static field has an embedding of dimension $RR^(N times F C)$.
+
+We concatenate an embedding for each "static" field to the events in the context prior to event encoder. This allows the model to learn the relationships between the static fields and the events in the context with minimal memory requirements.
+
+We have developed the matching `TensorField` and `FieldEmbedder` modules so support similar field types (discrete, continuous, temporal, geospatial) for static fields as we have for dynamic fields. We did not develop a matching entity field type for static fields.
+
 === Putting it all together: MFES and examples
 The MFES can embed discrete, continuous, temporal, geospatial, and entity field types over long sequences. Consequently, we may input sequences that describe all of the transactions ever posted by a customer of a financial institution:
 
@@ -738,7 +749,7 @@ The MFES can embed discrete, continuous, temporal, geospatial, and entity field 
     caption: [An example sequence of mixed field types]
 )
 
-This approach is highly versatile. It can work with many different data types. Additionally, it can work with complex sequential data exactly how it already exists. There is effectively zero batch preprocessing other than a simple sorting and sharding operation to facilitate larger-than-memory streaming.
+This approach is highly versatile. It can work with many different data types. Additionally, it can work with multi-structured sequential data exactly how it already exists. There is zero batch preprocessing required to train a model on a ledger. In other words, one may train a model on a large dataset without ever creating a copy of the dataset. This approach is highly efficient and allows for the model to train on a dataset of any size, limited only by the speed of model training.
 
 == Model Encoder Architecture
 Upon instantiating the Modular Field Embedding System, our hierarchical transformer-encoder architecture can learn sequence and event representations. We include two transformer-encoder modules, the "field encoder" and the "event encoder." The field encoder allows each field to attend to every other field within each event. We concatenate the field representations among each event together to form a representation for each event. These event representations then attend to one another in the event encoder to create contextualized event representations and a sequence representation via a special `[CLS]` token. We pre-train the model with these contextualized event representations. We then fine-tune the model by inputting the sequence representations to a small MLP to solve arbitrary downstream supervised learning problems.
@@ -754,7 +765,7 @@ In the section #link(<terminology>)[_Terminology_], we described how we form obs
 
 TabBERT and UniTTab describe their observation sampling strategies as fixed and sampled at an event level. Their observations are "fixed" in that they create the observations as strided slices over each sequence's events during a batch preprocessing stage. Both TabBERT and UniTTab elected to utilize strided slices of events to mitigate potential data leakage, as the observations created from one sequence could end up in the train, validation, or test strata. In other words, they could use one slice from a sequence to train a model, and then a neighboring slice could validate it. Their strategy requires that the observations never overlap to mitigate the risk of data leakage.
 
-This event-sampling technique is unique to the problem of complex sequence modeling. In computer vision, practitioners uniformly sample from the population of images. In language modeling, practitioners uniformly sample from the population of documents in a corpus. However, sampling observations at a sequence level do not necessarily work for complex sequence modeling because some sequences may have very few events.
+This event-sampling technique is unique to the problem of multi-structured sequence modeling. In computer vision, practitioners uniformly sample from the population of images. In language modeling, practitioners uniformly sample from the population of documents in a corpus. However, sampling observations at a sequence is not effective for multi-structured sequence modeling because some sequences may have vary widely in size.
 
 For example, in the case of a financial institution with 10 million customers, each with a credit card, many credit card users may be "gamers" who only signed up for the card to collect a sign-on bonus. These inactive customers may only have tens of events on their records, whereas other customers may have thousands of events in their records. Sampling uniformly from each customer's sequence will result in sampling the same few transactions from inactive customers a hundred times before sampling any notable portion of the events belonging to more active customers, resulting in a long training time and poor performance because the model over-fits the less active customers and under-fits the more active ones.
 
@@ -818,13 +829,13 @@ For temporal fields, we attempt to classify the hour of the year present in a ti
     caption: [An example masked sequence]
 )
 
-== Fine-tuning Complex Sequence Models
-Unlike TabBERT or UniTTab, we create a sequence representation from the equivalent of a `[CLS]` token in BERT. The model learns a tensor of fixed size equal $RR^(N times 1 times F C)$ and appends it to the event representations, which it inputs into the event encoder. We pass the sequence representation from the sequence encoder to a small decision head (MLP) to train both the sequence encoder and the decision head to solve arbitrary supervised learning problems or improve the quality of the sequence representations for other tasks. In two hours, we were to fine-tune exhaustively pre-trained complex sequence models on modest consumer-grade hardware.
+== Fine-tuning Multi-Structured Sequence Models
+Unlike TabBERT or UniTTab, we create a sequence representation from the equivalent of a `[CLS]` token in BERT. The model learns a tensor of fixed size equal $RR^(N times 1 times F C)$ and appends it to the event representations, which it inputs into the event encoder. We pass the sequence representation from the sequence encoder to a small decision head (MLP) to train both the sequence encoder and the decision head to solve arbitrary supervised learning problems or improve the quality of the sequence representations for other tasks. In two hours, we were to fine-tune exhaustively pre-trained multi-structured sequence models on modest consumer-grade hardware.
 
-However, because complex sequence encoders utilize case-dependent fields, they cannot produce universal "foundation models." We may only fine-tune our pre-trained complex sequence encoder for supervised problems that use the set of fields with which it was pre-trained or a subset thereof.
+However, because multi-structured sequence encoders utilize case-dependent fields, they cannot produce universal "foundation models." We may only fine-tune our pre-trained multi-structured sequence encoder for supervised problems that use the set of fields with which it was pre-trained or a subset thereof.
 
 === Versatility of Supervised Tasks
-Complex sequence models can support a variety of tasks. In our implementation, we have designed the complex sequence model to support supervised classification and regression. Additionally, our technique supports "event-level supervised labels" such that each event may have an independent target label. In other words, we do not restrict each sequence from having only a single supervised target label.
+Multi-structured sequence models can support a variety of tasks. In our implementation, we have designed the multi-structured sequence model to support supervised classification and regression. Additionally, our technique supports "event-level supervised labels" such that each event may have an independent target label. In other words, we do not restrict each sequence from having only a single supervised target label.
 
 Additionally, we have developed a mechanism called "nullable tagging." Nullable tagging allows model developers to include null values in their targets. The data streaming operations will not sample events with null targets to create an observation. However, other observations may contain the contents of an event with a null target. This novelty aims to provide model developers the flexibility to include events that, while offering signal to "model-triggering" events, are not "model-triggering" events themselves.
 
@@ -850,7 +861,7 @@ We refer to this strategy as _partial field pruning_. The field pruning is "part
 
 With the relative feature importance, a model developer may permanently prune the least important fields or fields that otherwise pose model governance risks should their potential risk not justify model lift.
 
-Regarding model explainability, using complex sequential fields has another significant benefit over manually engineered tabular features: they are easier to monitor and intuitively comprehend. Some tabular machine learning techniques do provide better explainability in theory. However, in practice, it is very challenging to understand how hundreds of tabular features may interact with one another. Additionally, the logic used to construct tabular features from the ledger may lead to unexpected behavior.
+Regarding model explainability, using multi-structured sequential fields has another significant benefit over manually engineered tabular features: they are easier to monitor and intuitively comprehend. Some tabular machine learning techniques do provide better explainability in theory. However, in practice, it is very challenging to understand how hundreds of tabular features may interact with one another. Additionally, the logic used to construct tabular features from the ledger may lead to unexpected behavior.
 
 == Automated Model Training Pipeline
 
@@ -962,25 +973,19 @@ class VideoField(TensorField):
     video: Float[torch.Tensor, "N L V X Y"]
 ```
 
-Implementing such media fields is complicated but illustrates the versatility of approaching complex sequential data with modular field embeddings. Asynchronous streaming operations and distributed model training environments are necessary to scale these more complex media fields.
-
-
-=== Including Tabular Data and Multiple Sequences of Varying Event Rates
-We have not yet explored integrating static tabular data with sequential data, although Visa Research has explored this approach in their FATA-Trans paper. @fatatrans We are also curious about working with multiple contexts of event types per sequence where the event types among each context have similar event rates. For example, one context of 48 monthly billing statements over the last four years, a second context for the last 256 customer financial transactions, and a final context of the previous 2048 online click stream events. This approach would allow the model to learn from multiple sources without low-frequency events being diluted from a single context by high-frequency events.
-
-The most significant obstacle to utilizing contexts of varying event rates is the systematic synchronization of these events as a streaming operation. For example, which monthly statements should be available to the context given which online click stream events? Each click stream event would require an index to its corresponding monthly statement.
-
-Utilizing multiple sequences and tabular data provides another solution to the "flushing problem." Capturing signals from contexts of varying event rates will better utilize high-frequency events, such as clickstream events, without diluting low-frequency events, such as monthly credit bureau snapshots.
+Implementing such media fields is complicated but illustrates the versatility of approaching multi-structured sequential data with modular field embeddings. Asynchronous streaming operations and distributed model training environments are necessary to scale these more complex media fields.
 
 === Arbitrary Dimensionality
 In the examples above, we use a specific dimensionality: Each sequence contains events, and each event includes fields. In other words: `Customer > Transaction > Field`. This dimensionality fits the vast majority of use cases that come to mind. However, we realize there are counter-examples to this design.
 
 Walmart may want to model their transactions differently. For example, they might want to include the concept of "shopping trips", in which each customer might make multiple shopping trips, and during each shopping trip, they might purchase numerous items, and each item may have multiple fields. So, instead of `Customer > Transaction > Field`, we might instead model the sequence as `Customer > Trip > Item > Field`.
 
-While the implementation of the model will change completely, the concept is not all that different. Complex sequential modeling is still applicable. However, we do not currently have the development of this 3D implementation in scope.
+While the implementation of the model will change completely, the concept is not all that different. Multi-structured sequential modeling is still applicable. However, we do not currently have the development of this 3D implementation in scope.
+
+For such higher-dimensional problems, one may combine the two inner-most dimensions into a single dimension. In other words, each "trip" and "item" would be concatenated into a single "event" with a unique field type: `Customer > Trip * Item > Field`. This requires that combination of the two dimensions have some means of being sorted.
 
 === Sub-quadratic Alternatives to Self-Attention
-A unique property of sequential data is that events asynchronously arrive in separate streaming messages. Consequently, there is a potential optimization trick for real-time inference. Using emerging alternatives to transformers, such as RWKV or Mamba, one can save enormous amounts of the compute requirements for inference. The memory complexity with respect to the context size decreases from quadratic to constant.
+A unique property of multi-structured sequential data is that events asynchronously arrive in separate streaming messages. Consequently, there is a potential optimization for real-time inference. Using emerging alternatives to transformers, such as Mamba, one can save enormous amounts of the compute requirements for inference. The memory complexity with respect to the context size decreases from quadratic to constant.
 
 - Store sequence state representations in an in-memory cache like Redis
 - Whenever a new event arrives:
@@ -994,20 +999,21 @@ However, that approach will require an effectively infinite context size. An inf
 
 === Sparse Attention
 
-The modular field embedding system currently has a static definition of special tokens, such as `[PAD]` and `[UNK]`. These tokens can facilitate sparse attention for the field and event encoders to improve memory efficiency. Within the field encoder, we may create an attention mask to mask out fields equal to `[PAD]` or `[UNK]`. Within the event encoder, we may create an attention mask to mask out events in which all fields are equal to `[PAD]`. Given high enough sparsity, this may result in significantly better memory requirements.
+The modular field embedding system currently has a static definition of special tokens, such as `[PAD]` and `[UNK]`. These tokens can facilitate sparse attention for the field and event encoders to improve memory efficiency. Within the field encoder, we may create an attention mask to mask out fields equal to `[PAD]` or `[UNK]`. Within the event encoder, we may create an attention mask to mask out events in which all fields are equal to `[PAD]`. Givesn high enough sparsity, this may result in significantly better memory requirements.
 
 == Appendix
 
 === Sequence Entropy
-A unique characteristic of such multivariate sequences is that they are not nearly as structured as human language. Multivariate sequences can be noisy, whereas grammar rules bind human language. Human language has evolved to be structured, redundant, and fault-tolerant. For example, An adjective must precede another adjective or the noun it describes. If one shuffles all of the words in a sentence, the resulting collection of words would likely be nonsensical. However, if one were to mask out a random word, you may still have a decent guess as to the general message of the sentence.
+<sequence-entropy>
+A unique characteristic of such multivariate sequences is that they are not nearly as structured as human language. Multivariate sequences can be noisy, whereas grammar rules restrict human language. Human language has evolved to be structured, redundant, and fault-tolerant. For example, An adjective must precede another adjective or the noun it describes. If one shuffles all of the words in a sentence, the resulting collection of words would likely be nonsensical. However, if one were to mask out a random word, you may still have a decent guess as to the general message of the sentence.
 
-On the contrary, complex sequences of transactional data tend to have relatively less structure. Shuffling every event in a sequence will result in a new sequence almost as "plausible" as before. However, reconstructing after having masked out a random event would be much more challenging. For example, if you had to go grocery shopping and also top your tank with gas, what portion of the time do you go to the grocery store _before_ you go to the gas station? There is no correct answer. The order is almost entirely arbitrary.
+On the contrary, multi-structured sequences of transactional data tend to have relatively less structure. Shuffling every event in a sequence will result in a new sequence almost as "plausible" as before. However, reconstructing after having masked out a random event would be much more challenging. For example, if you had to go grocery shopping and also top your tank with gas, what portion of the time do you go to the grocery store _before_ you go to the gas station? The order is almost arbitrary.
 
-Additionally, pre-training a large language model on every human language is challenging due to large vocabulary sizes, disproportionate word usage, quotes, mannerisms, plagiarism, and writing styles. Pre-training complex sequence models with transactional data is trivial in comparison because the signals are not as complex, thus requiring significantly fewer resources.
+Additionally, pre-training a large language model on every human language is challenging due to large vocabulary sizes, disproportionate word usage, quotes, mannerisms, plagiarism, and writing styles. Pre-training multi-structured sequence models with transactional data is trivial in comparison because the signals are not as complex, thus requiring significantly fewer resources.
 
 === The Clipping Problem
 <clipping-problem>
-We discovered an unexpected complication while training sequential models on slices of complex sequential data. It is intuitive in hindsight but was initially challenging to identify.
+We discovered an unexpected complication while training sequential models on slices of multi-structured sequential data. It is intuitive in hindsight but was initially challenging to identify.
 
 It is commonplace to subset slices of time series based on some time window (IE, all events between January 2020 and January 2023). However, this subsetting strategy can lead to very unexpected behavior due to an issue we call the "clipping problem."
 
@@ -1020,9 +1026,10 @@ This problem has at least two solutions:
 These solutions resolved the ambiguity between a sequence with an artificial cutoff and a sequence with an available initial event.
 
 === The Flushing Problem
+<flushing-problem>
 A unique adversarial vulnerability arises when modeling sequential data with a fixed context size depending on the types of events allowed to fill the context window. Theoretically, an ill-intentioned individual could "flush" the context by spamming innocuous events. In other words, an attacker may "log in" and "log out" of their account several thousand times to attempt to manipulate the historical context.
 
-A more concrete example: A savvy hacker, having recently hacked into their victim's account at Big Online Store, could choose to reset the user's password, email, phone number, and mailing address before attempting to purchase gift card codes. Such risky actions, which may otherwise result in a security alert, may go unnoticed if the fraudster intentionally spams many login events between each nefarious action, such that the model doesn't see more than one such nefarious action at any time. In other words, if you perform a thousand low-risk events between every high-risk event, the model will not see just how risky your recent actions are.
+A more concrete example: A savvy hacker, having recently taken over a victim's account at Big Online Store, could choose to reset the user's password, email, phone number, and mailing address before attempting to purchase gift card codes. Such risky actions, which may otherwise result in a security alert, may go unnoticed if the fraudster intentionally spams many login events between each nefarious action, such that the model doesn't see more than one such nefarious action at any time. In other words, if you perform a thousand low-risk events between every high-risk event, the model will not see just how risky your recent actions are.
 
 There are multiple strategies to mitigate the risk of such an attack:
 + Increase the context size.

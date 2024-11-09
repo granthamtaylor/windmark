@@ -9,7 +9,6 @@ from windmark.tasks.split import create_split_manager as split
 from windmark.tasks.levels import create_unique_levels_from_lifestream as levels
 from windmark.tasks.compare import compare_sequence_lengths as compare
 from windmark.tasks.label import create_experiment_label as label
-from windmark.tasks.fan import fan_out_field_requests as fan
 
 
 __all__ = [
@@ -22,7 +21,6 @@ __all__ = [
     system,
     task,
     split,
-    fan,
     compare,
     label,
 ]

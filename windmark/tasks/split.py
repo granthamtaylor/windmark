@@ -2,7 +2,7 @@ from pathlib import Path
 from collections import Counter
 from functools import reduce
 
-from flytekit.types import directory
+import flytekit as fk
 
 from windmark.core.managers import SchemaManager, SplitManager
 from windmark.core.orchestration import task
@@ -10,12 +10,12 @@ from windmark.core.processors import multithread, count
 
 
 @task
-def create_split_manager(lifestreams: directory.FlyteDirectory, schema: SchemaManager) -> SplitManager:
+def create_split_manager(lifestreams: fk.FlyteDirectory, schema: SchemaManager) -> SplitManager:
     """
     Create a SplitManager to count number of events in each strata.
 
     Args:
-        lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
+        lifestreams (fk.FlyteDirectory): The directory containing the lifestreams.
         schema (SchemaManager): The schema manager object.
 
     Returns:

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from flytekit.types import directory
+import flytekit as fk
 
 from windmark.core.managers import SchemaManager
 from windmark.core.constructs.general import FieldRequest
@@ -11,12 +11,12 @@ from windmark.core.processors import multithread, compare
 
 
 @task
-def compare_sequence_lengths(lifestreams: directory.FlyteDirectory, schema: SchemaManager, field: FieldRequest):
+def compare_sequence_lengths(lifestreams: fk.FlyteDirectory, schema: SchemaManager, field: FieldRequest):
     """
     Compares the lengths of the inputs and indices in the given lifestreams.
 
     Args:
-        lifestreams (directory.FlyteDirectory): The directory containing the lifestreams.
+        lifestreams (fk.FlyteDirectory): The directory containing the lifestreams.
         schema (SchemaManager): The schema manager for the task.
         field (FieldRequest): The field to compare with the index.
     """

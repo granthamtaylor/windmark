@@ -13,10 +13,11 @@ from lightning.fabric.utilities.throughput import measure_flops
 from tensordict import TensorDict
 from torch.nn.functional import cross_entropy
 from torch.utils.data import DataLoader
-from torchdata import datapipes
+from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe as Shuffle
+
 
 from windmark.core.managers import SystemManager
-from windmark.core.operators import collate, stream, mock
+from windmark.core.operators import collate, mock, SequenceDataset
 from windmark.core.constructs.tensorfields import TargetField
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.packages import PretrainingData, SupervisedData, OutputData, SequenceData
@@ -623,6 +624,8 @@ def step(
 
     assert isinstance(batch, SupervisedData)
 
+    # FIXME return a dict instead of Tensor | Tuple[Tensor, Tensor]
+
     if strata == "predict":
         predictions = torch.nn.functional.softmax(output.predictions, dim=1)
         return predictions, output.sequence
@@ -671,36 +674,6 @@ class SequenceModule(lit.LightningModule):
         params (Hyperparameters): The hyperparameters for the model.
         manager (SystemManager): The system manager for the model.
         mode (str): The mode of operation for the model. Can be one of "pretrain", "finetune", or "inference".
-
-    Attributes:
-        datapath (str): The path to the data.
-        params (Hyperparameters): The hyperparameters for the model.
-        lr (float): The learning rate for the model.
-        mode (str): The mode of operation for the model.
-        manager (SystemManager): The system manager for the model.
-        modular_field_embedder (ModularFieldEmbeddingSystem): The modular field embedder for the model.
-        dynamic_field_encoder (DynamicFieldEncoder): The dynamic field encoder for the model.
-        event_encoder (EventEncoder): The event encoder for the model.
-        static_field_decoder (StaticFieldDecoder): The static field decoder for the model.
-        event_decoder (EventDecoder): The event decoder for the model.
-        decision_head (DecisionHead): The decision head for the model.
-        metrics (Metrics): The metrics for the model.
-        weights (torch.Tensor): The weights for the model.
-        dataloaders (dict[str, DataLoader]): The dataloaders for the model.
-        pipes (dict[str, datapipes.iter.IterDataPipe]): The data pipes for the model.
-        info (Callable): A partial function for logging information.
-        example_input_array (torch.Tensor): An example input array for the model.
-        flops_per_batch (float): The number of floating point operations per batch for the model.
-
-    Methods:
-        forward(inputs: TensorDict) -> OutputData: Performs a forward pass of the model.
-        configure_optimizers() -> torch.optim.Optimizer: Configures the optimizers for the model.
-        setup(stage: str): Sets up the data pipes for the specified stage.
-        teardown(stage: str): Tears down the data pipes for the specified stage.
-        train_dataloader() -> DataLoader: Returns the dataloader for the training stage.
-        val_dataloader() -> DataLoader: Returns the dataloader for the validation stage.
-        test_dataloader() -> DataLoader: Returns the dataloader for the testing stage.
-        predict_dataloader() -> DataLoader: Returns the dataloader for the prediction stage.
     """
 
     def __init__(self, datapath: str, params: Hyperparameters, manager: SystemManager, mode: str):
@@ -730,7 +703,7 @@ class SequenceModule(lit.LightningModule):
         self.register_buffer("weights", torch.tensor(manager.task.balancer.weights))
 
         self.dataloaders: dict[str, DataLoader] = {}
-        self.pipes: dict[str, datapipes.iter.IterDataPipe] = {}
+        self.pipes: dict[str, Shuffle | SequenceDataset] = {}
 
         self.info = partial(self.log, on_step=False, on_epoch=True, batch_size=self.params.batch_size)
 
@@ -804,7 +777,6 @@ class SequenceModule(lit.LightningModule):
             AssertionError: If the stage is not one of the allowed values.
 
         """
-        pipe = partial(stream, datapath=self.datapath, mode=self.mode, params=self.params, manager=self.manager)
 
         assert stage in ["fit", "validate", "test", "predict"]
 
@@ -817,7 +789,16 @@ class SequenceModule(lit.LightningModule):
 
         for strata in mapping[stage]:
             split = strata if strata != "predict" else "test"
-            self.pipes[strata] = pipe(split=split)
+
+            dataset = SequenceDataset(
+                datapath=self.datapath,
+                mode=self.mode,
+                params=self.params,
+                manager=self.manager,
+                split=split,
+            )
+
+            self.pipes[strata] = Shuffle(dataset, buffer_size=1024) if stage == "train" else dataset
 
     def teardown(self, stage: str):
         """

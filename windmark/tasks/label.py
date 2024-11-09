@@ -8,7 +8,7 @@ def create_experiment_label() -> str:
     Generates a new label.
 
     Returns:
-        str: The generated label in the format "address:hashtag".
+        str: The generated label in the format "address".
     """
 
     fake = Faker()

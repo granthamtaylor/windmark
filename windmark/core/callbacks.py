@@ -23,10 +23,6 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
         path (str): The path to the Parquet file.
         schema: The schema of the Parquet file.
         writer: The Parquet writer object.
-
-    Methods:
-        write_on_batch_end: Called when the predict epoch ends to write the batch predictions and representations to the Parquet file.
-        on_predict_end: Called at the end of the prediction loop to close the Parquet writer.
     """
 
     def __init__(self, path: str | os.PathLike):

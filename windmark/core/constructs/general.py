@@ -61,11 +61,6 @@ class FieldRequest:
     Attributes:
         name (str): The name of the field.
         fieldtype (str): The type of the field.
-
-    Methods:
-        new(cls, name: str, fieldtype: FieldType | str) -> "FieldRequest": Creates a new FieldRequest object.
-        type(self) -> FieldType: Returns the FieldType of the field.
-        is_static(self) -> bool: Returns True if the field is static, False otherwise.
     """
 
     name: str
@@ -127,39 +122,19 @@ class LevelSet:
     Attributes:
         name (str): The name of the level set.
         levels (list[str]): The list of levels in the set.
-        is_valid (bool): Indicates whether the level set is valid or not.
     """
 
     name: str
     levels: list[str]
-    is_valid: bool
 
-    @classmethod
-    def empty(cls, name: str) -> "LevelSet":
+    def __len__(self) -> int:
         """
-        Creates an empty LevelSet instance.
-
-        Args:
-            name (str): The name of the level set.
+        Returns the number of levels in the set.
 
         Returns:
-            LevelSet: An empty LevelSet instance.
+            int: The number of levels in the set.
         """
-        return cls(name=name, levels=[], is_valid=False)
-
-    @classmethod
-    def from_levels(cls, name: str, levels: list[str]) -> "LevelSet":
-        """
-        Creates a LevelSet instance from a list of levels.
-
-        Args:
-            name (str): The name of the level set.
-            levels (list[str]): The list of levels.
-
-        Returns:
-            LevelSet: A LevelSet instance with the specified levels.
-        """
-        return cls(name=name, levels=levels, is_valid=True)
+        return len(self.levels)
 
     @functools.cached_property
     def mapping(self) -> dict[str, int]:
@@ -183,31 +158,10 @@ class Centroid:
     Attributes:
         name (str): The name of the centroid.
         array (list[list[float]]): The array of floats representing the centroid.
-        is_valid (bool): A flag indicating the validity of the centroid.
-
-    Methods:
-        empty(name: str) -> Centroid: Creates an empty centroid with the given name.
-        from_digest(name: str, digest: TDigest) -> Centroid: Creates a centroid from a TDigest object.
-
     """
 
     name: str
-    array: list[list[float]]
-    is_valid: bool
-
-    @classmethod
-    def empty(cls, name: str) -> "Centroid":
-        """
-        Creates an empty centroid with the given name.
-
-        Args:
-            name (str): The name of the centroid.
-
-        Returns:
-            Centroid: An empty centroid object.
-
-        """
-        return cls(name=name, array=[], is_valid=False)
+    array: list[list[float, 2]]
 
     @classmethod
     def from_digest(cls, name: str, digest: TDigest) -> "Centroid":
@@ -223,7 +177,7 @@ class Centroid:
 
         """
         array = digest.get_centroids().tolist()
-        return cls(name=name, array=array, is_valid=True)
+        return cls(name=name, array=array)
 
 
 @pydantic.dataclasses.dataclass

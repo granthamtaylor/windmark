@@ -21,18 +21,13 @@ class DynamicCategoryFieldEmbedder(FieldEmbedder):
     Attributes:
         field (FieldRequest): The field to be embedded.
         embeddings (torch.nn.Embedding): The embedding layer for the field.
-
-    Methods:
-        __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest): Initializes the embedder.
-        forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]: Performs the forward pass of the embedder.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
         super().__init__()
 
         self.field: FieldRequest = field
-        self.embeddings = torch.nn.Embedding(manager.levelsets.get_size(field) + len(Tokens), params.d_field)
+        self.embeddings = torch.nn.Embedding(len(manager.levelsets[field]) + len(Tokens), params.d_field)
 
     @jaxtyped(typechecker=beartype)
     def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
@@ -70,7 +65,7 @@ class StaticCategoryFieldEmbedder(FieldEmbedder):
 
         self.field: FieldRequest = field
         self.embeddings = torch.nn.Embedding(
-            manager.levelsets.get_size(field) + len(Tokens), params.d_field * len(manager.schema.dynamic)
+            len(manager.levelsets[field]) + len(Tokens), params.d_field * len(manager.schema.dynamic)
         )
 
     @jaxtyped(typechecker=beartype)

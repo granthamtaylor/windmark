@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from hydra import compose, initialize
-from flytekit.types import directory
+import flytekit as fk
 
 from windmark.core.constructs.general import Hyperparameters
 from windmark.workflows.train import train
@@ -14,7 +14,7 @@ if __name__ == "__main__":
     with initialize(version_base=None, config_path=path):
         config = compose(config_name="config")
 
-    lifestreams = directory.FlyteDirectory(str(config.data.path))
+    lifestreams = fk.FlyteDirectory(str(config.data.path))
     schema = SchemaManager.new(**config.data.structure, **config.data.fields)
     params = Hyperparameters(**config.model)
 

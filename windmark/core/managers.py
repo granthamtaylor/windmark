@@ -123,7 +123,7 @@ class BalanceManager:
     Attributes:
         labels (list[str]): The list of class labels.
         counts (list[int]): The list of counts for each class label.
-        kappa (float): The kappa value for interpolation.
+        interpolation_rate (float): The rate value for interpolation.
         unlabeled (int): The number of unlabeled instances.
 
     Properties:
@@ -136,7 +136,7 @@ class BalanceManager:
 
     labels: list[str]
     counts: list[int]
-    kappa: float
+    interpolation_rate: float
     unlabeled: int
 
     total: int = dataclasses.field(init=False)
@@ -162,9 +162,11 @@ class BalanceManager:
 
         assert math.isclose(sum(self.values), 1.0)
 
-        assert 0.0 <= self.kappa <= 1.0
+        assert 0.0 <= self.interpolation_rate <= 1.0
 
-        self.interpolation = [self.kappa * null + (1 - self.kappa) * value for value in self.values]
+        self.interpolation = [
+            self.interpolation_rate * null + (1 - self.interpolation_rate) * value for value in self.values
+        ]
 
         assert math.isclose(sum(self.interpolation), 1.0)
 
@@ -182,7 +184,7 @@ class BalanceManager:
 
         console = Console()
 
-        table = Table(title=f"Balance Manager (kappa={self.kappa:.2%})")
+        table = Table(title=f"Balance Manager (interpolation rate = {self.interpolation_rate:.2%})")
 
         table.add_column("Class Labels", justify="right", style="cyan", no_wrap=True)
         table.add_column("Label Counts", style="cyan", no_wrap=True)
@@ -205,6 +207,20 @@ class BalanceManager:
 
     @functools.cached_property
     def mapping(self) -> dict[str, int]:
+        """
+        Returns a mapping of class labels to their indices.
+        """
+        return {label: index for index, label in enumerate(self.labels)}
+
+    @functools.cached_property
+    def sample_rates_mapping(self) -> dict[str, float]:
+        """
+        Returns the sample rates for each class label.
+        """
+        return {label: rate for label, rate in zip(self.labels, self.thresholds)}
+
+    @functools.cached_property
+    def label_mapping(self) -> dict[str, int]:
         """
         Returns a mapping of class labels to their indices.
         """
@@ -395,10 +411,10 @@ class CentroidManager:
         centroids (list[Centroid]): The list of centroids to be managed.
     """
 
-    centroids: list[Centroid]
+    centroids: list[Centroid | None]
 
     def __post_init__(self):
-        self.centroids = [centroid for centroid in self.centroids if centroid.is_valid]
+        self.centroids = [centroid for centroid in self.centroids if centroid is not None]
 
     @functools.cached_property
     def digests(self) -> dict[str, TDigest]:
@@ -463,24 +479,12 @@ class LevelManager:
     A class that manages levels and mappings for different fields.
     """
 
-    levelsets: list[LevelSet]
+    levelsets: list[LevelSet | None]
     mappings: dict[str, dict[str, int]] = dataclasses.field(init=False)
 
     def __post_init__(self):
-        self.mappings = {levelset.name: levelset.mapping for levelset in self.levelsets if levelset.is_valid}
-
-    def get_size(self, field: FieldRequest) -> int:
-        """
-        Get the size of the mapping for a specific field.
-
-        Args:
-            field (FieldRequest): The field for which to get the size.
-
-        Returns:
-            int: The size of the mapping for the specified field.
-        """
-        assert isinstance(field, FieldRequest)
-        return len(self.mappings[field.name])
+        levelsets = [levelset for levelset in self.levelsets if levelset is not None]
+        self.mappings = {levelset.name: levelset.mapping for levelset in levelsets}
 
     def __getitem__(self, field: FieldRequest) -> dict[str, int]:
         """
@@ -525,7 +529,7 @@ class LevelManager:
         console.print(table)
 
     def __repr__(self) -> str:
-        return f"LevelManager({[levelset.name for levelset in self.levelsets]})"
+        return f"LevelManager({[name for name in self.mappings.keys()]})"
 
 
 @dataclasses.dataclass

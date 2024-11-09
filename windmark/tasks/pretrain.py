@@ -1,5 +1,4 @@
 import flytekit as fk
-from flytekit.types import file, directory
 import torch
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import (
@@ -18,22 +17,22 @@ from windmark.core.orchestration import task
 
 @task(requests=fk.Resources(cpu="32", mem="64Gi"), cache_ignore_input_vars=tuple(["label"]))
 def pretrain_sequence_encoder(
-    lifestreams: directory.FlyteDirectory,
+    lifestreams: fk.FlyteDirectory,
     params: Hyperparameters,
     manager: SystemManager,
     label: str,
-) -> file.FlyteFile:
+) -> fk.FlyteFile:
     """
     Pretrains a sequence encoder model using the provided lifestreams, hyperparameters, and system manager.
 
     Args:
-        lifestreams (directory.FlyteDirectory): The directory containing the lifestreams data.
+        lifestreams (fk.FlyteDirectory): The directory containing the lifestreams data.
         params (Hyperparameters): The hyperparameters for pretraining.
         manager (SystemManager): The system state manager.
         label (str): The name for the experiment.
 
     Returns:
-        file.FlyteFile: The path to the best model checkpoint file.
+        fk.FlyteFile: The path to the best model checkpoint file.
     """
 
     torch.set_float32_matmul_precision("medium")
@@ -75,4 +74,4 @@ def pretrain_sequence_encoder(
 
     trainer.test(module)
 
-    return file.FlyteFile(checkpointer.best_model_path)
+    return fk.FlyteFile(checkpointer.best_model_path)

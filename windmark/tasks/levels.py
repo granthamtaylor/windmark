@@ -2,7 +2,7 @@ from pathlib import Path
 from collections import Counter
 from functools import reduce
 
-from flytekit.types import directory
+import flytekit as fk
 
 from windmark.core.managers import LevelSet
 from windmark.core.constructs.interface import FieldRequest, FieldType
@@ -11,20 +11,20 @@ from windmark.core.processors import multithread, count
 
 
 @task
-def create_unique_levels_from_lifestream(lifestreams: directory.FlyteDirectory, field: FieldRequest) -> LevelSet:
+def create_unique_levels_from_lifestream(lifestreams: fk.FlyteDirectory, field: FieldRequest) -> LevelSet | None:
     """
     Create unique levels from a lifestream.
 
     Args:
-        lifestreams (directory.FlyteDirectory): The lifestream directory.
+        lifestreams (fk.FlyteDirectory): The lifestream directory.
         field (FieldRequest): The field to create levels for.
 
     Returns:
-        LevelSet: The set of unique levels for the given field.
+        LevelSet|None: The set of unique levels for the given field.
     """
 
     if field.type not in [FieldType.Category, FieldType.Categories]:
-        return LevelSet.empty(name=field.name)
+        return None
 
     print(f'- creating state manager for field "{field.name}"')
 
@@ -39,4 +39,4 @@ def create_unique_levels_from_lifestream(lifestreams: directory.FlyteDirectory, 
     if None in levels.keys():
         del levels[None]
 
-    return LevelSet.from_levels(name=field.name, levels=(levels.keys()))
+    return LevelSet(name=field.name, levels=list(levels.keys()))
