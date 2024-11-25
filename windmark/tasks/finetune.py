@@ -1,5 +1,6 @@
-import flytekit as fk
-from datetime import datetime
+# Copyright Grantham Taylor.
+
+import flytekit as fl
 
 import torch
 from lightning.pytorch import Trainer
@@ -7,32 +8,32 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProg
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from windmark.core.architecture.encoders import SequenceModule
-from windmark.core.managers import SystemManager
+from windmark.core.constructs.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.callbacks import ThawedFinetuning
-from windmark.core.orchestration import task
+from windmark.core.architecture.callbacks import ThawedFinetuning
+from windmark.orchestration.environments import context
 
 
-@task(requests=fk.Resources(cpu="32", mem="64Gi"), cache_ignore_input_vars=tuple(["label"]))
+@context.lab
 def finetune_sequence_encoder(
-    lifestreams: fk.FlyteDirectory,
-    checkpoint: fk.FlyteFile,
+    lifestreams: fl.FlyteDirectory,
+    checkpoint: fl.FlyteFile,
     params: Hyperparameters,
     manager: SystemManager,
     label: str,
-) -> fk.FlyteFile:
+) -> fl.FlyteFile:
     """
     Finetunes a pretrained sequence encoder model using the provided lifestreams data, checkpoint, hyperparameters, and system manager.
 
     Args:
-        lifestreams (fk.FlyteDirectory): The directory containing the lifestreams data.
-        checkpoint (fk.FlyteFile): The pretrained checkpoint file to load the initial model weights from.
+        lifestreams (fl.FlyteDirectory): The directory containing the lifestreams data.
+        checkpoint (fl.FlyteFile): The pretrained checkpoint file to load the initial model weights from.
         params (Hyperparameters): The hyperparameters for the finetuning process.
         manager (SystemManager): The system state manager.
         label (str): The name for the experiment.
 
     Returns:
-        fk.FlyteFile: The file object representing the best model checkpoint after finetuning.
+        fl.FlyteFile: The file object representing the best model checkpoint after finetuning.
     """
 
     torch.set_float32_matmul_precision("medium")
@@ -46,16 +47,13 @@ def finetune_sequence_encoder(
         mode="finetune",
     )
 
-    timestamp = datetime.now().strftime("%Y-%m-%d|%H:%M")
-
     checkpointer = ModelCheckpoint(
-        dirpath=fk.current_context().working_directory,
+        dirpath=fl.current_context().working_directory,
         monitor="finetune-validate/loss",
-        filename=f"{label}:{timestamp}",
     )
 
     trainer = Trainer(
-        logger=WandbLogger(name="windmark", version=f"{label}:{timestamp}"),
+        logger=WandbLogger(project="windmark", name=label),
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
         max_epochs=params.max_finetune_epochs,
@@ -81,4 +79,4 @@ def finetune_sequence_encoder(
 
     # trainer.test(module)
 
-    return fk.FlyteFile(checkpointer.best_model_path)
+    return fl.FlyteFile(checkpointer.best_model_path)

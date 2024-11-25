@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import math
 import os
 from collections import OrderedDict
@@ -16,8 +18,8 @@ from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter.combinatorics import ShufflerIterDataPipe as Shuffle
 
 
-from windmark.core.managers import SystemManager
-from windmark.core.operators import collate, mock, SequenceDataset
+from windmark.core.data.operators import collate, mock, SequenceDataset
+from windmark.core.constructs.managers import SystemManager
 from windmark.core.constructs.tensorfields import TargetField
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.packages import PretrainingData, SupervisedData, OutputData, SequenceData
@@ -31,10 +33,6 @@ class LearnedTensor(torch.nn.Module):
 
     Args:
         *sizes (int): The sizes of each dimension of the tensor.
-
-    Attributes:
-        tensor (torch.Tensor): The learned tensor.
-
     """
 
     def __init__(self, *sizes: int):
@@ -77,10 +75,6 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
     Args:
         params (Hyperparameters): The hyperparameters for the embedding system.
         manager (SystemManager): The system manager for accessing the schema and field information.
-
-    Attributes:
-        embedders (torch.nn.ModuleDict): A dictionary of field embedders.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
@@ -104,7 +98,6 @@ class ModularFieldEmbeddingSystem(torch.nn.Module):
 
         Returns:
             tuple[Float[torch.Tensor, "_N L Fd C"], Float[torch.Tensor, "_N Fs FdC"]]: The dynamic and static field embeddings.
-
         """
 
         dynamic = []
@@ -141,11 +134,6 @@ class DynamicFieldEncoder(torch.nn.Module):
     Args:
         params (Hyperparameters): The hyperparameters for the encoder.
         manager (SystemManager): The system manager for the windmark architecture.
-
-    Attributes:
-        encoder (torch.nn.TransformerEncoder): The transformer encoder layer.
-        positional (LearnedTensor): The learned positional tensor.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
@@ -195,12 +183,6 @@ class EventEncoder(torch.nn.Module):
     Args:
         params (Hyperparameters): The hyperparameters for the encoder.
         manager (SystemManager): The system manager for accessing the schema.
-
-    Attributes:
-        encoder (torch.nn.TransformerEncoder): The TransformerEncoder layer.
-        positional (LearnedTensor): The learned positional tensor.
-        class_token (LearnedTensor): The learned class token tensor.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
@@ -328,10 +310,6 @@ class StaticFieldDecoder(torch.nn.Module):
     Args:
         params (Hyperparameters): The hyperparameters for the model.
         manager (SystemManager): The system manager for the windmark architecture.
-
-    Attributes:
-        projections (torch.nn.ModuleDict): A dictionary of linear projections for each static field.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
@@ -389,9 +367,6 @@ class DecisionHead(torch.nn.Module):
     Args:
         params (Hyperparameters): The hyperparameters for the model.
         manager (SystemManager): The system manager for the model.
-
-    Attributes:
-        mlp (torch.nn.Sequential): The multi-layer perceptron for the decision head.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager):
@@ -487,7 +462,7 @@ def pretrain(
     batch: PretrainingData,
     output: OutputData,
     strata: str,
-) -> torch.Tensor:
+) -> dict[str, torch.Tensor]:
     """
     Pretrains the sequence module using the given batch of pretraining data and output data.
 
@@ -498,7 +473,7 @@ def pretrain(
         strata (str): The strata identifier for logging purposes.
 
     Returns:
-        torch.Tensor: The total loss incurred during pretraining.
+        dict[str, torch.Tensor]: The total loss incurred during pretraining.
     """
 
     dynamic_losses = []
@@ -559,7 +534,7 @@ def pretrain(
 
     module.info(f"pretrain-total-{strata}/loss", total_loss, prog_bar=(strata == "validate"))
 
-    return total_loss
+    return {"loss": total_loss}
 
 
 @jaxtyped(typechecker=beartype)
@@ -568,7 +543,7 @@ def finetune(
     batch: SupervisedData,
     output: OutputData,
     strata: str,
-) -> torch.Tensor:
+) -> dict[str, torch.Tensor]:
     """
     Fine-tunes the given module using the provided batch data and output predictions.
 
@@ -579,7 +554,7 @@ def finetune(
         strata (str): The strata identifier for tracking metrics.
 
     Returns:
-        torch.Tensor: The loss value after fine-tuning.
+        dict[str, torch.Tensor]: The loss value after fine-tuning.
 
     """
     loss = cross_entropy(output.predictions, batch.targets, weight=module.weights)
@@ -593,7 +568,7 @@ def finetune(
         metric.update(probabilities, batch.targets)
         module.info(name=f"finetune-{strata}/{name}", value=metric)
 
-    return loss
+    return {"loss": loss}
 
 
 @jaxtyped(typechecker=beartype)
@@ -602,7 +577,7 @@ def step(
     batch: SequenceData,
     batch_idx: int,
     strata: str,
-) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+) -> dict[str, torch.Tensor]:
     """Execute training / inference step
 
     Args:
@@ -612,7 +587,7 @@ def step(
         strata (str): Data strata (one of "train", "validate", "test", "predict")
 
     Returns:
-        Tensor: Loss during training or predictions during inference
+        dict[str, torch.Tensor]: Loss during training or predictions during inference
     """
 
     assert strata in ["train", "validate", "test", "predict"]
@@ -624,11 +599,9 @@ def step(
 
     assert isinstance(batch, SupervisedData)
 
-    # FIXME return a dict instead of Tensor | Tuple[Tensor, Tensor]
-
     if strata == "predict":
         predictions = torch.nn.functional.softmax(output.predictions, dim=1)
-        return predictions, output.sequence
+        return {"predictions": predictions, "sequence": output.sequence}
 
     else:
         return finetune(module=self, batch=batch, output=output, strata=strata)
@@ -657,8 +630,7 @@ def dataloader(self: "SequenceModule", strata: str) -> DataLoader:
         num_workers=n_workers,
         persistent_workers=True,
         collate_fn=collate,
-        # FIXME: pin_memory not implemented for tensordict
-        # pin_memory=True,
+        pin_memory=True,
         drop_last=False,
     )
 
@@ -711,7 +683,7 @@ class SequenceModule(lit.LightningModule):
         self.flops_per_batch = measure_flops(self, lambda: self.forward(self.example_input_array))
 
     @jaxtyped(typechecker=beartype)
-    def forward(self, inputs: TensorDict) -> OutputData:  # type: ignore
+    def forward(self, inputs: TensorDict) -> OutputData:
         """
         Forward pass of the encoder module.
 
@@ -761,10 +733,10 @@ class SequenceModule(lit.LightningModule):
 
         return [optimizer], [scheduler]
 
-    training_step = partialmethod(step, strata="train")  # type: ignore
-    validation_step = partialmethod(step, strata="validate")  # type: ignore
-    test_step = partialmethod(step, strata="test")  # type: ignore
-    predict_step = partialmethod(step, strata="predict")  # type: ignore
+    training_step = partialmethod(step, strata="train")
+    validation_step = partialmethod(step, strata="validate")
+    test_step = partialmethod(step, strata="test")
+    predict_step = partialmethod(step, strata="predict")
 
     def setup(self, stage: str):
         """

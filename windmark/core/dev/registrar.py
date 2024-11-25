@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import builtins
 from functools import cache
 from enum import Enum

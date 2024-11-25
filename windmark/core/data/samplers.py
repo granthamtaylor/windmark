@@ -1,9 +1,11 @@
+# Copyright Grantham Taylor.
+
 from random import random
 from typing import TypeAlias, Any, Iterator
 from functools import partial
 from enum import Enum
 
-from windmark.core.managers import SystemManager
+from windmark.core.constructs.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
 
 AnnotationType: TypeAlias = tuple[str, str, int]

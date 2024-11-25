@@ -1,25 +1,27 @@
+# Copyright Grantham Taylor.
+
 from pathlib import Path
 from functools import reduce
 
 from pytdigest import TDigest
 import numpy as np
-import flytekit as fk
+import flytekit as fl
 
 from windmark.core.constructs.general import Centroid, FieldRequest, FieldType
-from windmark.core.orchestration import task
-from windmark.core.processors import multithread, digest
+from windmark.core.data.processors import multithread, digest
+from windmark.orchestration.environments import context
 
 
-@task
+@context.default
 def create_digest_centroids_from_lifestream(
-    lifestreams: fk.FlyteDirectory,
+    lifestreams: fl.FlyteDirectory,
     field: FieldRequest,
 ) -> Centroid | None:
     """
     Creates digest centroids from the given lifestreams.
 
     Args:
-        lifestreams (fk.FlyteDirectory): The directory containing the lifestreams.
+        lifestreams (fl.FlyteDirectory): The directory containing the lifestreams.
         field (FieldRequest): The field to create digest centroids for.
 
     Returns:

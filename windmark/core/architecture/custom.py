@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 from functools import reduce
 import math
 import warnings
@@ -10,7 +12,7 @@ from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
 
 from windmark.core.constructs.general import Tokens
-from windmark.core.constructs.interface import TensorField
+from windmark.core.dev.interface import TensorField
 
 
 @jaxtyped(typechecker=beartype)

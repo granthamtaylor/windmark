@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 from functools import cache
 from typing import Type, TypeAlias, Any
 
@@ -7,64 +9,46 @@ from jaxtyping import Bool, Int
 from tensordict import tensorclass
 
 from windmark.core.constructs.general import FieldRequest, FieldType
-from windmark.core.managers import SystemManager
+from windmark.core.constructs.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
 
 
 @tensorclass
 class TargetField:
-    """
-    Represents a target field in the windmark system.
-
-    Attributes:
-        lookup (Int[torch.Tensor, "_N L"]): The lookup value for the target field.
-        is_masked (Bool[torch.Tensor, "_N L"]): Indicates whether the target field is masked or not.
-    """
+    """Represents a target field in the windmark system."""
 
     lookup: Int[torch.Tensor, "_N L"]
     is_masked: Bool[torch.Tensor, "_N L"]
 
 
 class TensorField:
-    """
-    Represents an abstract tensor field.
-
-    Attributes:
-        None
-    """
+    """Represents an abstract tensor field."""
 
     @classmethod
     def new(cls, values: Any, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-        pass
+        raise NotImplementedError
 
     def mask(self, is_event_masked: torch.Tensor, params: Hyperparameters) -> "TargetField":
-        pass
+        raise NotImplementedError
 
     def prune(self) -> None:
-        pass
+        raise NotImplementedError
 
     @classmethod
     def get_target_size(cls, params: Hyperparameters, manager: SystemManager, field: FieldRequest) -> int:
-        pass
+        raise NotImplementedError
 
     @classmethod
     def postprocess(cls, values: torch.Tensor, targets: torch.Tensor, params: Hyperparameters) -> torch.Tensor:
-        pass
+        raise NotImplementedError
 
     @classmethod
     def mock(cls, field: FieldRequest, params: Hyperparameters, manager: SystemManager) -> "TensorField":
-        pass
+        raise NotImplementedError
 
 
 class FieldEmbedder(torch.nn.Module):
     """Abstract template for a field embedder module"""
-
-    # def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
-    #     pass
-
-    # @jaxtyped(typechecker=beartype)
-    # def forward(self, inputs: TensorField) -> Float[torch.Tensor, "_N L C"]:
-    #     pass
 
 
 Registrant: TypeAlias = Type[TensorField] | Type[FieldEmbedder]

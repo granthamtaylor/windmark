@@ -1,23 +1,25 @@
+# Copyright Grantham Taylor.
+
 from pathlib import Path
 from collections import Counter
 from functools import reduce
 
-import flytekit as fk
+import flytekit as fl
 
-from windmark.core.managers import SchemaManager, SupervisedTaskManager, BalanceManager
-from windmark.core.orchestration import task
-from windmark.core.processors import multithread, count
+from windmark.core.constructs.managers import SchemaManager, SupervisedTaskManager, BalanceManager
+from windmark.core.data.processors import multithread, count
+from windmark.orchestration.environments import context
 
 
-@task
+@context.default
 def create_task_manager(
-    lifestreams: fk.FlyteDirectory, schema: SchemaManager, interpolation_rate: float
+    lifestreams: fl.FlyteDirectory, schema: SchemaManager, interpolation_rate: float
 ) -> SupervisedTaskManager:
     """
     Creates a task manager for supervised machine learning tasks.
 
     Args:
-        lifestreams (fk.FlyteDirectory): The directory containing the lifestreams.
+        lifestreams (fl.FlyteDirectory): The directory containing the lifestreams.
         schema (SchemaManager): The schema manager for the task.
         interpolation_rate (float): interpolation rate.
 

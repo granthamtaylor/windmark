@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import string
 import random
 import datetime
@@ -13,19 +15,14 @@ from torch.nn.functional import pad
 
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest, FieldType
 from windmark.core.architecture.custom import smoothen
-from windmark.core.managers import SystemManager
-from windmark.core.constructs.interface import TargetField, TensorField, FieldInterface
+from windmark.core.constructs.managers import SystemManager
+from windmark.core.dev.interface import TargetField, TensorField, FieldInterface
 
 
 @FieldInterface.register(FieldType.Categories)
 @tensorclass
 class DynamicCategoryField(TensorField):
-    """
-    Represents a dynamic category field in a tensor field.
-
-    Attributes:
-        lookup (Int[torch.Tensor, "_N L"]): The lookup tensor for the dynamic category field.
-    """
+    """Represents a dynamic category field in a tensor field."""
 
     lookup: Int[torch.Tensor, "_N L"]
 
@@ -145,12 +142,7 @@ class DynamicCategoryField(TensorField):
 @FieldInterface.register(FieldType.Category)
 @tensorclass
 class StaticCategoryField(TensorField):
-    """
-    Represents a static category field in a tensor field.
-
-    Attributes:
-        lookup (Int[torch.Tensor, "_N"]): The lookup tensor for the field.
-    """
+    """Represents a static category field in a tensor field."""
 
     lookup: Int[torch.Tensor, "_N"]  # noqa: F821
 
@@ -533,15 +525,7 @@ class StaticNumberField(TensorField):
 @FieldInterface.register(FieldType.Quantiles)
 @tensorclass
 class DynamicQuantileField(TensorField):
-    """
-    A class representing a dynamic quantile field.
-
-    Inherits from the `TensorField` class.
-
-    Attributes:
-        lookup (Int[torch.Tensor, "_N L"]): The lookup tensor.
-        content (Float[torch.Tensor, "_N L"]): The content tensor.
-    """
+    """A class representing a dynamic quantile field. Inherits from the `TensorField` class."""
 
     lookup: Int[torch.Tensor, "_N L"]
     content: Float[torch.Tensor, "_N L"]
@@ -575,10 +559,6 @@ class StaticQuantileField(TensorField):
     Represents a static quantile field.
 
     This class inherits from the `TensorField` class and provides functionality specific to static quantile fields.
-
-    Attributes:
-        lookup (Int[torch.Tensor, "_N"]): The lookup tensor for the quantile field.
-        content (Float[torch.Tensor, "_N"]): The content tensor for the quantile field.
     """
 
     lookup: Int[torch.Tensor, "_N"]  # noqa: F821

@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 from typing import Annotated
 from beartype import beartype
 from jaxtyping import Float, Int, jaxtyped
@@ -18,14 +20,7 @@ class SequenceData:
 
 @tensorclass
 class PretrainingData(SequenceData):
-    """
-    A class representing pretraining data for a machine learning model.
-
-    Attributes:
-        inputs (Annotated[TensorDict, TensorField]): The input data for pretraining.
-        targets (Annotated[TensorDict, TargetField]): The target data for pretraining.
-        meta (list[tuple[str, str]] | tuple[str, str]): Additional metadata for the pretraining data.
-    """
+    """A class representing pretraining data for a machine learning model."""
 
     inputs: Annotated[TensorDict, TensorField]
     targets: Annotated[TensorDict, TargetField]
@@ -50,14 +45,7 @@ class PretrainingData(SequenceData):
 
 @tensorclass
 class SupervisedData(SequenceData):
-    """
-    A class representing supervised data for machine learning tasks.
-
-    Attributes:
-        inputs (TensorDict): The input data for the model.
-        targets (torch.Tensor): The target data for the model.
-        meta (list[tuple[str, str]] | tuple[str, str]): Additional metadata for the data.
-    """
+    """A class representing supervised data for machine learning tasks."""
 
     inputs: Annotated[TensorDict, TensorField]
     targets: Int[torch.Tensor, "_N T"]
@@ -84,15 +72,7 @@ class SupervisedData(SequenceData):
 
 @tensorclass
 class OutputData:
-    """
-    Represents the output data of a model.
-
-    Attributes:
-        sequence (Float[torch.Tensor, "_N FdC"]): The sequence data.
-        decoded_events (TensorDict): The decoded events.
-        decoded_static_fields (TensorDict): The decoded static fields.
-        predictions (Float[torch.Tensor, "_N T"]): The predictions.
-    """
+    """Represents the output data of a model."""
 
     sequence: Float[torch.Tensor, "_N FdC"]
     decoded_events: TensorDict

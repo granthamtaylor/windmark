@@ -1,26 +1,28 @@
+# Copyright Grantham Taylor.
+
 from pathlib import Path
 import json
 
-import flytekit as fk
+import flytekit as fl
 
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.managers import SystemManager
-from windmark.core.orchestration import task
+from windmark.core.constructs.managers import SystemManager
+from windmark.orchestration.environments import context
 
 
-@task
-def stash_model_state(checkpoint: fk.FlyteFile, manager: SystemManager, params: Hyperparameters, label: str):
+@context.default
+def stash_model_state(checkpoint: fl.FlyteFile, manager: SystemManager, params: Hyperparameters, label: str):
     """
     Stash state required to reproduce a model.
 
     Args:
-        model (fk.FlyteFile): The model file to pretrain.
+        model (fl.FlyteFile): The model file to pretrain.
         manager (SystemManager): The system state manager.
         params (Hyperparameters): The hyperparameters for pretraining.
         label (str): The name for the experiment.
 
     Returns:
-        fk.FlyteDirectory
+        fl.FlyteDirectory
     """
 
     path = Path("./model") / label

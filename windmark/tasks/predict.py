@@ -1,37 +1,39 @@
+# Copyright Grantham Taylor.
+
 import torch
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import RichProgressBar
 from lightning.pytorch.loggers.wandb import WandbLogger
 
-import flytekit as fk
+import flytekit as fl
 
 from windmark.core.architecture.encoders import SequenceModule
-from windmark.core.callbacks import ParquetBatchWriter
-from windmark.core.managers import SystemManager
+from windmark.core.architecture.callbacks import ParquetBatchWriter
+from windmark.core.constructs.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.orchestration import task
+from windmark.orchestration.environments import context
 
 
-@task
+@context.lab
 def predict_sequence_encoder(
-    checkpoint: fk.FlyteFile,
-    lifestreams: fk.FlyteDirectory,
+    checkpoint: fl.FlyteFile,
+    lifestreams: fl.FlyteDirectory,
     params: Hyperparameters,
     manager: SystemManager,
     label: str,
-) -> fk.FlyteFile:
+) -> fl.FlyteFile:
     """
     Predicts the sequence using an encoder model.
 
     Args:
-        checkpoint (fk.FlyteFile): The checkpoint file containing the finetuned model.
-        lifestreams (fk.FlyteDirectory): The directory containing the input data.
+        checkpoint (fl.FlyteFile): The checkpoint file containing the finetuned model.
+        lifestreams (fl.FlyteDirectory): The directory containing the input data.
         params (Hyperparameters): The hyperparameters for the model.
         manager (SystemManager): The system state manager.
         label (str): The name for the experiment.
 
     Returns:
-        fk.FlyteFile: Model score predictions
+        fl.FlyteFile: Model score predictions
     """
 
     torch.set_float32_matmul_precision("medium")
@@ -45,10 +47,10 @@ def predict_sequence_encoder(
         mode="inference",
     )
 
-    out = fk.FlyteFile.new("predictions.parquet")
+    out = fl.FlyteFile.new("predictions.parquet")
 
     trainer = Trainer(
-        logger=WandbLogger(name="windmark", version=label),
+        logger=WandbLogger(project="windmark", name=label),
         precision="bf16-mixed",
         callbacks=[
             RichProgressBar(),

@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import os
 from pathlib import Path
 import random
@@ -8,12 +10,12 @@ import msgspec
 import torch
 from tensordict import TensorDict
 
-from windmark.core.managers import SystemManager
+from windmark.core.constructs.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.architecture.embedders import FieldInterface
 from windmark.core.constructs.packages import SupervisedData, PretrainingData, SequenceData
 
-from windmark.core.samplers import Sampler, sample as sample_fn
+from windmark.core.data.samplers import Sampler, sample as sample_fn
 
 
 AnnotationType: TypeAlias = tuple[str, str, int]

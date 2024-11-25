@@ -1,22 +1,24 @@
+# Copyright Grantham Taylor.
+
 from pathlib import Path
 from collections import Counter
 from functools import reduce
 
-import flytekit as fk
+import flytekit as fl
 
-from windmark.core.managers import LevelSet
-from windmark.core.constructs.interface import FieldRequest, FieldType
-from windmark.core.orchestration import task
-from windmark.core.processors import multithread, count
+from windmark.core.constructs.managers import LevelSet
+from windmark.core.dev.interface import FieldRequest, FieldType
+from windmark.core.data.processors import multithread, count
+from windmark.orchestration.environments import context
 
 
-@task
-def create_unique_levels_from_lifestream(lifestreams: fk.FlyteDirectory, field: FieldRequest) -> LevelSet | None:
+@context.default
+def create_unique_levels_from_lifestream(lifestreams: fl.FlyteDirectory, field: FieldRequest) -> LevelSet | None:
     """
     Create unique levels from a lifestream.
 
     Args:
-        lifestreams (fk.FlyteDirectory): The lifestream directory.
+        lifestreams (fl.FlyteDirectory): The lifestream directory.
         field (FieldRequest): The field to create levels for.
 
     Returns:

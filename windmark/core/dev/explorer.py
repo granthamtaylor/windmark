@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import random
 import os
 from pathlib import Path
@@ -10,7 +12,7 @@ from textual.binding import Binding
 from textual.containers import HorizontalScroll
 from textual.widgets import DataTable, TabbedContent, TabPane, Footer
 
-from windmark.core.managers import SchemaManager
+from windmark.core.constructs.managers import SchemaManager
 
 
 class LifestreamSampler:
@@ -18,10 +20,6 @@ class LifestreamSampler:
     A class representing a sampler for a lifestream dataset.
 
     This class provides methods to sample and retrieve dynamic and static data from a lifestream dataset.
-
-    Attributes:
-        schema (SchemaManager): The schema manager for the lifestream dataset.
-        df (pl.DataFrame): The DataFrame containing the sampled data from the lifestream dataset.
     """
 
     def __init__(self) -> None:

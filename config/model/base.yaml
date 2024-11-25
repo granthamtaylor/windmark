@@ -1,4 +1,4 @@
-n_pretrain_steps: 512
+n_pretrain_steps: 128
 n_finetune_steps: 64
 n_context: 80
 batch_size: 256

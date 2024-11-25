@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import os
 from typing import Sequence, Optional
 
@@ -18,11 +20,6 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
 
     Args:
         path (str | os.PathLike): The path to the Parquet file.
-
-    Attributes:
-        path (str): The path to the Parquet file.
-        schema: The schema of the Parquet file.
-        writer: The Parquet writer object.
     """
 
     def __init__(self, path: str | os.PathLike):
@@ -37,7 +34,7 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
         self,
         trainer: lit.Trainer,
         pl_module: lit.LightningModule,
-        output: tuple[torch.Tensor, torch.Tensor],
+        output: dict[str, torch.Tensor],
         batch_indices: Optional[Sequence[int]],
         batch: SupervisedData,
         batch_idx: int,
@@ -49,25 +46,20 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
         Args:
             trainer (lit.Trainer): The Lightning Trainer object.
             pl_module (lit.LightningModule): The Lightning Module object.
-            output (tuple[torch.Tensor, torch.Tensor]): The output tuple containing the predictions and representations.
+            output (dict[str, torch.Tensor]): The output containing the predictions and representations.
             batch_indices (Optional[Sequence[int]]): The indices of the batch.
             batch (SupervisedData): The batch data.
             batch_idx (int): The index of the batch.
             dataloader_idx (int): The index of the dataloader.
-
-        Returns:
-            None
         """
-
-        predictions, representations = output
 
         table = (
             pl.DataFrame(
                 {
                     "meta": batch.meta,
                     "targets": batch.targets.cpu().detach().numpy(),
-                    "predictions": predictions.float().cpu().detach().numpy(),
-                    "representations": representations.float().cpu().detach().numpy(),
+                    "predictions": output["predictions"].float().cpu().detach().numpy(),
+                    "representations": output["sequence"].float().cpu().detach().numpy(),
                 }
             )
             .select(
@@ -93,9 +85,6 @@ class ParquetBatchWriter(callbacks.BasePredictionWriter):
         Args:
             trainer (lit.Trainer): The Lightning Trainer object.
             pl_module (lit.LightningModule): The Lightning Module object.
-
-        Returns:
-            None
         """
         if self.writer:
             self.writer.close()

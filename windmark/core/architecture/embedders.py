@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import math
 
 import torch
@@ -6,8 +8,8 @@ from jaxtyping import Float, jaxtyped
 
 from windmark.core.constructs.general import Hyperparameters, Tokens, FieldRequest, FieldType
 from windmark.core.constructs.tensorfields import FieldInterface
-from windmark.core.managers import SystemManager
-from windmark.core.constructs.interface import FieldEmbedder, TensorField
+from windmark.core.constructs.managers import SystemManager
+from windmark.core.dev.interface import FieldEmbedder, TensorField
 from windmark.core.architecture.custom import validate, jitter
 
 
@@ -17,10 +19,6 @@ class DynamicCategoryFieldEmbedder(FieldEmbedder):
     Embedder for dynamic categorical fields.
 
     This class represents an embedder for dynamic categorical fields. It inherits from the `FieldEmbedder` base class.
-
-    Attributes:
-        field (FieldRequest): The field to be embedded.
-        embeddings (torch.nn.Embedding): The embedding layer for the field.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -53,11 +51,6 @@ class StaticCategoryFieldEmbedder(FieldEmbedder):
         params (Hyperparameters): The hyperparameters for the embedder.
         manager (SystemManager): The system manager.
         field (FieldRequest): The field to embed.
-
-    Attributes:
-        field (FieldRequest): The field to embed.
-        embeddings (torch.nn.Embedding): The embedding layer.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -92,11 +85,6 @@ class DynamicEntityFieldEmbedder(FieldEmbedder):
         params (Hyperparameters): The hyperparameters for the embedder.
         manager (SystemManager): The system manager.
         field (FieldRequest): The field request.
-
-    Attributes:
-        field (FieldRequest): The field request.
-        embeddings (torch.nn.Embedding): The embedding layer.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -129,13 +117,6 @@ class DynamicQuantileFieldEmbedder(FieldEmbedder):
         params (Hyperparameters): The hyperparameters for the embedder.
         manager (SystemManager): The system manager.
         field (FieldRequest): The field request.
-
-    Attributes:
-        field (FieldRequest): The field request.
-        embeddings (torch.nn.Embedding): The embedding layer.
-        jitter (torch.Tensor): The jitter value.
-        n_quantiles (torch.Tensor): The number of quantiles.
-        dampener (torch.Tensor): The dampener value.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -180,13 +161,6 @@ class StaticQuantileFieldEmbedder(FieldEmbedder):
         params (Hyperparameters): The hyperparameters for the embedder.
         manager (SystemManager): The system manager.
         field (FieldRequest): The field request.
-
-    Attributes:
-        field (FieldRequest): The field request.
-        embeddings (torch.nn.Embedding): The embedding layer.
-        jitter (torch.Tensor): The jitter tensor.
-        n_quantiles (torch.Tensor): The number of quantiles tensor.
-        dampener (torch.Tensor): The dampener tensor.
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -239,13 +213,6 @@ class DynamicNumberFieldEmbedder(FieldEmbedder):
         params (Hyperparameters): The hyperparameters for the embedding.
         manager (SystemManager): The system manager for the embedding.
         field (FieldRequest): The field request for the embedding.
-
-    Attributes:
-        field (FieldRequest): The field request for the embedding.
-        linear (torch.nn.Linear): The linear layer for projection.
-        weights (torch.Tensor): The weights for input weighting.
-        jitter (torch.Tensor): The jitter for input perturbation.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -311,12 +278,6 @@ class StaticNumberFieldEmbedder(FieldEmbedder):
         params (Hyperparameters): The hyperparameters for the embedder.
         manager (SystemManager): The system manager.
         field (FieldRequest): The field request.
-
-    Attributes:
-        field (FieldRequest): The field request.
-        linear (torch.nn.Linear): The linear layer for projection.
-        weights (torch.Tensor): The weights for input weighting.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):
@@ -373,13 +334,6 @@ class DynamicTemporalFieldEmbedder(FieldEmbedder):
         params (Hyperparameters): The hyperparameters for the embedder.
         manager (SystemManager): The system manager.
         field (FieldRequest): The field request.
-
-    Attributes:
-        field (FieldRequest): The field request.
-        linear (torch.nn.Linear): Linear layer for projection.
-        weights (torch.Tensor): Buffer of precision bands.
-        embeddings (torch.nn.ModuleDict): Module dictionary for embeddings.
-
     """
 
     def __init__(self, params: Hyperparameters, manager: SystemManager, field: FieldRequest):

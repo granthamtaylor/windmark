@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 from pathlib import Path
 from typing import Any
 import os

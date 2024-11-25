@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 # TODO Distribution of sequence lengths
 
 # TODO Distribution of continuous field values

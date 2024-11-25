@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import re
 import functools
 from collections import namedtuple
@@ -12,19 +14,17 @@ from pytdigest import TDigest
 class Tokens(IntEnum):
     """
     Enum class representing different types of tokens.
-
-    Attributes:
-        VAL (int): Value token.
-        UNK (int): Unknown token.
-        PAD (int): Padding token.
-        MASK (int): Mask token.
-        PRUNE (int): Prune token.
     """
 
+    # Value token.
     VAL = 0
+    # Unknown token.
     UNK = 1
+    # Padding token.
     PAD = 2
+    # Mask token.
     MASK = 3
+    # Prune token.
     PRUNE = 4
 
 
@@ -57,10 +57,6 @@ class FieldType(namedtuple("Field", ["name", "is_static"]), Enum):
 class FieldRequest:
     """
     Represents a field request object.
-
-    Attributes:
-        name (str): The name of the field.
-        fieldtype (str): The type of the field.
     """
 
     name: str
@@ -118,10 +114,6 @@ class FieldRequest:
 class LevelSet:
     """
     Represents a set of levels.
-
-    Attributes:
-        name (str): The name of the level set.
-        levels (list[str]): The list of levels in the set.
     """
 
     name: str
@@ -154,10 +146,6 @@ class LevelSet:
 class Centroid:
     """
     Represents a centroid with a name, an array of floats, and a validity flag.
-
-    Attributes:
-        name (str): The name of the centroid.
-        array (list[list[float]]): The array of floats representing the centroid.
     """
 
     name: str

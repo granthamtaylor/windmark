@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 import math
 import dataclasses
 import functools
@@ -13,16 +15,7 @@ from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest, F
 
 @dataclasses.dataclass
 class SchemaManager:
-    """
-    Manages the schema for Windmark data.
-
-    Attributes:
-        sequence_id (str): The sequence ID.
-        event_id (str): The event ID.
-        split_id (str): The split ID.
-        target_id (str): The target ID.
-        fields (list[FieldRequest]): The list of field requests.
-    """
+    """Manages the schema for Windmark data."""
 
     sequence_id: str
     event_id: str
@@ -71,9 +64,8 @@ class SchemaManager:
         )
 
     def __post_init__(self):
-        """
-        Perform additional initialization after the object has been created.
-        """
+        """Perform additional initialization after the object has been created."""
+
         assert len(self.fields) > 1, "must pass in at least two fields"
 
         reserved_names: set[str] = {self.sequence_id, self.event_id, self.split_id, self.target_id}
@@ -117,22 +109,7 @@ class SchemaManager:
 
 @dataclasses.dataclass
 class BalanceManager:
-    """
-    A class that manages the balance of class labels in a dataset.
-
-    Attributes:
-        labels (list[str]): The list of class labels.
-        counts (list[int]): The list of counts for each class label.
-        interpolation_rate (float): The rate value for interpolation.
-        unlabeled (int): The number of unlabeled instances.
-
-    Properties:
-        total (int): The total number of instances.
-        values (list[float]): The distribution of class labels.
-        interpolation (list[float]): The interpolated distribution of class labels.
-        thresholds (list[float]): The thresholds for each class label.
-        weights (list[float]): The loss weights for each class label.
-    """
+    """A class that manages the balance of class labels in a dataset."""
 
     labels: list[str]
     counts: list[int]
@@ -239,11 +216,6 @@ class SupervisedTaskManager:
     """
     A manager class for supervised learning tasks.
 
-    Attributes:
-        task (str): The type of supervised learning task. Must be either "classification" or "regression".
-        n_targets (int): The number of target variables.
-        balancer (BalanceManager): An instance of the BalanceManager class.
-
     Raises:
         AssertionError: If the task is not "classification" or "regression".
         AssertionError: If the number of targets is less than or equal to 1.
@@ -260,14 +232,7 @@ class SupervisedTaskManager:
 
 @dataclasses.dataclass
 class SplitManager:
-    """
-    A class that manages the splits for a dataset.
-
-    Attributes:
-        train (int): The size of the training split.
-        validate (int): The size of the validation split.
-        test (int): The size of the test split.
-    """
+    """A class that manages the splits for a dataset."""
 
     train: int
     validate: int
@@ -315,16 +280,7 @@ class SplitManager:
 
 @dataclasses.dataclass
 class SampleManager:
-    """
-    A class that manages the sampling rates for pretraining and finetuning in a machine learning task.
-
-    Attributes:
-        batch_size (int): The batch size used for training.
-        n_pretrain_steps (int): The number of pretraining steps.
-        n_finetune_steps (int): The number of finetuning steps.
-        task (SupervisedTaskManager): The task manager for the supervised learning task.
-        split (SplitManager): The split manager for the dataset.
-    """
+    """A class that manages the sampling rates for pretraining and finetuning in a machine learning task."""
 
     batch_size: int
     n_pretrain_steps: int
@@ -404,12 +360,7 @@ class SampleManager:
 
 @dataclasses.dataclass
 class CentroidManager:
-    """
-    A class that manages centroids and provides methods to calculate digests and display information.
-
-    Attributes:
-        centroids (list[Centroid]): The list of centroids to be managed.
-    """
+    """A class that manages centroids and provides methods to calculate digests and display information."""
 
     centroids: list[Centroid | None]
 
@@ -534,17 +485,7 @@ class LevelManager:
 
 @dataclasses.dataclass
 class SystemManager:
-    """
-    The SystemManager class manages various components of the system.
-
-    Attributes:
-        schema (SchemaManager): The schema manager for managing schemas.
-        task (SupervisedTaskManager): The task manager for managing supervised tasks.
-        sample (SampleManager): The sample manager for managing samples.
-        split (SplitManager): The split manager for managing splits.
-        centroids (CentroidManager): The centroid manager for managing centroids.
-        levelsets (LevelManager): The level manager for managing level sets.
-    """
+    """The SystemManager class manages various components of the system."""
 
     schema: SchemaManager
     task: SupervisedTaskManager

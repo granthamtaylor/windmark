@@ -1,4 +1,6 @@
-import flytekit as fk
+# Copyright Grantham Taylor.
+
+import flytekit as fl
 import torch
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import (
@@ -10,29 +12,29 @@ from lightning.pytorch.callbacks import (
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 from windmark.core.architecture.encoders import SequenceModule
-from windmark.core.managers import SystemManager
+from windmark.core.constructs.managers import SystemManager
 from windmark.core.constructs.general import Hyperparameters
-from windmark.core.orchestration import task
+from windmark.orchestration.environments import context
 
 
-@task(requests=fk.Resources(cpu="32", mem="64Gi"), cache_ignore_input_vars=tuple(["label"]))
+@context.lab
 def pretrain_sequence_encoder(
-    lifestreams: fk.FlyteDirectory,
+    lifestreams: fl.FlyteDirectory,
     params: Hyperparameters,
     manager: SystemManager,
     label: str,
-) -> fk.FlyteFile:
+) -> fl.FlyteFile:
     """
     Pretrains a sequence encoder model using the provided lifestreams, hyperparameters, and system manager.
 
     Args:
-        lifestreams (fk.FlyteDirectory): The directory containing the lifestreams data.
+        lifestreams (fl.FlyteDirectory): The directory containing the lifestreams data.
         params (Hyperparameters): The hyperparameters for pretraining.
         manager (SystemManager): The system state manager.
         label (str): The name for the experiment.
 
     Returns:
-        fk.FlyteFile: The path to the best model checkpoint file.
+        fl.FlyteFile: The path to the best model checkpoint file.
     """
 
     torch.set_float32_matmul_precision("medium")
@@ -46,11 +48,11 @@ def pretrain_sequence_encoder(
     )
 
     checkpointer = ModelCheckpoint(
-        dirpath=fk.current_context().working_directory, monitor="pretrain-total-validate/loss", filename=label
+        dirpath=fl.current_context().working_directory, monitor="pretrain-total-validate/loss", filename=label
     )
 
     trainer = Trainer(
-        logger=WandbLogger(name="windmark", version=label),
+        logger=WandbLogger(project="windmark", name=label),
         precision="bf16-mixed",
         gradient_clip_val=params.gradient_clip_val,
         max_epochs=params.max_pretrain_epochs,
@@ -74,4 +76,4 @@ def pretrain_sequence_encoder(
 
     trainer.test(module)
 
-    return fk.FlyteFile(checkpointer.best_model_path)
+    return fl.FlyteFile(checkpointer.best_model_path)

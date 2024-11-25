@@ -1,3 +1,5 @@
+# Copyright Grantham Taylor.
+
 from windmark.tasks.digest import create_digest_centroids_from_lifestream as digest
 from windmark.tasks.pretrain import pretrain_sequence_encoder as pretrain
 from windmark.tasks.finetune import finetune_sequence_encoder as finetune

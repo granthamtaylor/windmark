@@ -1,6 +1,8 @@
-from windmark.core.orchestration import task
+# Copyright Grantham Taylor.
+
+from windmark.orchestration.environments import context
 from windmark.core.constructs.general import Centroid, LevelSet
-from windmark.core.managers import (
+from windmark.core.constructs.managers import (
     SchemaManager,
     SupervisedTaskManager,
     SampleManager,
@@ -11,7 +13,7 @@ from windmark.core.managers import (
 )
 
 
-@task
+@context.default
 def create_system_manager(
     schema: SchemaManager,
     task: SupervisedTaskManager,
