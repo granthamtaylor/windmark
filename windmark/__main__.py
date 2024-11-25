@@ -1,23 +1,21 @@
 # Copyright Grantham Taylor.
 
-import os
-from pathlib import Path
-
-from hydra import compose, initialize
+import hydra
 import flytekit as fl
 
 from windmark.core.constructs.general import Hyperparameters
-from windmark.workflows.train import train
 from windmark.core.constructs.managers import SchemaManager
+from windmark.workflows.train import train
+
+
+@hydra.main(version_base=None, config_path="config", config_name="config")
+def windmark(config) -> None:
+    train(
+        lifestreams=fl.FlyteDirectory(config.data.path),
+        schema=SchemaManager.new(**config.data.structure),
+        params=Hyperparameters(**config.model),
+    )
+
 
 if __name__ == "__main__":
-    path = os.path.relpath(Path(os.getcwd()) / "config", Path(os.path.realpath(__file__)).parent)
-
-    with initialize(version_base=None, config_path=path):
-        config = compose(config_name="config")
-
-    lifestreams = fl.FlyteDirectory(str(config.data.path))
-    schema = SchemaManager.new(**config.data.structure, **config.data.fields)
-    params = Hyperparameters(**config.model)
-
-    train(lifestreams=lifestreams, schema=schema, params=params)
+    windmark()

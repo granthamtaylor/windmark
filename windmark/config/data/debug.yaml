@@ -1,0 +1,13 @@
+path: /home/grantham/windmark/data/lifestreams/trxns
+
+structure:
+  sequence_id: customer_id
+  event_id: transaction_id
+  split_id: split
+  target_id: is_fraud
+
+  fields:
+    merchant_state: categories
+    amount: quantiles
+    timestamp: timestamps
+    card: entities

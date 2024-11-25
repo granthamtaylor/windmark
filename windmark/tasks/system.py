@@ -30,8 +30,8 @@ def create_system_manager(
         task (SupervisedTaskManager): The supervised task manager object.
         sample (SampleManager): The sample manager object.
         split (SplitManager): The split manager object.
-        centroids (list[Centroid|None]): The centroid objects.
-        levelsets (list[LevelSet|None]): The levelset objects.
+        centroids (list[Centroid | None]): The centroid objects.
+        levelsets (list[LevelSet | None]): The levelset objects.
 
     Returns:
         SystemManager: The created system state manager.

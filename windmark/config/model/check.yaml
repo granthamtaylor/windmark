@@ -24,5 +24,4 @@ head_shape_log_base: 4
 gradient_clip_val: 0.2
 interpolation_rate: 0.08
 learning_rate_dampener: 0.1
-n_workers: 18
 predict_only_sequence_end: false

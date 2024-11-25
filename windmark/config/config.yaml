@@ -1,0 +1,3 @@
+defaults:
+  - data: trxns
+  - model: base

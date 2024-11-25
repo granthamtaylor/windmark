@@ -62,6 +62,7 @@ class FieldRequest:
     name: str
     fieldtype: str
 
+    # TODO I could probably clean this up
     @classmethod
     def new(cls, name: str, fieldtype: FieldType | str) -> "FieldRequest":
         """
@@ -85,9 +86,16 @@ class FieldRequest:
             else:
                 raise KeyError
 
-        assert re.match(r"^[a-z][a-z0-9_]*$", name), f"invalid field name {name}"
-
         return cls(name=name, fieldtype=str(fieldtype))
+
+    def __post_init__(self):
+        """
+        Checks if the field name is valid.
+
+        Raises:
+            AssertionError: If the field name is invalid.
+        """
+        assert re.match(r"^[a-z][a-z0-9_]*$", self.name), f"invalid field name {self.name}"
 
     @functools.cached_property
     def type(self) -> FieldType:

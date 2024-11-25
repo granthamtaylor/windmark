@@ -10,7 +10,7 @@ from rich.table import Table
 from rich.panel import Panel
 from pytdigest import TDigest
 
-from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest, FieldType
+from windmark.core.constructs.general import Centroid, LevelSet, FieldRequest
 
 
 @dataclasses.dataclass
@@ -23,6 +23,7 @@ class SchemaManager:
     target_id: str
     fields: list[FieldRequest]
 
+    # TODO I could probably clean this up
     @classmethod
     def new(
         cls,
@@ -30,7 +31,7 @@ class SchemaManager:
         event_id: str,
         split_id: str,
         target_id: str,
-        **fields: FieldType | str,
+        fields: dict[str, str],
     ) -> "SchemaManager":
         """
         Create a new instance of SchemaManager.
@@ -41,7 +42,7 @@ class SchemaManager:
             event_id: The event ID.
             split_id: The split ID.
             target_id: The target ID.
-            **fields: The fields of the schema.
+            fields: The fields of the schema.
 
         Returns:
             An instance of SchemaManager.
@@ -50,10 +51,7 @@ class SchemaManager:
             ValueError: If no dynamic fields are included.
 
         """
-        fields: list[FieldRequest] = [FieldRequest.new(*field) for field in fields.items()]
-
-        if len([field for field in fields if not field.type.is_static]) < 1:
-            raise ValueError("include at least one dynamic field")
+        fields: list[FieldRequest] = [FieldRequest.new(name, field) for name, field in fields.items()]
 
         return cls(
             sequence_id=sequence_id,
@@ -65,6 +63,9 @@ class SchemaManager:
 
     def __post_init__(self):
         """Perform additional initialization after the object has been created."""
+
+        if len([field for field in self.fields if not field.type.is_static]) < 1:
+            raise ValueError("include at least one dynamic field")
 
         assert len(self.fields) > 1, "must pass in at least two fields"
 

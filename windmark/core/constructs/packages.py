@@ -11,11 +11,7 @@ from windmark.core.constructs.tensorfields import TensorField, TargetField
 
 
 class SequenceData:
-    """
-    Represents a sequential data package.
-    """
-
-    pass
+    """Represents a sequential data package."""
 
 
 @tensorclass
@@ -36,9 +32,6 @@ class PretrainingData(SequenceData):
             inputs (TensorDict): The input data for pretraining.
             targets (TensorDict): The target data for pretraining.
             meta (tuple[str, ...]): Additional metadata for the pretraining data.
-
-        Returns:
-            PretrainingData: A new instance of the PretrainingData class.
         """
         return cls(inputs=inputs, targets=targets, meta=meta, batch_size=[1])
 
@@ -61,9 +54,6 @@ class SupervisedData(SequenceData):
             inputs (TensorDict): The input tensors.
             targets (torch.Tensor): The target tensor.
             meta (tuple[str, ...]): The metadata.
-
-        Returns:
-            cls: The new instance of the class.
         """
         targets = targets.unsqueeze(0)
 
@@ -97,9 +87,6 @@ class OutputData:
             decoded_events: A dictionary of decoded events.
             decoded_static_fields: A dictionary of decoded static fields.
             predictions: The predictions.
-
-        Returns:
-            An instance of the class with the given arguments.
         """
         assert sequence.shape[0] == decoded_events.shape[0] == decoded_static_fields.shape[0] == predictions.shape[0]
 

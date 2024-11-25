@@ -15,8 +15,4 @@ def create_experiment_label() -> str:
 
     fake = Faker()
 
-    address = fake.street_name().replace(" ", "-").lower()
-
-    # hashtag = ("").join(random.choice(string.ascii_uppercase) for _ in range(4))
-
-    return address
+    return fake.street_name().replace(" ", "-").lower()

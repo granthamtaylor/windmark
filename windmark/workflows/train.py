@@ -4,9 +4,9 @@ from functools import partial
 
 import flytekit as fl
 
+import windmark.tasks as lib
 from windmark.core.constructs.general import Hyperparameters
 from windmark.core.constructs.managers import SchemaManager
-import windmark.tasks as lib
 
 
 @fl.workflow
